@@ -1,4 +1,4 @@
-// Start npm start, then run: playwright-cli run-code --filename=scripts/ui-smoke.js
+// Run through browser-ci.cjs, which bundles the real RTC module with fixture signalling.
 // All account, room, and task requests use an in-browser fixture.
 async (page) => {
     const origin = new URL(page.url()).origin;
@@ -12,10 +12,9 @@ async (page) => {
     const fitsViewport = async () => assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Page overflows horizontally');
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
-    await page.route('https://cdn.jsdelivr.net/**', route => route.fulfill({ body: '', contentType: 'text/javascript' }));
     await page.route('https://open.spotify.com/**', route => route.fulfill({ body: '<body>Spotify player fixture</body>', contentType: 'text/html' }));
     await page.route('https://www.youtube.com/**', route => route.fulfill({ body: '<body style="background:#14221b;color:#9baa9c;font:12px sans-serif;padding:20px">Background audio preview</body>', contentType: 'text/html' }));
-    await page.route('**/js/modules/supabase.js', route => route.fulfill({ contentType: 'text/javascript', body: `
+    await page.route('https://cdn.jsdelivr.net/**', route => route.fulfill({ contentType: 'text/javascript', body: `window.supabase = { createClient() {
         const user = { id: 'test-user', email: 'alex@example.com' };
         const tables = { profiles: [{ id: user.id, display_name: 'Alex' }], rooms: [], tasks: [], sessions: [] };
         const fixture = window.__fixture = { tables, calls: [], delay: 0, fail: null, authFailure: false, collision: false, rpcError: null, channelCount: 0, handlers: {} };
@@ -66,7 +65,7 @@ async (page) => {
             async send(value) { fixture.calls.push({ action: 'send', value }); return fixture.sendStatus || 'ok'; },
             presenceState() { return { [user.id]: [this.presence || { username: 'Alex' }] }; }
         };
-        export default {
+        return {
             from, channel: () => { fixture.channelCount++; return channel; }, async removeChannel() { fixture.removed = true; },
             rpc: async () => {
                 fixture.calls.push({ action: 'rpc' });
@@ -78,7 +77,7 @@ async (page) => {
                 signInWithPassword: authResult, signUp: authResult, signOut: async () => {}
             }
         };
-    ` }));
+    } };` }));
     await page.addInitScript(() => {
         if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = async () => { throw new Error('Camera disabled for UI test'); };
     });
@@ -246,7 +245,7 @@ async (page) => {
     // Failed initial task reads offer a working retry.
     await page.evaluate(async () => {
         window.__fixture.fail = { table: 'tasks', action: 'select', throw: true };
-        await (await import('/js/modules/socket.js')).reloadTasks();
+        await window.__fixture.handlers['postgres_changes:*']();
     });
     await visible('#retry-tasks-btn');
     await page.getByRole('button', { name: 'Retry loading tasks', exact: true }).click();
@@ -322,7 +321,7 @@ async (page) => {
 
     // 1,000 incoming messages stay bounded and hostile markup stays inert.
     await page.evaluate(async () => {
-        const chat = await import('/js/modules/chat.js');
+        const chat = { handleIncomingMessage: payload => window.__fixture.handlers['broadcast:chat-message']({ payload }) };
         for (let i = 0; i < 1000; i++) chat.handleIncomingMessage({ sender: '<svg onload=alert(1)>', text: '<img src=x onerror=alert(1)> ' + i + 'x'.repeat(500) });
         chat.handleIncomingMessage(null);
     });
@@ -332,24 +331,28 @@ async (page) => {
 
     // A dense task list stays usable after repeated reconciliation.
     const taskTiming = await page.evaluate(async () => {
-        const ui = await import('/js/modules/ui.js');
-        const list = document.getElementById('room-task-list');
-        const tasks = Array.from({ length: 500 }, (_, i) => ({ id: 'stress-' + i, title: '<img src=x> Task ' + i + 'x'.repeat(70), completed: i % 2 === 0 }));
+        window.__fixture.savedTasks = structuredClone(window.__fixture.tables.tasks);
+        window.__fixture.tables.tasks = Array.from({ length: 500 }, (_, i) => ({
+            id: 'stress-' + i, room_id: 'test-room', created_by: 'test-user',
+            title: '<img src=x> Task ' + i + 'x'.repeat(70), completed: i % 2 === 0
+        }));
         const start = performance.now();
-        for (let i = 0; i < 5; i++) ui.renderTaskList(list, tasks, false, () => {}, () => {}, {}, () => {});
+        for (let i = 0; i < 5; i++) await window.__fixture.handlers['postgres_changes:*']();
         return Math.round(performance.now() - start);
     });
     assert(await page.locator('.task-item').count() === 500, 'Task stress rows must not duplicate');
     assert(await page.locator('.task-item img').count() === 0, 'Task titles must stay inert');
     console.log('500 task rows, 5 reconciliations: ' + taskTiming + 'ms');
-    await page.evaluate(async () => { (await import('/js/modules/tasks.js')).rerenderTasks(); });
+    await page.evaluate(async () => { window.__fixture.tables.tasks = window.__fixture.savedTasks; await window.__fixture.handlers['postgres_changes:*'](); });
 
 
     // Actual local WebRTC negotiation with synthetic media and host-only ICE.
     // Supabase signalling and provider endpoints remain mocked.
     await page.route('**/api/turn-credentials', () => {}); // Deliberately stalled: the client must time out and continue.
     const rtcResult = await page.evaluate(async () => {
-        const rtc = await import('/js/modules/rtc.js');
+        const rtc = await import('/__flow-test/rtc.js');
+        const probeVideo = document.createElement('video');
+        await rtc.initMedia(probeVideo);
         const NativePeer = window.RTCPeerConnection;
         window.RTCPeerConnection = class extends NativePeer { constructor() { super({ iceServers: [] }); } };
         let remote;
@@ -392,6 +395,8 @@ async (page) => {
         } finally {
             remote?.close();
             rtc.removePeer('loopback-test');
+            probeVideo.srcObject?.getTracks().forEach(track => track.stop());
+            rtc.cleanupDummyStream();
             window.RTCPeerConnection = NativePeer;
         }
     });
@@ -444,11 +449,10 @@ async (page) => {
 
     // Local timer rejects malformed peer state and completes without waiting 25 minutes.
     await page.evaluate(async () => {
-        const timer = await import('/js/modules/timer.js');
-        timer.syncState({ mode: 'unknown', timeLeft: -1, isRunning: true });
+        window.__fixture.handlers['broadcast:timer-updated']({ payload: { mode: 'unknown', timeLeft: -1, isRunning: true } });
     });
     assert(await page.locator('#time-display').innerText() === '30:00', 'Malformed peer state must be ignored');
-    await page.evaluate(async () => { (await import('/js/modules/timer.js')).syncState({ mode: 'focus', timeLeft: 0, duration: 60, isRunning: true }); });
+    await page.evaluate(() => { window.__fixture.handlers['broadcast:timer-updated']({ payload: { mode: 'focus', timeLeft: 0, duration: 60, isRunning: true } }); });
     await visible('#timer-alert-modal');
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
 
@@ -477,22 +481,17 @@ async (page) => {
     await page.getByRole('button', { name: 'Leave', exact: true }).click();
 
     const cleanup = await page.evaluate(async () => {
-        const rtc = await import('/js/modules/rtc.js');
-        const socket = await import('/js/modules/socket.js');
         const tracks = document.getElementById('local-video').srcObject.getTracks();
-        rtc.cleanupMedia();
-        const freshRtc = await import('/js/modules/rtc.js?cleanup-race');
+        const freshRtc = await import('/__flow-test/rtc.js?cleanup-race');
         const pendingPeer = freshRtc.getOrCreatePeerConnection('cancelled-peer', () => {}).then(() => false, () => true);
         freshRtc.cleanupMedia();
         const cancelledPeer = await pendingPeer;
-        await socket.disconnectSocket();
         const count = window.__fixture.channelCount;
+        document.getElementById('confirm-leave-btn').click();
         window.__fixture.status('CLOSED');
-        await new Promise(resolve => setTimeout(resolve, 1100));
-        return { ended: tracks.every(track => track.readyState === 'ended'), disconnected: socket.getSocket() === null, noReconnect: count === window.__fixture.channelCount, cancelledPeer };
+        return { ended: tracks.every(track => track.readyState === 'ended'), disconnected: window.__fixture.untracked, noReconnect: count === window.__fixture.channelCount, cancelledPeer };
     });
     assert(cleanup.ended && cleanup.disconnected && cleanup.noReconnect && cleanup.cancelledPeer, 'Leaving must stop tracks and prevent channel resurrection');
-    await page.getByRole('button', { name: 'Leave room', exact: true }).click();
     await visible('#join-modal');
     await fitsViewport();
     await page.screenshot({ path: 'output/playwright/after-lobby-mobile.png', fullPage: true });

@@ -1,13 +1,14 @@
-import { updatePresence as socketUpdatePresence, getMyUserId } from './socket.js';
-import supabase from './supabase.js';
-import { startFocus, pauseFocus, getLiveFocus, confirmFocus } from './focus-progress.js';
+import type { PresenceState } from '../types';
+import { updatePresence as socketUpdatePresence, getMyUserId } from './socket';
+import { getSupabase } from './supabase';
+import { startFocus, pauseFocus, getLiveFocus, confirmFocus } from './focus-progress';
 
-let currentState = { status: 'Online', nowPlaying: null, currentTask: 'Planning…', focusTime: 0 };
-let roomId = null;
-let updateUI = null;
-let focusInterval = null;
+let currentState: PresenceState = { status: 'Online', nowPlaying: null, currentTask: 'Planning…', focusTime: 0 };
+let roomId: string | null = null;
+let updateUI: ((state: PresenceState) => void) | null = null;
+let focusInterval: ReturnType<typeof setInterval> | null = null;
 let savedSeconds = 0;
-let savedIds = [];
+let savedIds: string[] = [];
 
 export const fetchDailyFocusTime = async () => {
     const userId = getMyUserId();
@@ -15,7 +16,7 @@ export const fetchDailyFocusTime = async () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     try {
-        const { data, error } = await supabase.from('sessions').select('id, duration_seconds').eq('user_id', userId).gte('completed_at', today.toISOString());
+        const { data, error } = await getSupabase().from('sessions').select('id, duration_seconds').eq('user_id', userId).gte('completed_at', today.toISOString());
         if (!error && data) {
             savedSeconds = data.reduce((sum, row) => sum + row.duration_seconds, 0);
             savedIds = data.map(row => row.id);
@@ -27,7 +28,7 @@ export const fetchDailyFocusTime = async () => {
     return false;
 };
 
-export const initPresence = (id, callback) => {
+export const initPresence = (id: string, callback: (state: PresenceState) => void) => {
     roomId = id;
     updateUI = callback;
     broadcastPresence();
@@ -36,7 +37,7 @@ export const initPresence = (id, callback) => {
     document.addEventListener('session-completed', fetchDailyFocusTime);
 };
 
-export const updatePresence = updates => {
+export const updatePresence = (updates: Partial<PresenceState>) => {
     currentState = { ...currentState, ...updates };
     broadcastPresence();
     renderPresence();
@@ -51,7 +52,7 @@ export const startFocusTracking = () => {
 
 export const stopFocusTracking = (status = 'On Break') => {
     pauseFocus();
-    clearInterval(focusInterval);
+    if (focusInterval) clearInterval(focusInterval);
     focusInterval = null;
     updatePresence({ status });
 };
@@ -66,7 +67,7 @@ function renderPresence() {
     document.dispatchEvent(new Event('focus-progress'));
 }
 
-export const formatFocusTime = minutes => {
+export const formatFocusTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const rest = minutes % 60;
     return hours ? hours + 'h ' + rest + 'm' : rest + 'm';

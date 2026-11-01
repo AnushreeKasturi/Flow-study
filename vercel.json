@@ -1,13 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "",
-  "outputDirectory": "public",
-  "installCommand": "npm ci --omit=dev",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm ci",
   "functions": {
     "api/*.js": {
       "maxDuration": 25,
-      "excludeFiles": "public/**"
+      "excludeFiles": "{public,src,dist}/**"
     }
   }
 }

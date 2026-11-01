@@ -1,14 +1,16 @@
-import supabase from './supabase.js';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { SocketHandlers, Participants, Participant, Signal, TimerState, AudioProvider } from '../types';
+import { getSupabase } from './supabase';
 
-let channel = null;
-let currentRoomId = null;
-let myUserId = null;
-let myUsername = null;
-let currentHandlers = null;
+let channel: RealtimeChannel | null = null;
+let currentRoomId: string | null = null;
+let myUserId = '';
+let myUsername = '';
+let currentHandlers: SocketHandlers | null = null;
 let currentIsDummyMedia = false;
 let currentHandRaised = false;
 let connectionGeneration = 0;
-let heartbeatInterval = null;
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 const HEARTBEAT_INTERVAL_MS = 20000;
 
 // A flat 3s retry on every CLOSED hammers the server at a fixed rate when
@@ -19,7 +21,7 @@ const HEARTBEAT_INTERVAL_MS = 20000;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_DELAY_MS = 30000;
 
-export const initSocket = (roomId, username, isDummyMedia, handlers) => {
+export const initSocket = (roomId: string, username: string, isDummyMedia: boolean, handlers: SocketHandlers) => {
     currentRoomId = roomId;
     myUsername = username;
     currentHandlers = handlers;
@@ -35,13 +37,13 @@ export const initSocket = (roomId, username, isDummyMedia, handlers) => {
 export const disconnectSocket = async () => {
     connectionGeneration++;
     currentRoomId = null;
-    clearInterval(heartbeatInterval);
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
     heartbeatInterval = null;
     const previous = channel;
     channel = null;
     if (previous) {
         try { await previous.untrack(); } catch { /* Teardown continues after a network failure. */ }
-        try { await supabase.removeChannel(previous); } catch { /* Generation guard already prevents reconnection. */ }
+        try { await getSupabase().removeChannel(previous); } catch { /* Generation guard already prevents reconnection. */ }
     }
 };
 
@@ -54,6 +56,7 @@ export const disconnectSocket = async () => {
 const connectChannel = () => {
     const roomId = currentRoomId;
     const handlers = currentHandlers;
+    if (!roomId || !handlers) return;
 
     // Guards against the subscribe() status callback firing more than once
     // for a single underlying failure (e.g. CHANNEL_ERROR immediately
@@ -65,16 +68,16 @@ const connectChannel = () => {
     handlers.onConnectionStatus?.('CONNECTING');
 
     if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
         heartbeatInterval = null;
     }
 
     if (channel) {
-        supabase.removeChannel(channel);
+        getSupabase().removeChannel(channel);
         channel = null;
     }
 
-    channel = supabase.channel(`room:${roomId}`, {
+    const activeChannel = channel = getSupabase().channel(`room:${roomId}`, {
         config: {
             presence: { key: myUserId },
             broadcast: { ack: true, self: false }
@@ -82,75 +85,75 @@ const connectChannel = () => {
     });
 
     const emitRoomState = () => {
-        const state = channel.presenceState();
-        const participants = {};
+        const state = activeChannel.presenceState<Participant>();
+        const participants: Participants = {};
         for (const [key, presences] of Object.entries(state)) {
             participants[key] = presences[0];
         }
         handlers.onRoomState({ participants });
     };
 
-    channel.on('presence', { event: 'sync' }, emitRoomState);
+    activeChannel.on('presence', { event: 'sync' }, emitRoomState);
 
-    channel.on('presence', { event: 'join' }, ({ key, newPresences }) => {
+    activeChannel.on('presence', { event: 'join' }, ({ key, newPresences }) => {
         if (key !== myUserId) {
             handlers.onUserJoined({ userId: key, ...newPresences[0] });
         }
     });
 
-    channel.on('presence', { event: 'leave' }, ({ key }) => {
+    activeChannel.on('presence', { event: 'leave' }, ({ key }) => {
         if (key !== myUserId) {
             handlers.onUserLeft(key);
         }
     });
 
-    channel.on('broadcast', { event: 'signal' }, ({ payload }) => {
+    activeChannel.on('broadcast', { event: 'signal' }, ({ payload }) => {
         if (payload?.to === myUserId) {
             handlers.onSignal({ from: payload.from, signal: payload.signal });
         }
     });
 
-    channel.on('broadcast', { event: 'youtube-sync' }, ({ payload }) => {
+    activeChannel.on('broadcast', { event: 'youtube-sync' }, ({ payload }) => {
         if (typeof payload?.url === 'string') handlers.onYouTubeSync?.(payload.url);
     });
-    channel.on('broadcast', { event: 'audio-sync' }, ({ payload }) => {
+    activeChannel.on('broadcast', { event: 'audio-sync' }, ({ payload }) => {
         if (payload?.provider === 'spotify' && typeof payload.url === 'string') handlers.onAudioSync?.(payload.provider, payload.url);
     });
 
-    channel.on('broadcast', { event: 'timer-updated' }, ({ payload }) => {
+    activeChannel.on('broadcast', { event: 'timer-updated' }, ({ payload }) => {
         handlers.onTimerUpdated(payload);
     });
 
-    channel.on('broadcast', { event: 'chat-message' }, ({ payload }) => {
-        handlers.onChatMessage(payload);
+    activeChannel.on('broadcast', { event: 'chat-message' }, ({ payload }) => {
+        handlers.onChatMessage?.(payload);
     });
 
-    channel.on('broadcast', { event: 'reaction' }, ({ payload }) => {
+    activeChannel.on('broadcast', { event: 'reaction' }, ({ payload }) => {
         handlers.onReaction?.(payload);
     });
 
     // Cheap fallback for the rare case where a presence 'join' diff is
     // silently dropped (channel stays healthy on both ends, so nothing ever
-    // errors or reconnects, but one client's presenceState() permanently
+    // errors or reconnects, but one client's presenceState<Participant>() permanently
     // never learns about a participant who is genuinely there). Every
     // client periodically broadcasts its own identity; anyone who doesn't
     // already know about the sender treats it as a missed join and self-
     // heals from the payload. Pure broadcast — never touches the presence
     // channel's join/leave lifecycle, so unlike rebuilding the whole
     // channel, it's invisible to everyone else (no phantom leave+rejoin).
-    channel.on('broadcast', { event: 'presence-heartbeat' }, ({ payload }) => {
+    activeChannel.on('broadcast', { event: 'presence-heartbeat' }, ({ payload }) => {
         if (payload?.userId && payload.userId !== myUserId) {
             handlers.onPresenceHeartbeat?.(payload);
         }
     });
 
-    channel.on(
+    activeChannel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tasks', filter: `room_id=eq.${roomId}` },
         () => fetchTasks(roomId, handlers.onRoomTasksUpdate, handlers.onTasksError)
     );
 
-    channel.subscribe(async function onStatus(status, err) {
+    activeChannel.subscribe(async function onStatus(status: string, err?: Error) {
         // Ignore callbacks from a channel instance that's already been
         // superseded by a newer connectChannel() call.
         if (myGeneration !== connectionGeneration) return;
@@ -160,7 +163,7 @@ const connectChannel = () => {
         if (status === 'SUBSCRIBED') {
             try {
                 reconnectAttempts = 0;
-                await channel.track({
+                await activeChannel.track({
                     username: myUsername,
                     status: 'Online',
                     nowPlaying: null,
@@ -173,7 +176,7 @@ const connectChannel = () => {
 
                 const sendHeartbeat = () => {
                     if (myGeneration !== connectionGeneration) return;
-                    channel.send({
+                    activeChannel.send({
                         type: 'broadcast',
                         event: 'presence-heartbeat',
                         payload: { userId: myUserId, username: myUsername, isDummyMedia: currentIsDummyMedia }
@@ -193,9 +196,9 @@ const connectChannel = () => {
     });
 };
 
-const fetchTasks = async (roomId, callback, onError) => {
+const fetchTasks = async (roomId: string, callback: SocketHandlers['onRoomTasksUpdate'], onError?: () => void) => {
     try {
-        const { data, error } = await supabase.from('tasks').select('*').eq('room_id', roomId).order('created_at', { ascending: true });
+        const { data, error } = await getSupabase().from('tasks').select('*').eq('room_id', roomId).order('created_at', { ascending: true });
         if (error) throw error;
         if (currentRoomId === roomId && Array.isArray(data)) callback({ tasks: data });
     } catch {
@@ -203,7 +206,7 @@ const fetchTasks = async (roomId, callback, onError) => {
     }
 };
 export const reloadTasks = () => {
-    if (currentRoomId) return fetchTasks(currentRoomId, currentHandlers.onRoomTasksUpdate, currentHandlers.onTasksError);
+    if (currentRoomId && currentHandlers) return fetchTasks(currentRoomId, currentHandlers.onRoomTasksUpdate, currentHandlers.onTasksError);
 };
 
 export const getSocket = () => channel;
@@ -212,11 +215,11 @@ export const getMyUserId = () => myUserId;
 // Changes the name broadcast in this client's own presence going forward.
 // Doesn't re-track by itself — callers should follow up with a presence
 // update (e.g. presence.js's updatePresence) to actually push it out.
-export const updateMyUsername = (username) => {
+export const updateMyUsername = (username: string) => {
     myUsername = username;
 };
 
-export const sendSignal = (to, signal) => {
+export const sendSignal = (to: string, signal: Signal) => {
     if (!channel) return;
     channel.send({
         type: 'broadcast',
@@ -225,7 +228,7 @@ export const sendSignal = (to, signal) => {
     });
 };
 
-export const updateTimer = (roomId, action, payload) => {
+export const updateTimer = (_roomId: string | null, action: string, payload: Partial<TimerState>) => {
     if (!channel) return;
     channel.send({
         type: 'broadcast',
@@ -234,10 +237,10 @@ export const updateTimer = (roomId, action, payload) => {
     });
 };
 
-export const updatePresence = async (roomId, status, nowPlaying) => {
+export const updatePresence = async (_roomId: string | null, status: string, nowPlaying?: string | null) => {
     if (!channel) return;
-    const state = channel.presenceState();
-    const myState = state[myUserId] ? state[myUserId][0] : {};
+    const state = channel.presenceState<Participant>();
+    const myState: Participant = state[myUserId] ? state[myUserId][0] : {};
 
     await trackPresence({
         ...myState,
@@ -247,9 +250,9 @@ export const updatePresence = async (roomId, status, nowPlaying) => {
     });
 };
 
-export const updateCameraState = async (isVideoActive) => {
+export const updateCameraState = async (isVideoActive: boolean) => {
     if (!channel) return;
-    const state = channel.presenceState();
+    const state = channel.presenceState<Participant>();
     const myState = state[myUserId] ? state[myUserId][0] : {};
 
     await trackPresence({
@@ -258,7 +261,7 @@ export const updateCameraState = async (isVideoActive) => {
     });
 };
 
-export const sendReaction = (emoji) => {
+export const sendReaction = (emoji: string) => {
     if (!channel) return;
     channel.send({
         type: 'broadcast',
@@ -272,10 +275,10 @@ export const sendReaction = (emoji) => {
 // needs to survive a channel reconnect (presence re-syncs fully on every
 // reconnect; a plain broadcast sent during a reconnect gap would just be
 // lost, silently dropping the request).
-export const sendHandRaise = async (raised) => {
+export const sendHandRaise = async (raised: boolean) => {
     currentHandRaised = raised;
     if (!channel) return;
-    const state = channel.presenceState();
+    const state = channel.presenceState<Participant>();
     const myState = state[myUserId] ? state[myUserId][0] : {};
     await trackPresence({
         ...myState,
@@ -283,7 +286,7 @@ export const sendHandRaise = async (raised) => {
     });
 };
 
-export const broadcastYouTube = (url) => {
+export const broadcastYouTube = (url: string) => {
     if (!channel) return;
     return channel.send({
         type: 'broadcast',
@@ -292,12 +295,12 @@ export const broadcastYouTube = (url) => {
     });
 };
 
-export const broadcastAudio = (provider, url) => {
+export const broadcastAudio = (provider: AudioProvider, url: string) => {
     if (provider === 'youtube') return broadcastYouTube(url);
     if (channel && provider === 'spotify') return channel.send({ type: 'broadcast', event: 'audio-sync', payload: { provider, url } });
 };
 
-async function trackPresence(payload) {
+async function trackPresence(payload: Participant) {
     const current = channel;
     if (!current) return;
     try {

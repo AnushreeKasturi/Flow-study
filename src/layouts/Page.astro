@@ -1,0 +1,14 @@
+---
+import Head from '../components/Head.astro';
+interface Props { bodyClass?: string; }
+const { bodyClass } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+    <head><Head /><slot name="head" /></head>
+    <body class={bodyClass}>
+        <slot />
+        <script is:inline src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script>import '../client/speed-insights';</script>
+    </body>
+</html>

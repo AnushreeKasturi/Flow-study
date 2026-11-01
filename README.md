@@ -1,6 +1,8 @@
 # Flow.
 
 [![CI](https://github.com/ManasDasri/Flow-study/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ManasDasri/Flow-study/actions/workflows/ci.yml)
+[![Astro](https://img.shields.io/badge/Astro-7-bc52ee)](https://astro.build/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-22%20%7C%2024%20%7C%2026-5f8056)](https://nodejs.org/)
 [![Open Flow](https://img.shields.io/badge/demo-flow--study.me-b6d3ac)](https://flow-study.me)
 
@@ -23,19 +25,28 @@ A shared study room for focused work. Bring your group, set a timer, and work th
 
 ## Run locally
 
-Use Node.js 22, 24, or 26. CI exercises all three.
+Use Node.js 22.23.4 or newer. CI exercises the latest releases of Node 22, 24, and 26.
 
 ```sh
 git clone https://github.com/ManasDasri/Flow-study.git
 cd Flow-study
 npm ci
 cp .env.example .env
+npm run dev
+```
+
+Open `http://localhost:4321`. Astro provides live reload and forwards `/api/*` to the existing Express handlers.
+
+To run the production build locally:
+
+```sh
+npm run build
 npm start
 ```
 
-Open `http://localhost:3000`. Set `PORT` to use another port.
+The production server uses `http://localhost:3000`; set `PORT` to change that port.
 
-The browser connects to the Supabase project configured in [`public/js/modules/supabase.js`](public/js/modules/supabase.js). For your own deployment, replace its project URL and **public publishable/anon key** with your project's values. Never put a service-role key in browser code.
+The browser connects to the Supabase project configured in [`src/client/modules/supabase.ts`](src/client/modules/supabase.ts). For your own deployment, replace its project URL and **public publishable/anon key** with your project's values. Never put a service-role key in browser code.
 
 ### Server configuration
 
@@ -80,7 +91,18 @@ Generation loads Instrument Sans from Google Fonts; the deployed PNG has no font
 
 ## Architecture
 
-The frontend is HTML, CSS, and browser JavaScript modules. Instrument Sans and an outlined `f.` mark provide the visual identity.
+Astro generates static HTML from typed pages and reusable components. Strict TypeScript powers the interactive room modules, and Vite bundles and fingerprints JavaScript/CSS into `dist/_astro`. GSAP adds a single entry reveal and short responses to opening dialogs, switching panels, and completing tasks. Motion follows the system preference, including changes during a visit. Instrument Sans and an outlined `f.` mark preserve the visual identity.
+
+| Location | Responsibility |
+| --- | --- |
+| `src/pages` | Login and room page templates |
+| `src/layouts`, `src/components` | Shared metadata, page layout, room sections, and dialogs |
+| `src/client` | Typed browser behavior, service models, and motion |
+| `src/styles` | Shared design tokens, themes, and responsive layouts |
+| `public` | Images, favicon, and social preview copied unchanged to the build |
+| `api`, `server.js` | AI/TURN functions and the conventional Node server |
+
+No client framework runtime is needed. Pages are generated at build time, while rooms remain fully interactive in the browser.
 
 Express serves the site and the AI/TURN endpoints. Supabase handles authentication, PostgreSQL persistence, task changes, presence, and room broadcasts. WebRTC carries camera and microphone media between peers, with TURN relay support when configured. Groq handles assistant requests through the server. Room chat and broadcasts are transient; tasks, profiles, and completed sessions are stored.
 
@@ -106,7 +128,7 @@ GitHub Actions runs on pull requests to `main`, pushes/merges to `main`, and man
 
 | Check | What it verifies |
 | --- | --- |
-| Node.js 22 / 24 / 26 | JavaScript parsing, HTTP boundaries, local concurrency, URL validation, and focus accounting |
+| Node.js 22 / 24 / 26 | Strict Astro/TypeScript checks, production builds, JavaScript parsing, HTTP boundaries, local concurrency, URL validation, and focus accounting |
 | PostgreSQL 17 | Both schema variants, migration repeatability, preserved data, room/PIN access, and task policies |
 | Chromium | Complete interactive flows, failure recovery, stress fixtures, and ten responsive tool layouts |
 | Dependency audit | Production dependencies fail the job on reported high/critical vulnerabilities |
@@ -115,8 +137,8 @@ Browser screenshots, results, and failure traces are uploaded as `browser-diagno
 
 ## Deploy
 
-For free CDN hosting, use the included `vercel.json`: the `public` directory is served directly by the CDN, and the two files in `api` expose the existing Express endpoints as Node functions. This keeps Render's web-service startup out of page loads. See [HOSTING.md](HOSTING.md) for credentials, domain cutover, verification, and rollback.
+For free CDN hosting, use the included `vercel.json`: Astro builds the `dist` directory, which is served directly by the CDN, and the two files in `api` expose the existing Express endpoints as Node functions. This keeps Render's web-service startup out of page loads. See [HOSTING.md](HOSTING.md) for credentials, domain cutover, verification, and rollback.
 
-Conventional Node hosting remains supported with `npm ci --omit=dev` and `npm start`. Serve the public site over HTTPS for camera/microphone access. Keep server credentials in the host's secret settings.
+Conventional Node hosting remains supported with `npm ci`, `npm run build`, and `npm start`. Build dependencies must be installed before generating `dist`. Serve the public site over HTTPS for camera/microphone access. Keep server credentials in the host's secret settings.
 
 Before a wider launch, validate live authentication, two-account room behavior, physical media across networks, TURN, provider success paths, and browser compatibility. Local fixture stress checks are documented measurements, not a hosted-capacity guarantee.

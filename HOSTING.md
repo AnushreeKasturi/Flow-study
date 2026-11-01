@@ -8,13 +8,13 @@ This removes Render's sleeping web service from the page-delivery path. Function
 
 - Project: `flow-study`, in `manas-projects-e9259329` (verified Hobby scope).
 - Framework: Other; `vercel.json` explicitly sets `framework: null`.
-- Build command: empty; no frontend compilation is needed.
-- Output directory: `public`.
-- Install command: `npm ci --omit=dev`.
-- API functions reuse the tested Express handlers; public files are excluded from their bundles.
+- Build command: `npm run build` (Astro static generation).
+- Output directory: `dist`.
+- Install command: `npm ci`; TypeScript and build tools are needed during deployment.
+- API functions reuse the tested Express handlers; `public`, `src`, and `dist` are excluded from their bundles. Set Node.js to a supported version (at least 22.23.4).
 - Git repository: `ManasDasri/Flow-study`, production branch `main`.
 
-The project is connected to GitHub for automatic deployments after merges. Keep the existing GitHub CI checks enabled. Deployment files and local credentials under `.vercel` are ignored by Git; only `public` is statically served, and `.env`, SQL, tests, and screenshots are excluded from uploads.
+The project is connected to GitHub for automatic deployments after merges. Keep the existing GitHub CI checks enabled. Deployment files and local credentials under `.vercel` are ignored by Git; only the generated `dist` directory is statically served, and `.env`, SQL, tests, and screenshots are excluded from uploads.
 
 ## Move server credentials
 
@@ -41,17 +41,17 @@ Do not put these values in public files, Git, or chat. Existing Supabase public 
 Current domain configuration is visible at:
 https://vercel.com/manas-projects-e9259329/flow-study/settings/domains
 
-At preparation time, Namecheap serves the apex A record `216.24.57.1` for Render. Vercel's API recommends `216.198.79.1` as the primary replacement. In Namecheap Advanced DNS, edit the A record with host `@` to that value, keeping TTL Automatic. Re-check Vercel's domain settings before applying a later cutover. Do not change nameservers or unrelated MX/TXT records. The saved Render value is the rollback destination.
+The apex A record was switched from Render (`216.24.57.1`) to Vercel (`216.198.79.1`) on October 31, 2026. Re-check Vercel's domain settings before any later DNS change. Do not change nameservers or unrelated MX/TXT records. The saved Render value is the rollback destination.
 
 ## Latency and limits
 
-Both pages load the native HTML Speed Insights integration. It loads Vercel's deferred performance script on the custom domain and Vercel deployment URLs, strips query strings/fragments from reported URLs, and stays disabled on localhost. Enable Speed Insights in the project's dashboard to see incoming real-user measurements; no Next.js component or frontend build is required. The fixture browser suite intercepts telemetry so synthetic stress runs do not enter the dashboard. No paid Insights upgrade is enabled by this code.
+Both pages load the native HTML Speed Insights integration. It loads Vercel's deferred performance script on the custom domain and Vercel deployment URLs, strips query strings/fragments from reported URLs, and stays disabled on localhost. Enable Speed Insights in the project's dashboard to see incoming real-user measurements; the integration is bundled by Astro and does not require a Next.js component. The fixture browser suite intercepts telemetry so synthetic stress runs do not enter the dashboard. No paid Insights upgrade is enabled by this code.
 
 The browser loads the site without waiting for an API function. Groq has a 15-second request deadline without SDK retries. Twilio token requests have a four-second deadline, and the browser stops waiting for TURN after five seconds and continues with STUN. STUN-only calls may still fail on restrictive networks; a working TURN configuration remains important.
 
 The existing API request limits remain in Express. Those counters are local to each function instance, so they are not a global distributed quota. Monitor provider and Hobby usage before increasing traffic; distributed quotas can be added when needed.
 
-Local development remains `npm ci` followed by `npm start`. No Astro or design migration is included in this hosting change.
+Local development uses `npm ci` followed by `npm run dev` on port 4321. For the production server, run `npm run build` and then `npm start`. The Astro migration changes page generation and bundling without changing the database or provider endpoints.
 
 To run the isolated browser fixture suite against a deployed frontend instead of a local server:
 

@@ -1,13 +1,14 @@
-import { getSocket } from './socket.js';
-import { notify } from './feedback.js';
+import { byId } from '../dom';
+import { getSocket } from './socket';
+import { notify } from './feedback';
 
-let username = null;
+let username: string | null = null;
 let aiPending = false;
-const chatMessages = document.getElementById('chat-messages');
-const chatInput = document.getElementById('chat-input');
-const sendBtn = document.getElementById('send-chat-btn');
+const chatMessages = byId<HTMLElement>('chat-messages');
+const chatInput = byId<HTMLTextAreaElement>('chat-input');
+const sendBtn = byId<HTMLButtonElement>('send-chat-btn');
 
-export const initChat = (roomId, user) => {
+export const initChat = (_roomId: string, user: string) => {
     username = user;
     sendBtn.onclick = sendMessage;
     chatInput.onkeydown = event => {
@@ -15,8 +16,8 @@ export const initChat = (roomId, user) => {
     };
 };
 
-export const handleIncomingMessage = message => {
-    if (!message || typeof message.text !== 'string' || typeof message.sender !== 'string') return;
+export const handleIncomingMessage = (message: unknown) => {
+    if (!message || typeof message !== 'object' || !('text' in message) || !('sender' in message) || typeof message.text !== 'string' || typeof message.sender !== 'string') return;
     const sender = message.sender.slice(0, 80);
     const text = message.text.slice(0, 4000);
     const div = document.createElement('div');
@@ -29,7 +30,7 @@ export const handleIncomingMessage = message => {
     div.append(name, body);
     chatMessages.append(div);
     // Keep this ephemeral conversation bounded during long study sessions.
-    while (chatMessages.children.length > 300) chatMessages.firstElementChild.remove();
+    while (chatMessages.children.length > 300) chatMessages.firstElementChild!.remove();
     chatMessages.scrollTop = chatMessages.scrollHeight;
 };
 
@@ -56,7 +57,7 @@ async function sendMessage() {
     if (!query) { notify('Add a question after /ai to ask the study assistant.'); return; }
     chatInput.value = '';
     aiPending = true;
-    const pending = document.getElementById('ai-pending');
+    const pending = byId<HTMLElement>('ai-pending');
     pending.classList.remove('hidden');
     try {
         const response = await fetch('/api/ai', {

@@ -1,14 +1,15 @@
-import { sendSignal, getMyUserId } from './socket.js';
+import type { SignalMessage, RemoteStream } from '../types';
+import { sendSignal, getMyUserId } from './socket';
 
-let localStream = null;
+let localStream: MediaStream | null = null;
 let mediaGeneration = 0;
-const peers = {};
-const makingOffer = {};
-const candidateQueues = {};
-const pendingPeers = {};
-const remoteStreams = {};
+const peers: Record<string, RTCPeerConnection> = {};
+const makingOffer: Record<string, boolean> = {};
+const candidateQueues: Record<string, RTCIceCandidateInit[]> = {};
+const pendingPeers: Partial<Record<string, Promise<RTCPeerConnection>>> = {};
+const remoteStreams: Record<string, MediaStream> = {};
 
-const DEFAULT_ICE = {
+const DEFAULT_ICE: RTCConfiguration = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
@@ -17,9 +18,9 @@ const DEFAULT_ICE = {
 };
 
 let iceConfig = { ...DEFAULT_ICE };
-let fetchTurnPromise = null;
+let fetchTurnPromise: Promise<void> | null = null;
 
-const serializeCandidate = (candidate) => {
+const serializeCandidate = (candidate: RTCIceCandidate | null) => {
     if (!candidate) return null;
     if (typeof candidate.toJSON === 'function') return candidate.toJSON();
     return {
@@ -39,7 +40,7 @@ const fetchTurnCredentials = async () => {
             const data = await response.json();
             if (Array.isArray(data.iceServers) && data.iceServers.length) {
                 iceConfig = {
-                    iceServers: [...DEFAULT_ICE.iceServers, ...data.iceServers]
+                    iceServers: [...(DEFAULT_ICE.iceServers || []), ...data.iceServers]
                 };
             }
         } catch (e) {
@@ -49,16 +50,16 @@ const fetchTurnCredentials = async () => {
     return fetchTurnPromise;
 };
 
-export const hasPeer = (userId) => !!peers[userId];
+export const hasPeer = (userId: string) => !!peers[userId];
 
 // 'disconnected' is a normal transient ICE blip that usually self-recovers
 // in a second or two — tearing down on it immediately just recreates the
 // flicker this is meant to fix. Only treat it as broken once it's been
 // stuck for a while.
 const DISCONNECT_GRACE_MS = 6000;
-const disconnectedSince = {};
+const disconnectedSince: Record<string, number> = {};
 
-export const peerNeedsCall = (userId) => {
+export const peerNeedsCall = (userId: string) => {
     const pc = peers[userId];
     if (!pc) return true;
     const state = pc.connectionState;
@@ -68,15 +69,15 @@ export const peerNeedsCall = (userId) => {
 
 export let isDummyMedia = false;
 
-let dummyRAFId = null;
-let dummyAudioCtx = null;
-let dummyOscillator = null;
+let dummyRAFId: number | null = null;
+let dummyAudioCtx: AudioContext | null = null;
+let dummyOscillator: OscillatorNode | null = null;
 
 const createDummyStream = () => {
     const canvas = document.createElement('canvas');
     canvas.width = 1;
     canvas.height = 1;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d')!;
 
     const draw = () => {
         ctx.fillStyle = '#000000';
@@ -87,7 +88,7 @@ const createDummyStream = () => {
 
     const canvasStream = canvas.captureStream(15);
 
-    dummyAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    dummyAudioCtx = new (window.AudioContext || window.webkitAudioContext!)();
     const destination = dummyAudioCtx.createMediaStreamDestination();
     dummyOscillator = dummyAudioCtx.createOscillator();
     const gainNode = dummyAudioCtx.createGain();
@@ -126,7 +127,7 @@ export const cleanupMedia = () => {
     document.querySelectorAll('video').forEach(video => { video.srcObject = null; });
 };
 
-export const initMedia = async (videoEl) => {
+export const initMedia = async (videoEl: HTMLVideoElement) => {
     const generation = ++mediaGeneration;
     isDummyMedia = false;
     try {
@@ -194,7 +195,7 @@ export const isVideoActive = () => {
 
 
 
-export const getOrCreatePeerConnection = async (userId, onRemoteStream) => {
+export const getOrCreatePeerConnection = async (userId: string, onRemoteStream: RemoteStream) => {
     if (peers[userId] && peers[userId].signalingState !== 'closed') return peers[userId];
     if (pendingPeers[userId]) return pendingPeers[userId];
 
@@ -209,7 +210,7 @@ export const getOrCreatePeerConnection = async (userId, onRemoteStream) => {
 
         if (localStream) {
             localStream.getTracks().forEach((track) => {
-                pc.addTrack(track, localStream);
+                pc.addTrack(track, localStream!);
             });
         }
 
@@ -225,7 +226,7 @@ export const getOrCreatePeerConnection = async (userId, onRemoteStream) => {
                 remoteStreams[userId] = stream;
             }
             stream.addTrack(event.track);
-            
+
             if (event.track) {
                 event.track.onunmute = () => onRemoteStream(userId, stream);
             }
@@ -251,7 +252,7 @@ export const getOrCreatePeerConnection = async (userId, onRemoteStream) => {
     }
 };
 
-const flushCandidates = async (userId, pc) => {
+const flushCandidates = async (userId: string, pc: RTCPeerConnection) => {
     const queued = candidateQueues[userId] || [];
     candidateQueues[userId] = [];
     for (const candidate of queued) {
@@ -263,12 +264,12 @@ const flushCandidates = async (userId, pc) => {
     }
 };
 
-const isPolite = (remoteId) => {
+const isPolite = (remoteId: string) => {
     const mine = getMyUserId() || '';
     return mine > remoteId;
 };
 
-export const handleSignal = async (data, onRemoteStream) => {
+export const handleSignal = async (data: SignalMessage, onRemoteStream: RemoteStream) => {
     const { from, signal } = data || {};
     if (!from || !signal) return;
 
@@ -307,7 +308,7 @@ export const handleSignal = async (data, onRemoteStream) => {
     }
 };
 
-export const callUser = async (userId, onRemoteStream) => {
+export const callUser = async (userId: string, onRemoteStream: RemoteStream) => {
     try {
         const pc = await getOrCreatePeerConnection(userId, onRemoteStream);
         if (pc.signalingState !== 'stable') return;
@@ -324,7 +325,7 @@ export const callUser = async (userId, onRemoteStream) => {
     }
 };
 
-export const removePeer = (userId) => {
+export const removePeer = (userId: string) => {
     if (peers[userId]) {
         peers[userId].onicecandidate = null;
         peers[userId].ontrack = null;

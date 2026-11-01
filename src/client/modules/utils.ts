@@ -1,24 +1,24 @@
-export function escapeHTML(str) {
-    str = String(str ?? '');
-    return str.replace(/[&<>'"]/g, 
-        tag => ({
+export function escapeHTML(str: unknown) {
+    const text = String(str ?? '');
+    return text.replace(/[&<>'"]/g,
+        (tag: string) => ({
             '&': '&amp;',
             '<': '&lt;',
             '>': '&gt;',
             "'": '&#39;',
             '"': '&quot;'
-        }[tag] || tag)
+        } as Record<string, string>)[tag] || tag
     );
 }
 
-export function getStoredUser() {
+export function getStoredUser(): { id: string; email: string } | null {
     try {
-        const user = JSON.parse(localStorage.getItem('flow_user'));
+        const user = JSON.parse(localStorage.getItem('flow_user') || 'null');
         return typeof user?.id === 'string' && typeof user.email === 'string' && user.email.includes('@') ? user : null;
     } catch { return null; }
 }
 
-export function youtubeEmbedUrl(value) {
+export function youtubeEmbedUrl(value: string) {
     try {
         const url = new URL(value);
         if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
@@ -31,7 +31,7 @@ export function youtubeEmbedUrl(value) {
     } catch { return null; }
 }
 
-export function spotifyEmbedUrl(value) {
+export function spotifyEmbedUrl(value: string) {
     try {
         const url = new URL(value);
         if (!['https:', 'http:'].includes(url.protocol) || url.hostname !== 'open.spotify.com') return null;

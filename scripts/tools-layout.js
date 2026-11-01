@@ -1,4 +1,4 @@
-// Run after ui-smoke.js in the same isolated Playwright CLI session.
+// Run after ui-smoke.js through browser-ci.cjs with its isolated backend fixture.
 async page => {
     const origin = new URL(page.url()).origin;
     const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -21,7 +21,7 @@ async page => {
     await input.press('Enter');
     await page.waitForFunction(() => document.getElementById('chat-messages').textContent.includes('First line\nSecond line'));
     await page.evaluate(async () => {
-        const chat = await import('/js/modules/chat.js');
+        const chat = { handleIncomingMessage: payload => window.__fixture.handlers['broadcast:chat-message']({ payload }) };
         chat.handleIncomingMessage({ sender: 'Riya', text: 'I’m reviewing the practice set. Let’s work through question 3 in this session.' });
         chat.handleIncomingMessage({ sender: 'AI Assistant', text: 'Start by identifying what the question asks you to find.\n\nWrite down the known values, choose the relevant relationship, and work through one step at a time. Compare your result with your study partner before moving on.' });
     });
@@ -86,5 +86,28 @@ async page => {
         return { path: new URL(link.href).pathname, width: image.naturalWidth, height: image.naturalHeight };
     });
     assert(icon.path === '/favicon.svg' && icon.width > 0, 'The outlined favicon should load');
-    return { passed: true, shiftEnter: true, favicon: icon, measurements };
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.locator('#my-presence-card').click();
+    await page.waitForFunction(() => {
+        const modal = document.getElementById('profile-modal');
+        return !modal.classList.contains('hidden') && !modal.style.transform && !modal.style.opacity;
+    });
+    await page.locator('#close-profile-btn').click();
+    // Close during the entrance, then change the OS preference during a new entrance.
+    await page.evaluate(() => {
+        document.getElementById('my-presence-card').click();
+        document.getElementById('close-profile-btn').click();
+        document.getElementById('my-presence-card').click();
+    });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.waitForFunction(() => {
+        const modal = document.getElementById('profile-modal');
+        return !modal.style.transform && !modal.style.opacity && document.getElementById('app').inert;
+    });
+    await page.keyboard.press('Escape');
+    assert(await page.locator('#modal-overlay').isHidden(), 'Interrupted motion must not reopen a closed dialog');
+    assert(await page.locator('#my-presence-card').evaluate(element => element === document.activeElement), 'Motion must preserve focus restoration');
+    await page.getByRole('tab', { name: 'Tasks', exact: true }).click();
+    assert(await page.locator('#tasks-tab').evaluate(element => !element.style.opacity && !element.style.transform), 'Reduced motion should leave panels immediately readable');
+    return { passed: true, motionPreferences: true, shiftEnter: true, favicon: icon, measurements };
 }

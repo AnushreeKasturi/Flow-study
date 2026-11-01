@@ -1,8 +1,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
+const { transpileModule, ModuleKind } = require('typescript');
+const source = transpileModule(readFileSync('src/client/modules/focus-progress.ts', 'utf8'), { compilerOptions: { module: ModuleKind.ESNext, target: 9 } }).outputText;
 let instance = 0;
-const load = () => import('data:text/javascript;base64,' + Buffer.from(readFileSync('public/js/modules/focus-progress.js')).toString('base64') + '#' + instance++);
+const load = () => import('data:text/javascript;base64,' + Buffer.from(source).toString('base64') + '#' + instance++);
 
 test('live focus survives pause and resume and excludes paused time', async () => {
     const focus = await load();

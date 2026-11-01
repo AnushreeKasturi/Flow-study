@@ -2,6 +2,7 @@ const { chromium } = require('playwright');
 const { once } = require('node:events');
 const { mkdirSync, readFileSync, writeFileSync } = require('node:fs');
 const { Script } = require('node:vm');
+const { build } = require('esbuild');
 process.env.GROQ_API_KEY = '';
 process.env.TWILIO_ACCOUNT_SID = '';
 process.env.TWILIO_AUTH_TOKEN = '';
@@ -28,6 +29,17 @@ const app = require('../server');
         });
         context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
         await context.route('**/_vercel/speed-insights/**', route => route.fulfill({ body: '', contentType: 'text/javascript' }));
+        // Compile the real RTC module with only signalling stubbed. Never ship this test route.
+        const rtcHarness = await build({
+            entryPoints: ['src/client/modules/rtc.ts'], bundle: true, write: false, format: 'esm',
+            plugins: [{ name: 'rtc-test-signalling', setup(builder) {
+                builder.onResolve({ filter: /^\.\/socket$/ }, () => ({ path: 'socket', namespace: 'test' }));
+                builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({
+                    contents: "export const getMyUserId = () => 'test-user'; export const sendSignal = (to, signal) => window.__fixture.calls.push({ value: { payload: { to, from: 'test-user', signal } } });"
+                }));
+            } }]
+        });
+        await context.route('**/__flow-test/rtc.js*', route => route.fulfill({ body: rtcHarness.outputFiles[0].text, contentType: 'text/javascript' }));
         await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
         page = await context.newPage();
         page.setDefaultTimeout(15000);
