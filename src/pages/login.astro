@@ -1,5 +1,6 @@
 ---
 import Page from '../layouts/Page.astro';
+import GitHubStar from '../components/GitHubStar.astro';
 import '../styles/login.css';
 ---
 <Page bodyClass="login-page">
@@ -49,6 +50,6 @@ import '../styles/login.css';
             <p class="login-note">A room, a goal, and a little momentum.</p>
         </section>
     </main>
-    <footer class="login-footer"><span>Study better, together.</span><span>A space for uninterrupted work.</span></footer>
+    <footer class="login-footer"><span>Study better, together.</span><GitHubStar /></footer>
         <script>import '../client/login';</script>
 </Page>

@@ -102,6 +102,8 @@ input.brutal-input:focus, input.input-field:focus, select.brutal-input:focus {
 .lobby-divider::before, .lobby-divider::after { content: ''; flex: 1; height: 1px; background: var(--glass-border); }
 .lobby-note { text-align: center; font-size: .74rem; color: var(--text-muted); margin-top: 22px; line-height: 1.8; }
 .logout-link { align-self: center; font-size: .78rem; color: var(--text-muted); margin-top: 24px; }
+.lobby-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.lobby-footer .logout-link { margin-top: 0; }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 2000; width: max-content; max-width: min(520px, calc(100vw - 32px)); padding: 14px 20px; border: 1px solid var(--primary); border-radius: 12px; background: var(--surface); color: var(--text-primary); box-shadow: 0 8px 32px #0004; font-size: .85rem; overflow-wrap: anywhere; }
 .toast[data-kind="error"] { border-color: var(--danger); }
 .inline-error { padding: 12px; border-left: 2px solid var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 5%, transparent); font-size: .82rem; margin-bottom: 20px; }
