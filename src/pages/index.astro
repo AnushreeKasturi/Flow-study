@@ -1,0 +1,20 @@
+---
+import Page from '../layouts/Page.astro';
+import Dialogs from '../components/room/Dialogs.astro';
+import Header from '../components/room/Header.astro';
+import PeopleAudio from '../components/room/PeopleAudio.astro';
+import VideoStage from '../components/room/VideoStage.astro';
+import SessionTools from '../components/room/SessionTools.astro';
+import '../styles/layout.css';
+import '../styles/animations.css';
+---
+<Page>
+    <div id="toast" class="toast hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+    <Dialogs />
+    <div id="app" class="app-container hidden">
+        <Header />
+        <div id="network-banner" class="network-banner hidden" role="status">You’re offline. Changes may not save until your connection returns.</div>
+        <div class="workspace-grid"><PeopleAudio /><VideoStage /><SessionTools /></div>
+    </div>
+    <script>import '../client/app';</script>
+</Page>

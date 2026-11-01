@@ -1,38 +1,40 @@
-import supabase from './modules/supabase.js';
+import { enterPage } from './motion';
+import { byId } from './dom';
+import supabase from './modules/supabase';
 
 // DOM Elements
-const emailInput = document.getElementById('email-input');
-const passwordInput = document.getElementById('password-input');
-const loginBtn = document.getElementById('login-btn');
-const signupBtn = document.getElementById('signup-btn');
-const errorMsg = document.getElementById('error-message');
-const successMsg = document.getElementById('success-message');
-const themePicker = document.getElementById('theme-picker');
+const emailInput = byId<HTMLInputElement>('email-input');
+const passwordInput = byId<HTMLInputElement>('password-input');
+const loginBtn = byId<HTMLButtonElement>('login-btn');
+const signupBtn = byId<HTMLButtonElement>('signup-btn');
+const errorMsg = byId<HTMLElement>('error-message');
+const successMsg = byId<HTMLElement>('success-message');
+const themePicker = byId<HTMLSelectElement>('theme-picker');
 
 let authBusy = false;
 let redirectPending = false;
 
 const supportedThemes = new Set(['forest', 'midnight', 'warm', 'aqua', 'amethyst']);
-const savedTheme = localStorage.getItem('flow_theme');
+const savedTheme = localStorage.getItem('flow_theme') || 'forest';
 const activeTheme = supportedThemes.has(savedTheme) ? savedTheme : 'forest';
 document.documentElement.setAttribute('data-theme', activeTheme);
 if (themePicker) {
     themePicker.value = activeTheme;
     themePicker.addEventListener('change', (e) => {
-        const theme = e.target.value;
+        const theme = (e.target as HTMLSelectElement).value;
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('flow_theme', theme);
     });
 }
 
 // Helper to show errors
-const showError = (msg) => {
+const showError = (msg: string) => {
     errorMsg.innerText = msg;
     errorMsg.style.display = 'block';
     successMsg.style.display = 'none';
 };
 
-const showSuccess = (msg) => {
+const showSuccess = (msg: string) => {
     successMsg.innerText = msg;
     successMsg.style.display = 'block';
     errorMsg.style.display = 'none';
@@ -43,7 +45,7 @@ const clearMessages = () => {
     successMsg.style.display = 'none';
 };
 
-const persistAndRedirect = (user, action) => {
+const persistAndRedirect = (user: { id: string; email?: string }, action: string) => {
     redirectPending = true;
     localStorage.setItem('flow_user', JSON.stringify({
         id: user.id,
@@ -55,10 +57,10 @@ const persistAndRedirect = (user, action) => {
     }, 1000);
 };
 
-const handleAuth = async (action) => {
+const handleAuth = async (action: 'login' | 'signup') => {
     if (authBusy) return;
     clearMessages();
-    if (!document.getElementById('auth-form').reportValidity()) return;
+    if (!byId<HTMLFormElement>('auth-form').reportValidity()) return;
     const email = emailInput.value.trim();
     const password = passwordInput.value;
 
@@ -129,20 +131,22 @@ const handleAuth = async (action) => {
     }
 };
 
-document.getElementById('auth-form').addEventListener('submit', (e) => {
+byId<HTMLFormElement>('auth-form').addEventListener('submit', (e) => {
     e.preventDefault();
     handleAuth('login');
 });
 signupBtn.addEventListener('click', () => handleAuth('signup'));
 
-document.getElementById('toggle-password').addEventListener('click', event => {
+byId<HTMLButtonElement>('toggle-password').addEventListener('click', event => {
     const visible = passwordInput.type === 'password';
     passwordInput.type = visible ? 'text' : 'password';
-    event.currentTarget.textContent = visible ? 'Hide' : 'Show';
-    event.currentTarget.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
-    event.currentTarget.setAttribute('aria-pressed', String(visible));
+    (event.currentTarget as HTMLButtonElement).textContent = visible ? 'Hide' : 'Show';
+    (event.currentTarget as HTMLButtonElement).setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+    (event.currentTarget as HTMLButtonElement).setAttribute('aria-pressed', String(visible));
 });
-document.querySelectorAll('[data-preview-minutes]').forEach(button => button.addEventListener('click', () => {
-    document.getElementById('preview-time').textContent = button.dataset.previewMinutes.padStart(2, '0') + ':00';
-    document.querySelectorAll('[data-preview-minutes]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+document.querySelectorAll<HTMLButtonElement>('[data-preview-minutes]').forEach(button => button.addEventListener('click', () => {
+    byId<HTMLElement>('preview-time').textContent = button.dataset.previewMinutes!.padStart(2, '0') + ':00';
+    document.querySelectorAll<HTMLButtonElement>('[data-preview-minutes]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
 }));
+
+enterPage();

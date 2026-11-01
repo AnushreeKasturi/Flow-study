@@ -1,0 +1,57 @@
+import type { AudioProvider } from '../types';
+import { byId } from '../dom';
+import { youtubeEmbedUrl, spotifyEmbedUrl } from './utils';
+import { broadcastAudio } from './socket';
+import { notify } from './feedback';
+
+let provider: AudioProvider = 'youtube';
+const links = { youtube: '', spotify: '' };
+const sources: Record<AudioProvider, string | null> = { youtube: 'https://www.youtube.com/embed/rFZHOHl-L8A?autoplay=1&mute=1', spotify: null };
+const frame = (name: AudioProvider) => byId<HTMLIFrameElement>(name === 'youtube' ? 'youtube-iframe' : 'spotify-iframe');
+
+function selectProvider(next: AudioProvider) {
+    if (!['youtube', 'spotify'].includes(next)) return;
+    if (next !== provider) frame(provider).src = 'about:blank';
+    provider = next;
+    document.querySelectorAll<HTMLButtonElement>('[data-audio-provider]').forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.audioProvider === next));
+    });
+    byId<HTMLIFrameElement>('youtube-iframe').classList.toggle('hidden', next !== 'youtube');
+    byId<HTMLIFrameElement>('spotify-iframe').classList.toggle('hidden', next !== 'spotify' || !sources.spotify);
+    byId<HTMLElement>('spotify-empty').classList.toggle('hidden', next !== 'spotify' || !!sources.spotify);
+    const input = byId<HTMLInputElement>('youtube-url-input');
+    input.value = links[next];
+    input.placeholder = next === 'youtube' ? 'YouTube link' : 'Spotify link';
+    input.setAttribute('aria-label', next === 'youtube' ? 'YouTube video or playlist link' : 'Spotify track, album, or playlist link');
+    if (sources[next] && frame(next).getAttribute('src') !== sources[next]) frame(next).src = sources[next]!;
+}
+
+export function loadRoomAudio(next: AudioProvider, url: string) {
+    const embed = next === 'youtube' ? youtubeEmbedUrl(url) : next === 'spotify' ? spotifyEmbedUrl(url) : null;
+    if (!embed) return false;
+    links[next] = url;
+    sources[next] = embed;
+    selectProvider(next);
+    frame(next).src = embed;
+    return true;
+}
+
+export function initAudio() {
+    document.querySelectorAll<HTMLButtonElement>('[data-audio-provider]').forEach(button => button.addEventListener('click', () => selectProvider(button.dataset.audioProvider as AudioProvider)));
+    byId<HTMLButtonElement>('sync-youtube-btn').addEventListener('click', async event => {
+        const url = byId<HTMLInputElement>('youtube-url-input').value.trim();
+        if (!loadRoomAudio(provider, url)) {
+            notify('Paste a valid ' + (provider === 'youtube' ? 'YouTube video or playlist' : 'Spotify content') + ' link.', 'error');
+            return;
+        }
+        const button = event.currentTarget as HTMLButtonElement;
+        button.disabled = true;
+        try {
+            const status = await broadcastAudio(provider, url);
+            if (status !== 'ok') throw new Error('Sharing failed');
+            notify('Audio link shared. Each person controls their own playback.');
+        } catch { notify('The link could not be shared. Check your connection and try again.', 'error'); }
+        finally { button.disabled = false; }
+    });
+    selectProvider(provider);
+}

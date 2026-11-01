@@ -22,8 +22,8 @@ const aiLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-// Serve static files from the 'public' directory
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve Astro's generated production pages and fingerprinted assets.
+app.use(express.static(path.join(__dirname, 'dist')));
 app.use(express.json({ limit: '16kb' }));
 app.use('/api', (req, res, next) => {
     res.set('Cache-Control', 'private, no-store');

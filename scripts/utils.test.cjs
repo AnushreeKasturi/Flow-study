@@ -2,11 +2,13 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync, readdirSync } = require('node:fs');
 const { spawnSync } = require('node:child_process');
-const source = readFileSync('public/js/modules/utils.js', 'utf8');
+const { transpileModule, ModuleKind } = require('typescript');
+const compile = path => transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ModuleKind.ESNext, target: 9 } }).outputText;
+const source = compile('src/client/modules/utils.ts');
 const load = () => import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 
 test('all shipped JavaScript parses', () => {
-    const files = readdirSync('public/js', { recursive: true }).filter(path => path.endsWith('.js')).map(path => 'public/js/' + path);
+    const files = readdirSync('dist/_astro', { recursive: true }).filter(path => path.endsWith('.js')).map(path => 'dist/_astro/' + path);
     for (const file of ['server.js', ...files]) {
         const result = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
         assert.equal(result.status, 0, file + ': ' + result.stderr);
@@ -48,7 +50,7 @@ test('Supabase fetch has a deadline and preserves caller cancellation', async ()
     global.window = { supabase: { createClient: (url, key, config) => { options = config.global; return {}; } } };
     global.fetch = async (url, config) => { observedSignal = config.signal; return new Response('{}'); };
     try {
-        const module = readFileSync('public/js/modules/supabase.js', 'utf8');
+        const module = compile('src/client/modules/supabase.ts');
         await import('data:text/javascript;base64,' + Buffer.from(module).toString('base64'));
         await options.fetch('https://example.test');
         assert(observedSignal instanceof AbortSignal);
@@ -77,11 +79,11 @@ test('Spotify parser accepts official content and rejects untrusted or malformed
 
 test('hosted Speed Insights omits invitation parameters and stays off localhost', () => {
     const { runInNewContext } = require('node:vm');
-    const source = readFileSync('public/js/speed-insights.js', 'utf8');
+    const source = compile('src/client/speed-insights.ts');
     for (const hostname of ['localhost', 'flow-study.me', 'flow-study-example.vercel.app']) {
         const injected = [];
         const window = {};
-        runInNewContext(source, {
+        runInNewContext(source.replace(/export \{\};?/, ''), {
             window, location: { hostname, origin: 'https://' + hostname }, URL,
             document: { createElement: () => ({}), head: { appendChild: script => injected.push(script) } }
         });

@@ -1,9 +1,11 @@
-let toastTimer;
-let returnFocus;
-const overlay = () => document.getElementById('modal-overlay');
+import { reveal, clearMotion } from '../motion';
+import { byId } from '../dom';
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
+let returnFocus: HTMLElement | null = null;
+const overlay = () => byId<HTMLElement>('modal-overlay');
 
-export function notify(message, kind = 'info') {
-    const toast = document.getElementById('toast');
+export function notify(message: string, kind: 'info' | 'error' = 'info') {
+    const toast = byId<HTMLElement>('toast');
     if (!toast) return;
     clearTimeout(toastTimer);
     toast.textContent = message;
@@ -12,21 +14,22 @@ export function notify(message, kind = 'info') {
     toastTimer = setTimeout(() => toast.classList.add('hidden'), kind === 'error' ? 8000 : 4500);
 }
 
-export function openModal(id) {
+export function openModal(id: string) {
     const container = overlay();
     if (!container) return;
-    if (container.classList.contains('hidden')) returnFocus = document.activeElement;
+    if (container.classList.contains('hidden')) returnFocus = document.activeElement as HTMLElement | null;
     container.querySelectorAll('.modal').forEach(modal => modal.classList.toggle('hidden', modal.id !== id));
     container.classList.remove('hidden');
-    document.getElementById('app').inert = true;
-    requestAnimationFrame(() => document.getElementById(id).querySelector('input, button, a')?.focus());
+    reveal(byId(id), 'dialog');
+    byId<HTMLElement>('app').inert = true;
+    requestAnimationFrame(() => byId(id).querySelector<HTMLElement>('input, button, a')?.focus());
 }
 
 export function closeModal() {
     const container = overlay();
     container.classList.add('hidden');
-    container.querySelectorAll('.modal').forEach(modal => modal.classList.add('hidden'));
-    document.getElementById('app').inert = false;
+    container.querySelectorAll('.modal').forEach(modal => { clearMotion(modal); modal.classList.add('hidden'); });
+    byId<HTMLElement>('app').inert = false;
     returnFocus?.focus();
 }
 
@@ -41,8 +44,8 @@ export function initDialogs() {
             closeModal();
         }
         if (event.key === 'Tab') {
-            const controls = [...modal.querySelectorAll('a[href], button, input, select, [tabindex]')]
-                .filter(el => !el.disabled && el.tabIndex >= 0 && el.getClientRects().length);
+            const controls = [...modal.querySelectorAll<HTMLElement>('a[href], button, input, select, [tabindex]')]
+                .filter(el => !el.hasAttribute('disabled') && el.tabIndex >= 0 && el.getClientRects().length);
             const first = controls[0], last = controls.at(-1);
             if ((event.shiftKey && document.activeElement === first) || (!event.shiftKey && document.activeElement === last) || !modal.contains(document.activeElement)) {
                 event.preventDefault();

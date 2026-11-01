@@ -13,8 +13,11 @@ test('HTTP boundaries and bounded local concurrency', async t => {
     const post = body => fetch(origin + '/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
 
     await t.test('HTML, CSS, modules, missing files, and private files', async () => {
-        for (const path of ['/', '/login.html', '/styles/login.css', '/js/modules/feedback.js', '/favicon.svg']) assert.equal((await fetch(origin + path)).status, 200, path);
-        for (const path of ['/.env', '/sql/schema.sql', '/package.json', '/missing.html']) assert.equal((await fetch(origin + path)).status, 404, path);
+        for (const path of ['/', '/login.html', '/favicon.svg']) assert.equal((await fetch(origin + path)).status, 200, path);
+        const html = await (await fetch(origin + '/login.html')).text();
+        const asset = html.match(/src="([^"]+\.js)"/)[1];
+        assert.equal((await fetch(origin + asset)).status, 200);
+        for (const path of ['/src/client/app.ts', '/.env', '/sql/schema.sql', '/package.json', '/missing.html']) assert.equal((await fetch(origin + path)).status, 404, path);
     });
     await t.test('link crawlers receive static metadata and a public preview image', async () => {
         const expected = {
@@ -77,7 +80,9 @@ test('HTTP boundaries and bounded local concurrency', async t => {
     });
     await t.test('100 simultaneous local static requests complete', async () => {
         const start = performance.now();
-        const statuses = await Promise.all(Array.from({ length: 100 }, async (_, i) => (await fetch(origin + (i % 2 ? '/login.html' : '/styles/global.css'))).status));
+        const html = await (await fetch(origin + '/login.html')).text();
+        const stylesheet = html.match(/href="([^"]+\.css)"/)[1];
+        const statuses = await Promise.all(Array.from({ length: 100 }, async (_, i) => (await fetch(origin + (i % 2 ? '/login.html' : stylesheet))).status));
         assert(statuses.every(status => status === 200));
         console.log('100 concurrent static requests: ' + Math.round(performance.now() - start) + 'ms');
     });

@@ -1,0 +1,37 @@
+<aside class="sidebar left-sidebar">
+                <h2 class="panel-heading">In this room</h2>
+
+                <div class="brutal-card profile-card" id="my-presence-card" role="button" tabindex="0" title="View focus summary" aria-label="Edit your profile">
+                    <div class="profile-header">
+                        <div class="avatar" id="my-avatar">?</div>
+                        <div class="profile-info">
+                            <h3 id="my-username">You</h3>
+                            <div class="status-indicator">
+                                <span class="dot green"></span>
+                                <span id="my-status-text">Online</span>
+                            </div>
+                            <div id="my-focus-time" style="font-size: 12px; margin-top: 4px; color: var(--text-muted);">Today: 0m focused</div>
+                        </div>
+                    </div>
+                    <span class="profile-open-hint">View focus summary <span aria-hidden="true">›</span></span>
+                </div>
+
+
+                <div id="partner-presence-container" style="display:flex; flex-direction:column; gap:16px;"></div>
+
+                <section class="brutal-card ambience-panel" aria-label="Room audio">
+                    <div><h2 class="panel-heading">Room audio</h2><p class="panel-description">Choose the sound of your session.</p></div>
+                    <div class="audio-providers" role="group" aria-label="Audio provider">
+                        <button class="provider-btn" data-audio-provider="youtube" aria-pressed="true">YouTube</button>
+                        <button class="provider-btn" data-audio-provider="spotify" aria-pressed="false">Spotify</button>
+                    </div>
+                    <div class="input-row">
+                        <input type="url" id="youtube-url-input" class="brutal-input" placeholder="YouTube link" aria-label="YouTube video or playlist link">
+                        <button id="sync-youtube-btn" class="btn btn-secondary" aria-label="Share audio with room">Share</button>
+                    </div>
+                    <iframe id="youtube-iframe" title="YouTube background audio" loading="lazy" src="https://www.youtube.com/embed/rFZHOHl-L8A?autoplay=1&amp;mute=1" width="100%" height="152" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+                    <div id="spotify-empty" class="audio-empty hidden"><span>Spotify, in your room.</span><p>Paste a track, playlist, album, or podcast link to load the player.</p></div>
+                    <iframe id="spotify-iframe" class="hidden" title="Spotify background audio" loading="lazy" width="100%" height="152" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>
+                    <p class="audio-note">Share the link. Playback stays personal.</p>
+                </section>
+            </aside>

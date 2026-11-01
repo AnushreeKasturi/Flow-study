@@ -1,0 +1,69 @@
+<aside class="sidebar right-sidebar" aria-label="Session and room tools">
+
+                <section class="pill-timer" aria-label="Session timer">
+                    <div class="timer-heading">
+                        <div class="timer-heading-copy">
+                            <h2>Session timer</h2>
+                            <span id="timer-state-label">Ready to focus</span>
+                        </div>
+                        <div class="timer-utilities">
+                            <button id="focus-mode-toggle" class="icon-btn"  title="Toggle Focus Mode"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
+                            <button id="open-timer-settings-btn" class="icon-btn" aria-label="Timer settings" ><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
+                        </div>
+                    </div>
+                    <div class="timer-main">
+                        <div class="time-display" id="time-display">25:00</div>
+                        <div class="timer-controls">
+                            <button id="timer-toggle-btn" class="icon-btn" aria-label="Start timer" ><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></button>
+                            <button id="timer-reset-btn" class="icon-btn" aria-label="Reset timer" ><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.59-8.31l5.67-5.67"/></svg></button>
+                        </div>
+                    </div>
+                    <div class="timer-modes" aria-label="Session mode">
+                        <button class="mode-btn active" data-mode="focus">Focus</button>
+                        <button class="mode-btn" data-mode="shortBreak">Break</button>
+                        <button class="mode-btn" data-mode="longBreak">Long break</button>
+                    </div>
+                </section>
+
+
+                <div class="brutal-card tabbed-container p-0">
+                    <div class="tabs-header" role="tablist" aria-label="Room tools">
+                        <button id="tasks-tab-button" class="tab-btn active" data-tab="tasks-tab" role="tab" aria-controls="tasks-tab" aria-selected="true">Tasks</button>
+                        <button id="chat-tab-button" class="tab-btn" data-tab="chat-tab" role="tab" aria-controls="chat-tab" aria-selected="false" tabindex="-1">Chat</button>
+                    </div>
+
+
+                    <div id="tasks-tab" class="tab-content active" role="tabpanel" aria-labelledby="tasks-tab-button">
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="new-task-input" class="brutal-input" aria-label="New shared task" placeholder="Add a shared task..." maxlength="100">
+                            <button id="add-task-btn" class="btn btn-primary" aria-label="Add task">+</button>
+                        </div>
+
+
+                        <div class="progress-heading"><span>Session progress</span><span id="room-task-progress-text">0%</span></div>
+                        <div class="task-progress-bar mb-4">
+                            <div id="room-task-progress-fill" class="task-progress-fill" style="width: 0%;"></div>
+                        </div>
+
+                        <p id="task-sync-status" class="panel-description" role="status">Loading room tasks…</p>
+                        <button id="retry-tasks-btn" class="btn btn-secondary hidden">Retry loading tasks</button>
+                        <ul class="task-list" id="room-task-list">
+
+                        </ul>
+                    </div>
+
+
+                    <div id="chat-tab" class="tab-content" role="tabpanel" aria-labelledby="chat-tab-button">
+                        <div id="chat-messages" role="log" aria-label="Room messages"></div>
+                        <div id="ai-pending" class="panel-description hidden" role="status">Study assistant is thinking…</div>
+                        <div class="chat-compose">
+                            <textarea id="chat-input" placeholder="Write to your room…" aria-label="Message to room" aria-describedby="chat-compose-help" rows="2" maxlength="300"></textarea>
+                            <div class="chat-compose-actions">
+                                <span id="chat-compose-help"><kbd>/ai</kbd> Study assistant</span>
+                                <button id="send-chat-btn" class="btn btn-primary" title="Send message (Enter)">Send</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </aside>

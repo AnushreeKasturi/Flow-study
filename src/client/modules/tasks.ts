@@ -1,21 +1,22 @@
-import supabase from './supabase.js';
-import { updatePresence } from './presence.js';
-import { notify } from './feedback.js';
+import type { Task, TaskStats } from '../types';
+import { getSupabase } from './supabase';
+import { updatePresence } from './presence';
+import { notify } from './feedback';
 
-let roomTasks = [];
-let roomId = null;
-let updateUI = null;
+let roomTasks: Task[] = [];
+let roomId: string | null = null;
+let updateUI: ((tasks: Task[], stats: TaskStats) => void) | null = null;
 let adding = false;
-const pending = new Set();
+const pending = new Set<string>();
 
-export const initTasks = (id, initialTasks, uiCallback) => {
+export const initTasks = (id: string, initialTasks: Task[], uiCallback: (tasks: Task[], stats: TaskStats) => void) => {
     roomId = id;
     roomTasks = initialTasks || [];
     updateUI = uiCallback;
     renderTasks();
 };
 
-export const setSharedTasks = tasks => {
+export const setSharedTasks = (tasks: Task[]) => {
     if (!Array.isArray(tasks)) return;
     const inFlight = roomTasks.filter(task => pending.has(task.id));
     roomTasks = tasks.filter(task => !pending.has(task.id)).concat(inFlight);
@@ -23,17 +24,17 @@ export const setSharedTasks = tasks => {
     updateCurrentTaskPresence();
 };
 
-export const addTask = async title => {
+export const addTask = async (title: string) => {
     title = title.trim();
     if (!roomId || adding || !title || title.length > 100) return false;
     adding = true;
-    const user = JSON.parse(localStorage.getItem('flow_user'));
+    const user = JSON.parse(localStorage.getItem('flow_user') || 'null');
     const task = { id: 'temp-' + crypto.randomUUID(), room_id: roomId, title, created_by: user?.id, completed: false, pending: true };
     pending.add(task.id);
     roomTasks.push(task);
     renderTasks();
     try {
-        const { data, error } = await supabase.from('tasks').insert({
+        const { data, error } = await getSupabase().from('tasks').insert({
             room_id: roomId, title, created_by: user?.id, completed: false
         }).select();
         if (error || !data?.[0]) throw new Error('Task was not saved');
@@ -52,7 +53,7 @@ export const addTask = async title => {
     }
 };
 
-async function updateTask(id, changes) {
+async function updateTask(id: string, changes: (task: Task) => Partial<Omit<Task, 'pending'>>) {
     const task = roomTasks.find(row => row.id === id);
     if (!task || pending.has(id)) return;
     const previous = { ...task };
@@ -60,7 +61,7 @@ async function updateTask(id, changes) {
     pending.add(id);
     renderTasks();
     try {
-        const { data, error } = await supabase.from('tasks').update(changes(previous)).eq('id', id).select();
+        const { data, error } = await getSupabase().from('tasks').update(changes(previous)).eq('id', id).select();
         if (error || !data?.length) throw new Error('Task was not updated');
     } catch {
         Object.assign(task, previous);
@@ -73,17 +74,17 @@ async function updateTask(id, changes) {
     }
 }
 
-export const toggleTask = id => updateTask(id, task => ({ completed: !task.completed }));
-export const assignTask = (id, userId) => updateTask(id, () => ({ assigned_to: userId }));
+export const toggleTask = (id: string) => updateTask(id, task => ({ completed: !task.completed }));
+export const assignTask = (id: string, userId: string | null) => updateTask(id, () => ({ assigned_to: userId }));
 
-export const deleteTask = async id => {
+export const deleteTask = async (id: string) => {
     const index = roomTasks.findIndex(row => row.id === id);
     if (index < 0 || pending.has(id)) return;
     const [task] = roomTasks.splice(index, 1);
     pending.add(id);
     renderTasks();
     try {
-        const { data, error } = await supabase.from('tasks').delete().eq('id', id).select();
+        const { data, error } = await getSupabase().from('tasks').delete().eq('id', id).select();
         if (error || !data?.length) throw new Error('Task was not deleted');
     } catch {
         if (!roomTasks.some(row => row.id === id)) roomTasks.splice(Math.min(index, roomTasks.length), 0, task);

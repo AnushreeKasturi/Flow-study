@@ -1,8 +1,9 @@
-import supabase from './supabase.js';
-import { getLiveFocus } from './focus-progress.js';
+import type { ProfileStats } from '../types';
+import { getSupabase } from './supabase';
+import { getLiveFocus } from './focus-progress';
 
-export const getMyProfile = async (userId) => {
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+export const getMyProfile = async (userId: string) => {
+    const { data, error } = await getSupabase().from('profiles').select('*').eq('id', userId).maybeSingle();
     if (error) {
         console.error('Failed to load profile:', error.message);
         return null;
@@ -10,9 +11,9 @@ export const getMyProfile = async (userId) => {
     return data;
 };
 
-export const saveDisplayName = async (userId, displayName) => {
+export const saveDisplayName = async (userId: string, displayName: string) => {
     try {
-        const { error } = await supabase.from('profiles').upsert({
+        const { error } = await getSupabase().from('profiles').upsert({
             id: userId,
             display_name: displayName,
             updated_at: new Date().toISOString()
@@ -29,7 +30,7 @@ export const saveDisplayName = async (userId, displayName) => {
 // session, counting back from today. A day with no session yet is only a
 // streak-breaker once "today" has fully passed, so an active streak still
 // shows correctly before the user's first session of the day.
-const computeStreak = (localDateStrings) => {
+const computeStreak = (localDateStrings: string[]) => {
     const days = new Set(localDateStrings);
     const cursor = new Date();
     cursor.setHours(0, 0, 0, 0);
@@ -46,10 +47,10 @@ const computeStreak = (localDateStrings) => {
     return streak;
 };
 
-export const getStats = async (userId) => {
+export const getStats = async (userId: string) => {
     const [{ data: sessions, error: sessionError }, { count: tasksCompleted, error: taskError }] = await Promise.all([
-        supabase.from('sessions').select('id, duration_seconds, completed_at').eq('user_id', userId),
-        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('created_by', userId).eq('completed', true)
+        getSupabase().from('sessions').select('id, duration_seconds, completed_at').eq('user_id', userId),
+        getSupabase().from('tasks').select('id', { count: 'exact', head: true }).eq('created_by', userId).eq('completed', true)
     ]);
     if (sessionError || taskError) throw new Error('Profile stats are unavailable');
 
@@ -58,7 +59,7 @@ export const getStats = async (userId) => {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const savedTodaySeconds = rows.filter(r => new Date(r.completed_at) >= today).reduce((acc, r) => acc + r.duration_seconds, 0);
+    const savedTodaySeconds = rows.filter(r => new Date(r.completed_at).getTime() >= today.getTime()).reduce((acc, r) => acc + r.duration_seconds, 0);
 
     const streak = computeStreak(rows.map(r => new Date(r.completed_at).toDateString()));
 
@@ -72,7 +73,7 @@ export const getStats = async (userId) => {
     });
 };
 
-export function withLiveFocus(stats) {
+export function withLiveFocus(stats: Omit<ProfileStats, 'totalMinutes' | 'todayMinutes' | 'liveMinutes'>): ProfileStats {
     const live = getLiveFocus({ persistedIds: stats.persistedIds });
     return {
         ...stats,

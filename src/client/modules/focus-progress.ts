@@ -1,7 +1,8 @@
 // Unsaved local focus, shared by the room card and profile summary.
-let segments = [];
-let activeStart = null;
-const pending = new Map();
+type Segment = { start: number; end: number };
+let segments: Segment[] = [];
+let activeStart: number | null = null;
+const pending = new Map<string, Segment[]>();
 
 export function startFocus(now = Date.now()) {
     if (activeStart === null) activeStart = now;
@@ -12,7 +13,7 @@ export function pauseFocus(now = Date.now()) {
     activeStart = null;
 }
 
-export function getLiveFocus({ persistedIds = [], now = Date.now() } = {}) {
+export function getLiveFocus({ persistedIds = [], now = Date.now() }: { persistedIds?: string[]; now?: number } = {}) {
     const saved = new Set(persistedIds);
     const intervals = [...segments];
     if (activeStart !== null) intervals.push({ start: activeStart, end: now });
@@ -38,4 +39,4 @@ export function finishFocus(now = Date.now()) {
     return { id, seconds, completedAt: new Date(now).toISOString() };
 }
 
-export function confirmFocus(id) { pending.delete(id); }
+export function confirmFocus(id: string) { pending.delete(id); }

@@ -1,41 +1,44 @@
-import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, updateMyUsername, sendReaction, sendHandRaise } from './modules/socket.js';
-import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, cleanupMedia, isVideoActive, hasAudioTrack } from './modules/rtc.js';
-import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState } from './modules/timer.js';
-import { initTasks, addTask, toggleTask, deleteTask, assignTask, rerenderTasks, getStats as getTaskStats, setSharedTasks } from './modules/tasks.js';
-import { initPresence, updatePresence, startFocusTracking, stopFocusTracking, formatFocusTime } from './modules/presence.js';
-import { initChat, handleIncomingMessage } from './modules/chat.js';
-import { getMyProfile, saveDisplayName, getStats as getProfileStats, withLiveFocus } from './modules/profile.js';
-import * as UI from './modules/ui.js';
-import supabase from './modules/supabase.js';
-import { initAudio, loadRoomAudio } from './modules/audio.js';
-import { notify, openModal, closeModal, initDialogs } from './modules/feedback.js';
-import { escapeHTML, getStoredUser } from './modules/utils.js';
+import { enterPage, reveal } from './motion';
+import type { Participants, ProfileStats, TimerMode } from './types';
+import { byId } from './dom';
+import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, updateMyUsername, sendReaction, sendHandRaise } from './modules/socket';
+import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, cleanupMedia, isVideoActive, hasAudioTrack } from './modules/rtc';
+import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState } from './modules/timer';
+import { initTasks, addTask, toggleTask, deleteTask, assignTask, rerenderTasks, getStats as getTaskStats, setSharedTasks } from './modules/tasks';
+import { initPresence, updatePresence, startFocusTracking, stopFocusTracking, formatFocusTime } from './modules/presence';
+import { initChat, handleIncomingMessage } from './modules/chat';
+import { getMyProfile, saveDisplayName, getStats as getProfileStats, withLiveFocus } from './modules/profile';
+import * as UI from './modules/ui';
+import supabase from './modules/supabase';
+import { initAudio, loadRoomAudio } from './modules/audio';
+import { notify, openModal, closeModal, initDialogs } from './modules/feedback';
+import { escapeHTML, getStoredUser } from './modules/utils';
 
 let currentRoomId = null;
-let currentUsername = null;
-let partners = {}; // Store partner data
+let currentUsername = '';
+let partners: Participants = {}; // Store partner data
 let handRaised = false;
 let roomActionBusy = false;
 let leaving = false;
-let cachedProfileStats = null;
-const hostBtn = document.getElementById('host-btn');
-const lobbyError = document.getElementById('lobby-error');
-function setRoomBusy(busy, action = 'join') {
+let cachedProfileStats: ProfileStats | null = null;
+const hostBtn = byId<HTMLButtonElement>('host-btn');
+const lobbyError = byId<HTMLElement>('lobby-error');
+function setRoomBusy(busy: boolean, action = 'join') {
     roomActionBusy = busy;
     joinBtn.disabled = hostBtn.disabled = busy;
     joinBtn.textContent = busy && action === 'join' ? 'Joining…' : 'Join room';
     hostBtn.textContent = busy && action === 'host' ? 'Creating…' : 'Create a room';
 }
-function showLobbyError(message) {
+function showLobbyError(message: string) {
     lobbyError.textContent = message;
     lobbyError.classList.remove('hidden');
 }
-function connectionStatus(status) {
-    const el = document.getElementById('connection-status');
+function connectionStatus(status: string) {
+    const el = byId<HTMLElement>('connection-status');
     const offline = !navigator.onLine;
     el.textContent = offline ? 'Offline' : status === 'SUBSCRIBED' ? 'Connected' : 'Reconnecting…';
     el.dataset.state = offline ? 'offline' : status === 'SUBSCRIBED' ? 'connected' : 'connecting';
-    document.getElementById('network-banner').classList.toggle('hidden', !offline);
+    byId<HTMLElement>('network-banner').classList.toggle('hidden', !offline);
 }
 
 // A participant's realtime channel can drop and reconnect on its own (network
@@ -44,7 +47,7 @@ function connectionStatus(status) {
 // the leave past that window lets a rejoin cancel the teardown instead of
 // tearing down and rebuilding the peer connection and video tile for a blip
 // that was never a real leave.
-const pendingLeaves = {};
+const pendingLeaves: Record<string, ReturnType<typeof setTimeout>> = {};
 const LEAVE_GRACE_MS = 18000;
 
 // Mic/camera toggle icons, swapped in on click so the button's on/off state
@@ -56,12 +59,12 @@ const CAM_ON_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
 const CAM_OFF_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
 
 // Modals
-const joinBtn = document.getElementById('join-btn');
-const roomCodeInput = document.getElementById('room-code-input');
-const appContainer = document.getElementById('app');
+const joinBtn = byId<HTMLButtonElement>('join-btn');
+const roomCodeInput = byId<HTMLInputElement>('room-code-input');
+const appContainer = byId<HTMLElement>('app');
 
 // Video Container
-const videoGrid = document.getElementById('video-grid');
+const videoGrid = byId<HTMLElement>('video-grid');
 
 // Excludes visually ambiguous characters (0/O, 1/I/L) so codes shared verbally
 // or by text can't be mistyped into a different valid-looking code.
@@ -92,14 +95,14 @@ const initApp = async () => {
 
     joinBtn.addEventListener('click', handleJoin);
 
-    [roomCodeInput, document.getElementById('room-pin-input')].forEach(input => {
+    [roomCodeInput, byId<HTMLInputElement>('room-pin-input')].forEach(input => {
         input.addEventListener('keydown', e => {
             if (e.key === 'Enter') { e.preventDefault(); handleJoin(); }
         });
     });
     hostBtn.addEventListener('click', async () => {
         if (roomActionBusy) return;
-        const pin = document.getElementById('room-pin-input').value.trim();
+        const pin = byId<HTMLInputElement>('room-pin-input').value.trim();
         if (pin && !/^\d{4}$/.test(pin)) { showLobbyError('Use a 4-digit PIN, or leave it empty.'); return; }
         setRoomBusy(true, 'host');
         lobbyError.classList.add('hidden');
@@ -125,35 +128,35 @@ const initApp = async () => {
         }
         if (createdCode) { roomCodeInput.value = createdCode; await handleJoin(); }
     });
-    document.getElementById('logout-link').addEventListener('click', async e => {
+    byId<HTMLElement>('logout-link').addEventListener('click', async e => {
         e.preventDefault();
         try { await supabase?.auth.signOut(); } catch { /* Clear the local login even when offline. */ }
         localStorage.removeItem('flow_user');
         sessionStorage.removeItem('flow_last_room');
         window.location.replace('/login.html');
     });
-    document.getElementById('toggle-mic').addEventListener('click', (e) => {
+    byId<HTMLButtonElement>('toggle-mic').addEventListener('click', (e) => {
         const enabled = toggleAudio();
         if (enabled === null) {
             notify('No microphone is available. Check your browser permissions, then rejoin.', 'error');
             return;
         }
-        e.currentTarget.classList.toggle('active', enabled);
-        e.currentTarget.setAttribute('aria-pressed', String(enabled));
-        e.currentTarget.innerHTML = enabled ? MIC_ON_ICON : MIC_OFF_ICON;
+        (e.currentTarget as HTMLButtonElement).classList.toggle('active', enabled);
+        (e.currentTarget as HTMLButtonElement).setAttribute('aria-pressed', String(enabled));
+        (e.currentTarget as HTMLButtonElement).innerHTML = enabled ? MIC_ON_ICON : MIC_OFF_ICON;
     });
 
-    document.getElementById('toggle-cam').addEventListener('click', (e) => {
+    byId<HTMLButtonElement>('toggle-cam').addEventListener('click', (e) => {
         const isEnabled = toggleVideo();
-        e.currentTarget.classList.toggle('active', isEnabled);
-        e.currentTarget.setAttribute('aria-pressed', String(isEnabled));
-        e.currentTarget.innerHTML = isEnabled ? CAM_ON_ICON : CAM_OFF_ICON;
+        (e.currentTarget as HTMLButtonElement).classList.toggle('active', isEnabled);
+        (e.currentTarget as HTMLButtonElement).setAttribute('aria-pressed', String(isEnabled));
+        (e.currentTarget as HTMLButtonElement).innerHTML = isEnabled ? CAM_ON_ICON : CAM_OFF_ICON;
 
-        const localDummy = document.getElementById('local-dummy-placeholder');
+        const localDummy = byId<HTMLElement>('local-dummy-placeholder');
         if (!isEnabled) {
             localDummy.classList.remove('hidden');
-            document.getElementById('local-dummy-avatar').innerText = currentUsername.charAt(0).toUpperCase();
-            localDummy.querySelector('.text').innerText = 'Camera Off';
+            byId<HTMLElement>('local-dummy-avatar').innerText = currentUsername.charAt(0).toUpperCase();
+            localDummy.querySelector<HTMLElement>('.text')!.innerText = 'Camera Off';
         } else {
             localDummy.classList.add('hidden');
         }
@@ -162,18 +165,19 @@ const initApp = async () => {
     });
 
     // Reactions & Raise Hand
-    document.querySelectorAll('.reaction-btn').forEach((btn) => {
+    document.querySelectorAll<HTMLButtonElement>('.reaction-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
             const emoji = btn.dataset.emoji;
+            if (!emoji) return;
             sendReaction(emoji);
             showReaction(getMyUserId(), emoji); // no self-broadcast echo, so render locally too
         });
     });
 
-    document.getElementById('toggle-hand').addEventListener('click', (e) => {
+    byId<HTMLElement>('toggle-hand').addEventListener('click', (e) => {
         handRaised = !handRaised;
-        e.currentTarget.classList.toggle('active', handRaised);
-        e.currentTarget.setAttribute('aria-pressed', String(handRaised));
+        (e.currentTarget as HTMLButtonElement).classList.toggle('active', handRaised);
+        (e.currentTarget as HTMLButtonElement).setAttribute('aria-pressed', String(handRaised));
         sendHandRaise(handRaised);
         setHandRaised(getMyUserId(), handRaised);
     });
@@ -183,33 +187,33 @@ const initApp = async () => {
         toggleTimer();
     });
 
-    document.getElementById('timer-reset-btn').addEventListener('click', () => {
+    byId<HTMLButtonElement>('timer-reset-btn').addEventListener('click', () => {
         resetTimer();
     });
 
-    document.getElementById('focus-mode-toggle').addEventListener('click', (e) => {
+    byId<HTMLElement>('focus-mode-toggle').addEventListener('click', (e) => {
         document.body.classList.toggle('focus-active');
-        e.currentTarget.classList.toggle('active', document.body.classList.contains('focus-active'));
-        e.currentTarget.setAttribute('aria-pressed', String(document.body.classList.contains('focus-active')));
+        (e.currentTarget as HTMLButtonElement).classList.toggle('active', document.body.classList.contains('focus-active'));
+        (e.currentTarget as HTMLButtonElement).setAttribute('aria-pressed', String(document.body.classList.contains('focus-active')));
     });
 
     UI.UI.timerModes.forEach(btn => {
         btn.addEventListener('click', (e) => {
-            setMode(e.target.dataset.mode);
+            setMode((e.target as HTMLButtonElement).dataset.mode as TimerMode);
         });
     });
 
     // Timer Settings Modal
-    document.getElementById('open-timer-settings-btn').addEventListener('click', () => {
+    byId<HTMLButtonElement>('open-timer-settings-btn').addEventListener('click', () => {
         openModal('timer-settings-modal');
     });
 
-    document.getElementById('close-timer-settings-btn').addEventListener('click', () => {
+    byId<HTMLButtonElement>('close-timer-settings-btn').addEventListener('click', () => {
         closeModal();
     });
 
-    document.getElementById('save-timer-settings-btn').addEventListener('click', () => {
-        const inputs = ['setting-focus-duration', 'setting-short-break-duration', 'setting-long-break-duration'].map(id => document.getElementById(id));
+    byId<HTMLButtonElement>('save-timer-settings-btn').addEventListener('click', () => {
+        const inputs = ['setting-focus-duration', 'setting-short-break-duration', 'setting-long-break-duration'].map(id => byId<HTMLInputElement>(id));
         if (!inputs.every(input => input.reportValidity())) return;
         const [focus, shortBreak, longBreak] = inputs.map(input => Number(input.value));
 
@@ -223,7 +227,7 @@ const initApp = async () => {
     });
 
     // Profile Modal
-    const profileCard = document.getElementById('my-presence-card');
+    const profileCard = byId<HTMLElement>('my-presence-card');
     profileCard.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -233,9 +237,9 @@ const initApp = async () => {
     profileCard.addEventListener('click', async () => {
         openModal('profile-modal');
 
-        document.getElementById('profile-display-name-input').value = currentUsername || '';
-        document.getElementById('profile-avatar').textContent = currentUsername.charAt(0).toUpperCase();
-        const statsEl = document.getElementById('profile-stats');
+        byId<HTMLInputElement>('profile-display-name-input').value = currentUsername || '';
+        byId<HTMLElement>('profile-avatar').textContent = currentUsername.charAt(0).toUpperCase();
+        const statsEl = byId<HTMLElement>('profile-stats');
         cachedProfileStats = null;
         statsEl.innerHTML = '<div style="color: var(--text-muted);">Loading…</div>';
 
@@ -249,26 +253,26 @@ const initApp = async () => {
     });
 
     document.addEventListener('focus-progress', () => {
-        if (cachedProfileStats && !document.getElementById('profile-modal').classList.contains('hidden')) renderProfileStats(withLiveFocus(cachedProfileStats));
+        if (cachedProfileStats && !byId<HTMLElement>('profile-modal').classList.contains('hidden')) renderProfileStats(withLiveFocus(cachedProfileStats));
     });
     document.addEventListener('session-completed', async () => {
         cachedProfileStats = null;
-        if (document.getElementById('profile-modal').classList.contains('hidden')) return;
+        if (byId<HTMLElement>('profile-modal').classList.contains('hidden')) return;
         try {
             cachedProfileStats = await getProfileStats(getMyUserId());
             renderProfileStats(withLiveFocus(cachedProfileStats));
         } catch { notify('Your focus summary could not be refreshed. Reopen it to retry.', 'error'); }
     });
-    document.getElementById('close-profile-btn').addEventListener('click', () => {
+    byId<HTMLButtonElement>('close-profile-btn').addEventListener('click', () => {
         closeModal();
     });
 
-    document.getElementById('save-profile-name-btn').addEventListener('click', async () => {
-        const input = document.getElementById('profile-display-name-input');
+    byId<HTMLButtonElement>('save-profile-name-btn').addEventListener('click', async () => {
+        const input = byId<HTMLInputElement>('profile-display-name-input');
         const newName = input.value.trim();
         if (!newName || newName.length > 40) { input.reportValidity(); return; }
 
-        const btn = document.getElementById('save-profile-name-btn');
+        const btn = byId<HTMLButtonElement>('save-profile-name-btn');
         const originalText = btn.innerText;
         btn.innerText = 'Saving...';
         btn.disabled = true;
@@ -287,20 +291,20 @@ const initApp = async () => {
         updateMyUsername(newName);
         updatePresence({});
         UI.updateMyPresenceUI({ status: UI.UI.myStatusText.textContent }, getTaskStats(), currentUsername);
-        document.getElementById('local-dummy-avatar').textContent = currentUsername.charAt(0).toUpperCase();
-        document.getElementById('profile-avatar').textContent = currentUsername.charAt(0).toUpperCase();
+        byId<HTMLElement>('local-dummy-avatar').textContent = currentUsername.charAt(0).toUpperCase();
+        byId<HTMLElement>('profile-avatar').textContent = currentUsername.charAt(0).toUpperCase();
         notify('Display name saved.');
     });
 
-    document.getElementById('retry-tasks-btn').addEventListener('click', async event => {
-        event.currentTarget.disabled = true;
+    byId<HTMLButtonElement>('retry-tasks-btn').addEventListener('click', async event => {
+        (event.currentTarget as HTMLButtonElement).disabled = true;
         try { await reloadTasks(); }
-        finally { document.getElementById('retry-tasks-btn').disabled = false; }
+        finally { byId<HTMLButtonElement>('retry-tasks-btn').disabled = false; }
     });
 
     // Task Controls
-    const taskInput = document.getElementById('new-task-input');
-    const addTaskBtn = document.getElementById('add-task-btn');
+    const taskInput = byId<HTMLInputElement>('new-task-input');
+    const addTaskBtn = byId<HTMLButtonElement>('add-task-btn');
     const submitTask = async () => {
         if (addTaskBtn.disabled) return;
         const title = taskInput.value;
@@ -312,45 +316,45 @@ const initApp = async () => {
     taskInput.addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submitTask(); }
     });
-    document.getElementById('share-link-btn').addEventListener('click', async () => {
+    byId<HTMLButtonElement>('share-link-btn').addEventListener('click', async () => {
         const url = new URL(window.location.href);
-        url.searchParams.set('room', document.getElementById('header-room-code').textContent);
+        url.searchParams.set('room', byId<HTMLElement>('header-room-code').textContent);
         try {
             await navigator.clipboard.writeText(url.toString());
             notify('Invite link copied.');
         } catch {
-            document.getElementById('invite-link-input').value = url.toString();
+            byId<HTMLInputElement>('invite-link-input').value = url.toString();
             openModal('invite-modal');
-            document.getElementById('invite-link-input').select();
+            byId<HTMLInputElement>('invite-link-input').select();
         }
     });
 
-    document.getElementById('invite-empty-btn').addEventListener('click', () => document.getElementById('share-link-btn').click());
+    byId<HTMLButtonElement>('invite-empty-btn').addEventListener('click', () => byId<HTMLButtonElement>('share-link-btn').click());
 
     // Theming Logic
-    const themePicker = document.getElementById('theme-picker');
+    const themePicker = byId<HTMLSelectElement>('theme-picker');
     const supportedThemes = new Set(['forest', 'midnight', 'warm', 'aqua', 'amethyst']);
-    const savedTheme = localStorage.getItem('flow_theme');
+    const savedTheme = localStorage.getItem('flow_theme') || 'forest';
     const activeTheme = supportedThemes.has(savedTheme) ? savedTheme : 'forest';
     document.documentElement.setAttribute('data-theme', activeTheme);
     themePicker.value = activeTheme;
 
     themePicker.addEventListener('change', (e) => {
-        const theme = e.target.value;
+        const theme = (e.target as HTMLSelectElement).value;
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('flow_theme', theme);
     });
 
 
 
-    document.getElementById('leave-btn').addEventListener('click', () => openModal('leave-modal'));
-    document.querySelector('.app-header .brand').addEventListener('click', e => { e.preventDefault(); openModal('leave-modal'); });
-    document.getElementById('cancel-leave-btn').addEventListener('click', closeModal);
-    document.getElementById('close-invite-btn').addEventListener('click', closeModal);
-    document.getElementById('confirm-leave-btn').addEventListener('click', async () => {
+    byId<HTMLButtonElement>('leave-btn').addEventListener('click', () => openModal('leave-modal'));
+    document.querySelector<HTMLElement>('.app-header .brand')!.addEventListener('click', e => { e.preventDefault(); openModal('leave-modal'); });
+    byId<HTMLButtonElement>('cancel-leave-btn').addEventListener('click', closeModal);
+    byId<HTMLButtonElement>('close-invite-btn').addEventListener('click', closeModal);
+    byId<HTMLButtonElement>('confirm-leave-btn').addEventListener('click', async () => {
         if (leaving) return;
         leaving = true;
-        document.getElementById('confirm-leave-btn').disabled = true;
+        byId<HTMLButtonElement>('confirm-leave-btn').disabled = true;
         cleanupMedia();
         try {
             await Promise.race([disconnectSocket(), new Promise(resolve => setTimeout(resolve, 1500))]);
@@ -363,14 +367,14 @@ const initApp = async () => {
     connectionStatus('CONNECTING');
 
     // Tab Logic
-    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabBtns = document.querySelectorAll<HTMLButtonElement>('.tab-btn');
     tabBtns.forEach(btn => {
         btn.addEventListener('keydown', (e) => {
             if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
                 e.preventDefault();
                 const next = e.key === 'Home' ? tabBtns[0] : e.key === 'End' ? tabBtns[tabBtns.length - 1] : [...tabBtns].find(b => b !== btn);
-                next.click();
-                next.focus();
+                next?.click();
+                next?.focus();
             }
         });
         btn.addEventListener('click', (e) => {
@@ -381,10 +385,11 @@ const initApp = async () => {
             });
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-            e.target.classList.add('active');
-            e.target.setAttribute('aria-selected', 'true');
-            e.target.tabIndex = 0;
-            document.getElementById(e.target.dataset.tab).classList.add('active');
+            (e.target as HTMLElement).classList.add('active');
+            (e.target as HTMLElement).setAttribute('aria-selected', 'true');
+            (e.target as HTMLElement).tabIndex = 0;
+            byId((e.target as HTMLButtonElement).dataset.tab!).classList.add('active');
+            reveal(byId((e.target as HTMLButtonElement).dataset.tab!));
         });
     });
 
@@ -395,30 +400,31 @@ const initApp = async () => {
     });
 
     setRoomBusy(false);
+    enterPage();
 };
 
-const renderProfileStats = stats => {
+const renderProfileStats = (stats: ProfileStats) => {
     const markup = '<div class="focus-summary"><span>Focused today</span><strong id="profile-today-value">' + formatFocusTime(stats.todayMinutes) + '</strong><p>' + (stats.liveMinutes ? 'Includes ' + stats.liveMinutes + ' live minute' + (stats.liveMinutes === 1 ? '' : 's') + ' from this visit.' : 'Your focus time, one session at a time.') + '</p></div>' +
         '<dl class="profile-stat-list">' + [
             ['All-time focus', formatFocusTime(stats.totalMinutes)],
             ['Current streak', stats.streak + ' day' + (stats.streak === 1 ? '' : 's')],
             ['Completed sessions', stats.sessionsCompleted], ['Completed tasks', stats.tasksCompleted]
         ].map(([label, value]) => '<div><dt>' + label + '</dt><dd>' + value + '</dd></div>').join('') + '</dl>';
-    const container = document.getElementById('profile-stats');
+    const container = byId<HTMLElement>('profile-stats');
     if (container.innerHTML !== markup) container.innerHTML = markup;
 };
 
 // Everyone currently in the room, keyed by user id, for the task
 // assignee picker — includes yourself alongside partners.js's tracked list.
 const getRoomParticipants = () => ({
-    [getMyUserId()]: { username: currentUsername },
+    [getMyUserId() || '']: { username: currentUsername },
     ...partners
 });
 
 const handleJoin = async () => {
     if (roomActionBusy) return;
     const roomCode = roomCodeInput.value.trim().toUpperCase();
-    const pin = document.getElementById('room-pin-input').value.trim();
+    const pin = byId<HTMLInputElement>('room-pin-input').value.trim();
     if (!/^[A-Z0-9]{6}$/.test(roomCode)) { showLobbyError('Enter the 6-character code shared by your study group.'); roomCodeInput.focus(); return; }
     if (pin && !/^\d{4}$/.test(pin)) { showLobbyError('Use a 4-digit PIN, or leave it empty.'); return; }
     const userObj = getStoredUser();
@@ -441,6 +447,7 @@ const handleJoin = async () => {
 
         closeModal();
         appContainer.classList.remove('hidden');
+        reveal(appContainer, 'room');
         const roomUrl = new URL(window.location.href);
         roomUrl.searchParams.set('room', roomCode);
         history.replaceState(null, '', roomUrl);
@@ -450,28 +457,28 @@ const handleJoin = async () => {
         // set until initTasks() runs much later in this function (after media
         // and socket setup) — adding a task in that window hits a real "room_id
         // violates not-null constraint" error. Disable until initTasks is ready.
-        const taskInput = document.getElementById('new-task-input');
-        const addTaskBtn = document.getElementById('add-task-btn');
+        const taskInput = byId<HTMLInputElement>('new-task-input');
+        const addTaskBtn = byId<HTMLButtonElement>('add-task-btn');
         taskInput.disabled = true;
         addTaskBtn.disabled = true;
 
-        document.getElementById('header-room-code').innerText = roomCode; // Still show the code in the UI
+        byId<HTMLElement>('header-room-code').innerText = roomCode; // Still show the code in the UI
 
 
         // Initialize Local Media
-        const localVideo = document.getElementById('local-video');
+        const localVideo = byId<HTMLVideoElement>('local-video');
         await initMedia(localVideo);
         if (leaving) return;
 
-        const localDummy = document.getElementById('local-dummy-placeholder');
-        const cameraButton = document.getElementById('toggle-cam');
+        const localDummy = byId<HTMLElement>('local-dummy-placeholder');
+        const cameraButton = byId<HTMLButtonElement>('toggle-cam');
         cameraButton.classList.toggle('active', isVideoActive());
         cameraButton.setAttribute('aria-pressed', String(isVideoActive()));
         cameraButton.innerHTML = isVideoActive() ? CAM_ON_ICON : CAM_OFF_ICON;
         if (!isVideoActive()) {
             localDummy.classList.remove('hidden');
-            document.getElementById('local-dummy-avatar').innerText = currentUsername.charAt(0).toUpperCase();
-            localDummy.querySelector('.text').innerText = 'Camera Off';
+            byId<HTMLElement>('local-dummy-avatar').innerText = currentUsername.charAt(0).toUpperCase();
+            localDummy.querySelector<HTMLElement>('.text')!.innerText = 'Camera Off';
         }
 
         // getUserMedia can succeed for video while falling back to no audio at
@@ -479,7 +486,7 @@ const handleJoin = async () => {
         // in that case, so disable the control up front instead of leaving a
         // clickable button that silently does nothing.
         if (!hasAudioTrack()) {
-            const micBtn = document.getElementById('toggle-mic');
+            const micBtn = byId<HTMLButtonElement>('toggle-mic');
             micBtn.classList.remove('active');
             micBtn.innerHTML = MIC_OFF_ICON;
             micBtn.disabled = true;
@@ -525,7 +532,7 @@ const handleJoin = async () => {
                 // Broadcast timer state to the new user
                 broadcastCurrentState();
             },
-            onUserLeft: (userId) => {
+            onUserLeft: (userId: string) => {
                 // Don't tear down immediately — a channel rebuild elsewhere in
                 // the room looks identical to a genuine leave followed almost
                 // instantly by a rejoin. Give it a grace window to resolve
@@ -561,13 +568,13 @@ const handleJoin = async () => {
             },
             onTimerUpdated: timerData => syncState(timerData),
             onTasksError: () => {
-                document.getElementById('task-sync-status').textContent = 'Tasks could not be loaded.';
-                document.getElementById('task-sync-status').classList.remove('hidden');
-                document.getElementById('retry-tasks-btn').classList.remove('hidden');
+                byId<HTMLElement>('task-sync-status').textContent = 'Tasks could not be loaded.';
+                byId<HTMLElement>('task-sync-status').classList.remove('hidden');
+                byId<HTMLButtonElement>('retry-tasks-btn').classList.remove('hidden');
             },
             onRoomTasksUpdate: (data) => {
-                document.getElementById('task-sync-status').classList.add('hidden');
-                document.getElementById('retry-tasks-btn').classList.add('hidden');
+                byId<HTMLElement>('task-sync-status').classList.add('hidden');
+                byId<HTMLButtonElement>('retry-tasks-btn').classList.add('hidden');
                 setSharedTasks(data.tasks);
             },
             onPartnerPresenceUpdate: (data) => {
@@ -596,7 +603,7 @@ const handleJoin = async () => {
                     // the same broken connection instead of actually recovering.
                     if (hasPeer(userId)) removePeer(userId);
                     // Only the "smaller" ID initiates the call to prevent double-calling
-                    if (getMyUserId() < userId) {
+                    if ((getMyUserId() || '') < userId) {
                         console.log(`[Self-Healing] Missing connection to ${userId}. Initiating call...`);
                         callUser(userId, onRemoteStream);
                     }
@@ -613,8 +620,8 @@ const handleJoin = async () => {
         });
 
         initTasks(currentRoomId, [], (tasks, stats) => {
-            UI.renderTaskList(document.getElementById('room-task-list'), tasks, false, toggleTask, deleteTask, getRoomParticipants(), assignTask);
-            UI.updateTaskStatsUI(stats, document.getElementById('room-task-progress-text'), document.getElementById('room-task-progress-fill'));
+            UI.renderTaskList(byId<HTMLElement>('room-task-list'), tasks, false, toggleTask, deleteTask, getRoomParticipants(), assignTask);
+            UI.updateTaskStatsUI(stats, byId<HTMLElement>('room-task-progress-text'), byId<HTMLElement>('room-task-progress-fill'));
 
             // Refresh my presence UI when tasks change
             UI.updateMyPresenceUI(getPresenceState(), getTaskStats(), currentUsername);
@@ -645,8 +652,8 @@ const handleJoin = async () => {
     }
 };
 
-const ensureVideoWrapper = (userId) => {
-    let videoEl = document.getElementById(`video-${userId}`);
+const ensureVideoWrapper = (userId: string) => {
+    let videoEl = document.getElementById(`video-${userId}`) as HTMLVideoElement | null;
     if (!videoEl) {
         const wrapper = document.createElement('div');
         wrapper.className = 'video-wrapper fade-in';
@@ -672,13 +679,13 @@ const ensureVideoWrapper = (userId) => {
     } else {
         const nameTag = document.getElementById(`name-tag-${userId}`);
         if (nameTag && partners[userId]) {
-            nameTag.innerText = partners[userId].username;
+            nameTag.innerText = partners[userId].username || 'Partner';
         }
     }
     return videoEl;
 };
 
-const onRemoteStream = (userId, stream) => {
+const onRemoteStream = (userId: string, stream: MediaStream) => {
     const videoEl = ensureVideoWrapper(userId);
     if (videoEl.srcObject !== stream) {
         videoEl.srcObject = stream;
@@ -691,15 +698,15 @@ const onRemoteStream = (userId, stream) => {
     });
 };
 
-const removeRemoteVideo = (userId) => {
+const removeRemoteVideo = (userId: string) => {
     const wrapper = document.getElementById(`video-wrapper-${userId}`);
     if (wrapper) wrapper.remove();
 };
 
-const getWrapperForUser = (userId) =>
+const getWrapperForUser = (userId: string) =>
     document.getElementById(userId === getMyUserId() ? 'video-wrapper-local' : `video-wrapper-${userId}`);
 
-const showReaction = (userId, emoji) => {
+const showReaction = (userId: string, emoji: string) => {
     const wrapper = getWrapperForUser(userId);
     if (!wrapper) return;
 
@@ -710,7 +717,7 @@ const showReaction = (userId, emoji) => {
     setTimeout(() => el.remove(), 1800);
 };
 
-const setHandRaised = (userId, raised) => {
+const setHandRaised = (userId: string, raised: boolean) => {
     const wrapper = getWrapperForUser(userId);
     if (!wrapper) return;
 
@@ -727,7 +734,7 @@ const setHandRaised = (userId, raised) => {
     }
 };
 
-const updatePartnerUI = (userId) => {
+const updatePartnerUI = (userId: string) => {
     const partner = partners[userId];
     if (!partner) return;
 
