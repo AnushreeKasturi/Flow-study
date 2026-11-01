@@ -33,7 +33,7 @@
 .auth-message { display: none; padding: 12px; margin-top: 20px; border: 1px solid currentColor; border-radius: 8px; font-size: .9rem; overflow-wrap: anywhere; }
 .error-msg { color: var(--danger); }
 .success-msg { color: var(--green); }
-.login-footer { position: absolute; top: max(calc(100svh - 52px), 728px); left: 0; width: 100%; display: flex; justify-content: space-between; gap: 24px; padding: 16px 4vw; font-size: .73rem; color: var(--text-muted); }
+.login-footer { position: absolute; top: max(calc(100svh - 60px), 720px); left: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 4vw; font-size: .73rem; color: var(--text-muted); }
 .login-footer span:first-child { color: #b7c8c1; }
 @media (max-width: 1000px) {
     .login-layout { grid-template-columns: 1fr 1fr; }
@@ -55,5 +55,4 @@
     .login-card h2 { font-size: 1.6rem; }
     .login-footer { position: static; padding: 20px 24px; }
     .login-footer span:first-child { color: var(--text-muted); }
-    .login-footer span:last-child { display: none; }
 }
