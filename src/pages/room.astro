@@ -1,0 +1,25 @@
+---
+import Page from '../layouts/Page.astro';
+import Dialogs from '../components/room/Dialogs.astro';
+import Header from '../components/room/Header.astro';
+import Scene from '../components/room/Scene.astro';
+import Sky from '../components/Sky.astro';
+import VideoStage from '../components/room/VideoStage.astro';
+import SessionTools from '../components/room/SessionTools.astro';
+import '../styles/room.css';
+---
+<Page title="Study room | Flow" bodyClass="room-page">
+    <Fragment slot="head">
+        <!-- Signed-out visitors go to login before the room bundle runs; an invite code rides along. -->
+        <script is:inline>try { if (!localStorage.getItem('flow_user')) location.replace('/login.html' + location.search); } catch (e) {}</script>
+    </Fragment>
+    <Sky />
+    <div id="toast" class="toast hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+    <Dialogs />
+    <div id="app" class="app-container hidden">
+        <Header />
+        <div id="network-banner" class="network-banner hidden" role="status">You’re offline. Changes may not save until your connection returns.</div>
+        <div class="workspace-grid"><Scene /><VideoStage /><SessionTools /></div>
+    </div>
+    <script>import '../client/room';</script>
+</Page>

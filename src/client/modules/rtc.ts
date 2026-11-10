@@ -1,5 +1,6 @@
 import type { SignalMessage, RemoteStream } from '../types';
 import { sendSignal, getMyUserId } from './socket';
+import { api } from './api';
 
 let localStream: MediaStream | null = null;
 let mediaGeneration = 0;
@@ -35,7 +36,7 @@ const fetchTurnCredentials = async () => {
     if (fetchTurnPromise) return fetchTurnPromise;
     fetchTurnPromise = (async () => {
         try {
-            const response = await fetch('/api/turn-credentials', { method: 'POST', signal: AbortSignal.timeout(5000) });
+            const response = await api('/api/turn-credentials', {}, 5000);
             if (!response.ok) return;
             const data = await response.json();
             if (Array.isArray(data.iceServers) && data.iceServers.length) {

@@ -5,9 +5,10 @@ import { getSupabase } from './supabase';
 import { finishFocus, confirmFocus } from './focus-progress';
 import { fetchDailyFocusTime } from './presence';
 import { openModal, closeModal, notify } from './feedback';
+import { ROUNDS } from './ui';
 
 let state: TimerState = {
-    mode: 'focus', // 'focus', 'shortBreak', 'longBreak'
+    mode: 'focus',
     timeLeft: 25 * 60,
     isRunning: false,
     duration: 25 * 60,
@@ -39,12 +40,14 @@ export const syncState = (newState: Partial<TimerState>) => {
     if (newState.duration !== undefined && (!Number.isInteger(newState.duration) || newState.duration < 60 || newState.duration > 7200)) return;
     if (newState.durations && !validDurations(newState.durations)) return;
     if (newState.isRunning !== undefined && typeof newState.isRunning !== 'boolean') return;
+    if (newState.sessionCount !== undefined && (!Number.isInteger(newState.sessionCount) || newState.sessionCount < 0 || newState.sessionCount > 10000)) return;
     // If we receive a sync with the full state, update our local state
     if (newState.durations) state.durations = newState.durations;
     if (newState.mode) state.mode = newState.mode;
     if (newState.duration) state.duration = newState.duration;
     if (newState.timeLeft !== undefined) state.timeLeft = newState.timeLeft;
     if (newState.isRunning !== undefined) state.isRunning = newState.isRunning;
+    if (newState.sessionCount !== undefined) state.sessionCount = newState.sessionCount;
 
     deadline = Date.now() + state.timeLeft * 1000;
     if (state.isRunning && !timerInterval) {
@@ -99,7 +102,7 @@ export const setMode = (mode: TimerMode, broadcast = true) => {
 const validDurations = (values: Durations) => (['focus', 'shortBreak', 'longBreak'] as const).every(key => Number.isInteger(values[key]) && values[key] >= 60 && values[key] <= (key === 'focus' ? 7200 : 3600));
 
 export const setTimerSettings = (durations: Durations, broadcast = true) => {
-    if (!validDurations(durations)) return false;
+    if (!validDurations(durations)) return;
     state.durations = durations;
     state.duration = MODES[state.mode]();
     if (!state.isRunning) {
@@ -158,7 +161,7 @@ const playChime = () => {
         osc.frequency.exponentialRampToValueAtTime(440, sharedAudioCtx.currentTime + 0.5); // Slide down to A4
 
         gainNode.gain.setValueAtTime(0, sharedAudioCtx.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.5, sharedAudioCtx.currentTime + 0.05);
+        gainNode.gain.linearRampToValueAtTime(0.3, sharedAudioCtx.currentTime + 0.05);
         gainNode.gain.exponentialRampToValueAtTime(0.001, sharedAudioCtx.currentTime + 1.5);
 
         osc.connect(gainNode);
@@ -171,16 +174,20 @@ const playChime = () => {
     }
 };
 
+// A system notification, only when the user opted in and Flow is in a background tab.
+const announce = (title: string, body: string) => {
+    try {
+        if (document.hidden && localStorage.getItem('flow_notify') === '1' && 'Notification' in window && Notification.permission === 'granted') {
+            new Notification(title, { body, icon: '/favicon.svg', tag: 'flow-timer' });
+        }
+    } catch { /* Notifications are a courtesy; the chime and dialog still fire. */ }
+};
+
 const handleComplete = () => {
     stopLocalTick();
-
-    let title = "Time's Up!";
-    let msg = "Great session!";
+    let title, msg;
 
     if (state.mode === 'focus') {
-        title = "Focus session complete";
-        msg = "Your focus session is complete. Take a short break before the next one.";
-
         const userId = getMyUserId();
         const completed = finishFocus();
         if (userId && completed) {
@@ -194,30 +201,28 @@ const handleComplete = () => {
             }).catch(() => notify('This session could not be saved. Its focus time is still included while this page stays open.', 'error'));
         }
 
-        // Auto switch to break mode
-        setMode('shortBreak');
+        // Every fourth focus block earns the long break.
+        state.sessionCount++;
+        const longBreak = state.sessionCount % ROUNDS === 0;
+        title = 'Focus session complete';
+        msg = longBreak ? `That’s ${ROUNDS} rounds. Take a long break; you’ve earned it.` : 'Nice work. Take a short break before the next one.';
+        setMode(longBreak ? 'longBreak' : 'shortBreak');
         document.body.classList.remove('focus-active');
         const focusBtn = byId<HTMLElement>('focus-mode-toggle');
-        if(focusBtn) focusBtn.classList.remove('active');
+        focusBtn.classList.remove('active');
+        focusBtn.setAttribute('aria-pressed', 'false');
     } else {
-        title = "Break complete";
-        msg = "Ready for your next focus session?";
-        // Auto switch to focus mode
+        title = 'Break complete';
+        msg = 'Ready for your next focus session?';
         setMode('focus');
     }
 
-    // Play sound
     playChime();
-
-    // Show Modal
-    const overlay = byId<HTMLElement>('modal-overlay');
-    const alertModal = byId<HTMLElement>('timer-alert-modal');
-    if (overlay && alertModal) {
-        byId<HTMLElement>('timer-alert-title').innerText = title;
-        byId<HTMLElement>('timer-alert-msg').innerText = msg;
-        openModal('timer-alert-modal');
-        byId<HTMLButtonElement>('close-timer-alert-btn').onclick = closeModal;
-    }
+    announce(title, msg);
+    byId<HTMLElement>('timer-alert-title').textContent = title;
+    byId<HTMLElement>('timer-alert-msg').textContent = msg;
+    openModal('timer-alert-modal');
+    byId<HTMLButtonElement>('close-timer-alert-btn').onclick = closeModal;
 };
 
 const renderTimer = () => {

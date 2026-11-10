@@ -1,5 +1,5 @@
-import { enterPage } from './motion';
 import { byId } from './dom';
+import { bindThemePicker } from './theme';
 import supabase from './modules/supabase';
 
 // DOM Elements
@@ -9,22 +9,16 @@ const loginBtn = byId<HTMLButtonElement>('login-btn');
 const signupBtn = byId<HTMLButtonElement>('signup-btn');
 const errorMsg = byId<HTMLElement>('error-message');
 const successMsg = byId<HTMLElement>('success-message');
-const themePicker = byId<HTMLSelectElement>('theme-picker');
-
 let authBusy = false;
 let redirectPending = false;
 
-const supportedThemes = new Set(['forest', 'midnight', 'warm', 'aqua', 'amethyst']);
-const savedTheme = localStorage.getItem('flow_theme') || 'forest';
-const activeTheme = supportedThemes.has(savedTheme) ? savedTheme : 'forest';
-document.documentElement.setAttribute('data-theme', activeTheme);
-if (themePicker) {
-    themePicker.value = activeTheme;
-    themePicker.addEventListener('change', (e) => {
-        const theme = (e.target as HTMLSelectElement).value;
-        document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('flow_theme', theme);
-    });
+bindThemePicker(byId<HTMLSelectElement>('theme-picker'));
+
+// An invite link survives the trip through sign-in.
+const invitedRoom = new URLSearchParams(location.search).get('room');
+if (invitedRoom && /^[A-Za-z0-9]{6}$/.test(invitedRoom)) {
+    byId<HTMLElement>('invite-code').textContent = invitedRoom.toUpperCase();
+    byId<HTMLElement>('invite-note').classList.remove('hidden');
 }
 
 // Helper to show errors
@@ -51,10 +45,8 @@ const persistAndRedirect = (user: { id: string; email?: string }, action: string
         id: user.id,
         email: user.email
     }));
-    showSuccess(action === 'login' ? 'Logged in successfully! Redirecting...' : 'Account created successfully! Redirecting...');
-    setTimeout(() => {
-        window.location.href = '/';
-    }, 1000);
+    showSuccess(action === 'login' ? 'Logged in. Opening your room…' : 'Account created. Opening your room…');
+    setTimeout(() => { window.location.href = '/room.html' + location.search; }, 500);
 };
 
 const handleAuth = async (action: 'login' | 'signup') => {
@@ -72,14 +64,9 @@ const handleAuth = async (action: 'login' | 'signup') => {
         showError('Password must be at least 6 characters.');
         return;
     }
-    if (!supabase) {
-        showError('Sign-in is temporarily unavailable. Refresh the page and try again.');
-        return;
-    }
-
     const btn = action === 'login' ? loginBtn : signupBtn;
     const originalText = btn.innerText;
-    btn.innerText = 'Processing...';
+    btn.innerText = action === 'login' ? 'Logging in…' : 'Creating account…';
     authBusy = true;
     loginBtn.disabled = signupBtn.disabled = true;
     try {
@@ -144,9 +131,3 @@ byId<HTMLButtonElement>('toggle-password').addEventListener('click', event => {
     (event.currentTarget as HTMLButtonElement).setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
     (event.currentTarget as HTMLButtonElement).setAttribute('aria-pressed', String(visible));
 });
-document.querySelectorAll<HTMLButtonElement>('[data-preview-minutes]').forEach(button => button.addEventListener('click', () => {
-    byId<HTMLElement>('preview-time').textContent = button.dataset.previewMinutes!.padStart(2, '0') + ':00';
-    document.querySelectorAll<HTMLButtonElement>('[data-preview-minutes]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
-}));
-
-enterPage();

@@ -7,7 +7,7 @@ async page => {
     await page.getByLabel('Email address').fill('alex@example.com');
     await page.getByLabel('Password', { exact: true }).fill('test-password');
     await page.getByRole('button', { name: 'Log in', exact: true }).click();
-    await page.waitForURL(origin + '/');
+    await page.waitForURL(origin + '/room.html');
     await page.getByLabel('Room code', { exact: true }).fill('FOCUS6');
     await page.getByRole('button', { name: 'Join room', exact: true }).click();
     await page.waitForFunction(() => !document.getElementById('new-task-input').disabled);
@@ -52,11 +52,12 @@ async page => {
                 composerBottom: compose.getBoundingClientRect().bottom,
                 timerHeight: Math.round(timer.getBoundingClientRect().height),
                 chatHeight: Math.round(log.getBoundingClientRect().height),
-                modeButtonsFit: [...document.querySelectorAll('.mode-btn')].every(button => button.getBoundingClientRect().right <= rect.right)
+                modeButtonsFit: [...document.querySelectorAll('.mode-btn')].every(button => button.scrollWidth <= button.clientWidth && button.getBoundingClientRect().right <= innerWidth),
+                clockOnScreen: innerWidth <= 1050 || document.querySelector('.timer-modes').getBoundingClientRect().bottom <= innerHeight
             };
         });
         measurements.push(layout);
-        assert(layout.pageFits && layout.panelFits && layout.modeButtonsFit, width + 'x' + height + ': panel or controls overflow');
+        assert(layout.pageFits && layout.panelFits && layout.modeButtonsFit && layout.clockOnScreen, width + 'x' + height + ': panel or controls overflow ' + JSON.stringify(layout));
         assert(layout.chatHeight >= (height <= 560 && width > 1050 ? 80 : 110), width + 'x' + height + ': message area is too cramped (' + layout.chatHeight + 'px)');
         assert(layout.composerBottom <= layout.panelBottom, width + 'x' + height + ': composer should remain inside panel');
         if (width > 1050) assert(layout.panelBottom <= height + 1, width + 'x' + height + ': tools should fit the viewport ' + JSON.stringify(layout));
@@ -67,9 +68,11 @@ async page => {
         await page.getByRole('button', { name: 'Toggle Focus Mode', exact: true }).click();
         await page.waitForFunction(() => document.body.classList.contains('focus-active'));
         assert(await page.locator('#focus-mode-toggle').isVisible(), 'Focus mode must retain its exit control');
+        // Focus mode leaves only the sky and the clock; the clock and its controls must stay on screen.
         await page.waitForFunction(() => {
-            const rect = document.querySelector('.right-sidebar').getBoundingClientRect();
-            return [...document.querySelectorAll('.mode-btn')].filter(button => button.getClientRects().length).every(button => button.scrollWidth <= button.clientWidth && button.getBoundingClientRect().right <= rect.right) && rect.left >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight && rect.top >= 0;
+            const rect = document.querySelector('.pill-timer').getBoundingClientRect();
+            const exit = document.getElementById('focus-mode-toggle').getBoundingClientRect();
+            return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight && exit.bottom <= innerHeight && !document.querySelector('.right-sidebar').getClientRects().length;
         }, undefined, { polling: 50 });
         if (width === 1440 && height === 900) await page.screenshot({ path: 'output/playwright/fullscreen-amethyst.png' });
         await page.getByRole('button', { name: 'Toggle Focus Mode', exact: true }).click();

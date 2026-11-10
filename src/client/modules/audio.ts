@@ -6,7 +6,9 @@ import { notify } from './feedback';
 
 let provider: AudioProvider = 'youtube';
 const links = { youtube: '', spotify: '' };
-const sources: Record<AudioProvider, string | null> = { youtube: 'https://www.youtube.com/embed/rFZHOHl-L8A?autoplay=1&mute=1', spotify: null };
+// Players load only when someone asks for one, so joining a room never pulls in a third-party embed.
+const sources: Record<AudioProvider, string | null> = { youtube: null, spotify: null };
+const LOFI_STREAM = 'https://www.youtube.com/watch?v=rFZHOHl-L8A';
 const frame = (name: AudioProvider) => byId<HTMLIFrameElement>(name === 'youtube' ? 'youtube-iframe' : 'spotify-iframe');
 
 function selectProvider(next: AudioProvider) {
@@ -16,7 +18,8 @@ function selectProvider(next: AudioProvider) {
     document.querySelectorAll<HTMLButtonElement>('[data-audio-provider]').forEach(button => {
         button.setAttribute('aria-pressed', String(button.dataset.audioProvider === next));
     });
-    byId<HTMLIFrameElement>('youtube-iframe').classList.toggle('hidden', next !== 'youtube');
+    byId<HTMLIFrameElement>('youtube-iframe').classList.toggle('hidden', next !== 'youtube' || !sources.youtube);
+    byId<HTMLElement>('youtube-empty').classList.toggle('hidden', next !== 'youtube' || !!sources.youtube);
     byId<HTMLIFrameElement>('spotify-iframe').classList.toggle('hidden', next !== 'spotify' || !sources.spotify);
     byId<HTMLElement>('spotify-empty').classList.toggle('hidden', next !== 'spotify' || !!sources.spotify);
     const input = byId<HTMLInputElement>('youtube-url-input');
@@ -53,5 +56,6 @@ export function initAudio() {
         } catch { notify('The link could not be shared. Check your connection and try again.', 'error'); }
         finally { button.disabled = false; }
     });
+    byId<HTMLButtonElement>('load-lofi-btn').addEventListener('click', () => loadRoomAudio('youtube', LOFI_STREAM));
     selectProvider(provider);
 }

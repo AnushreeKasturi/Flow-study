@@ -9,81 +9,93 @@ async (page) => {
         await page.locator(selector).waitFor({ state: 'visible' });
         if (selector === '#join-modal') await page.waitForFunction(() => !document.getElementById('join-btn').disabled);
     };
-    const fitsViewport = async () => assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Page overflows horizontally');
+    // Polls briefly: right after a resize, size transitions hold the old layout for a frame.
+    const fitsViewport = () => page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth, undefined, { timeout: 2000 }).catch(() => { throw new Error('Page overflows horizontally at ' + page.viewportSize().width + 'px'); });
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
     await page.route('https://open.spotify.com/**', route => route.fulfill({ body: '<body>Spotify player fixture</body>', contentType: 'text/html' }));
     await page.route('https://www.youtube.com/**', route => route.fulfill({ body: '<body style="background:#14221b;color:#9baa9c;font:12px sans-serif;padding:20px">Background audio preview</body>', contentType: 'text/html' }));
-    await page.route('https://cdn.jsdelivr.net/**', route => route.fulfill({ contentType: 'text/javascript', body: `window.supabase = { createClient() {
-        const user = { id: 'test-user', email: 'alex@example.com' };
-        const tables = { profiles: [{ id: user.id, display_name: 'Alex' }], rooms: [], tasks: [], sessions: [] };
-        const fixture = window.__fixture = { tables, calls: [], delay: 0, fail: null, authFailure: false, collision: false, rpcError: null, channelCount: 0, handlers: {} };
-        async function authResult() {
-            fixture.calls.push({ action: 'auth' });
-            await new Promise(resolve => setTimeout(resolve, fixture.delay));
-            if (fixture.authFailure) throw new Error('Network unavailable');
-            return { data: { user, session: {} }, error: null };
-        }
-        function from(table) {
-            let action = 'select', payload, filters = [], single = false;
-            const query = {
-                select() { return this; }, order() { return this; }, limit() { return this; }, gte() { return this; },
-                eq(key, value) { filters.push(row => row[key] === value); return this; },
-                maybeSingle() { single = true; return this; },
-                insert(value) { action = 'insert'; payload = value; return this; },
-                update(value) { action = 'update'; payload = value; return this; },
-                upsert(value) { action = 'insert'; payload = value; return this; },
-                delete() { action = 'delete'; return this; },
-                then(resolve, reject) {
-                    return (async () => {
-                    fixture.calls.push({ table, action });
-                    await new Promise(resolve => setTimeout(resolve, fixture.delay));
-                    const failure = fixture.fail;
-                    if (failure && failure.table === table && failure.action === action) {
-                        fixture.fail = null;
-                        if (failure.throw) throw new Error('Network failure');
-                        return { data: [], error: failure.zero ? null : { message: 'Permission denied' } };
-                    }
-                    if (fixture.collision && table === 'rooms' && action === 'select') return { data: [{ id: 'collision' }], error: null };
-                    let rows = tables[table].filter(row => filters.every(filter => filter(row)));
-                    if (action === 'insert') {
-                        rows = (Array.isArray(payload) ? payload : [payload]).map(row => ({ id: crypto.randomUUID(), ...row }));
-                        tables[table].push(...rows);
-                    }
-                    if (action === 'update') rows.forEach(row => Object.assign(row, payload));
-                    if (action === 'delete') tables[table] = tables[table].filter(row => !rows.includes(row));
-                    return { data: single ? rows[0] || null : structuredClone(rows), error: null, count: rows.length };
-                    })().then(resolve, reject);
-                }
-            };
-            return query;
-        }
-        const channel = {
-            on(type, config, callback) { fixture.handlers[type + ':' + config.event] = callback; return this; },
-            subscribe(callback) { fixture.status = callback; setTimeout(() => callback('SUBSCRIBED'), 0); return this; },
-            async track(value) { if (fixture.trackFailures > 0) { fixture.trackFailures--; throw new Error('Track failed'); } this.presence = value; }, async untrack() { fixture.untracked = true; },
-            async send(value) { fixture.calls.push({ action: 'send', value }); return fixture.sendStatus || 'ok'; },
-            presenceState() { return { [user.id]: [this.presence || { username: 'Alex' }] }; }
-        };
-        return {
-            from, channel: () => { fixture.channelCount++; return channel; }, async removeChannel() { fixture.removed = true; },
-            rpc: async () => {
-                fixture.calls.push({ action: 'rpc' });
-                await new Promise(resolve => setTimeout(resolve, fixture.delay));
-                if (fixture.rpcError === 'throw') throw new Error('Network unavailable');
-                return { data: fixture.rpcError ? null : 'test-room', error: fixture.rpcError ? { message: fixture.rpcError } : null };
-            },
-            auth: {
-                signInWithPassword: authResult, signUp: authResult, signOut: async () => {}
-            }
-        };
-    } };` }));
+    await page.addInitScript({ path: 'scripts/supabase-fixture.js' });
     await page.addInitScript(() => {
         if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = async () => { throw new Error('Camera disabled for UI test'); };
     });
     await page.goto(origin + '/login.html');
     await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
     await page.reload();
+
+    // Landing page: fits every width, the hero timer responds, and old invite links still reach the room.
+    await page.goto(origin + '/');
+    for (const width of [1440, 768, 390, 320]) {
+        await page.setViewportSize({ width, height: 900 });
+        await fitsViewport();
+        await visible('#preview-toggle');
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    assert(await page.locator('.intro').isHidden(), 'Reduced motion must skip the opening animation');
+    await page.screenshot({ path: 'output/playwright/landing-desktop.png' });
+    await page.getByRole('button', { name: 'Play the demo', exact: true }).click();
+    await page.waitForFunction(() => document.getElementById('preview-time').textContent !== '25:00' && Number(getComputedStyle(document.body).getPropertyValue('--sun-y')) > .43);
+    await page.getByRole('button', { name: 'Daylight', exact: true }).click();
+    assert(await page.locator('html').getAttribute('data-theme') === 'daylight', 'Landing swatches should change the atmosphere');
+    await page.getByRole('button', { name: 'Forest', exact: true }).click();
+    assert(await page.getByRole('link', { name: 'Log in', exact: true }).first().getAttribute('href') === '/login.html', 'Signed-out visitors are sent to login');
+
+    // Setup flow: every answer changes the page, is kept for the room, and ends in an account.
+    await page.goto(origin + '/start.html');
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    assert(await page.locator('#start-message').isVisible() && await page.locator('.step[data-step="name"]').isVisible(), 'Setup needs a name before moving on');
+    await page.getByLabel('Your name').fill('Alex');
+    assert(await page.locator('#start-greeting').innerText() === 'Hello, Alex.', 'The greeting should answer as the name is typed');
+    await page.getByLabel('Your name').press('Enter');
+    await page.getByRole('button', { name: 'Midnight', exact: true }).click();
+    assert(await page.locator('html').getAttribute('data-theme') === 'midnight', 'Choosing a sky should retheme the page');
+    await page.getByRole('button', { name: 'Forest', exact: true }).click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    const sunAt = () => page.evaluate(() => Number(document.body.style.getPropertyValue('--sun-y')));
+    const lowSun = await sunAt();
+    await page.getByRole('button', { name: '45 min', exact: true }).click();
+    assert(await page.locator('#start-minutes').innerText() === '45' && await sunAt() < lowSun, 'A longer block should lift the sun');
+    const sunBox = await page.locator('.sun').boundingBox();
+    await page.mouse.move(sunBox.x + sunBox.width / 2, sunBox.y + sunBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(sunBox.x + sunBox.width / 2, sunBox.y - 60, { steps: 4 });
+    await page.mouse.up();
+    assert(Number(await page.locator('#start-minutes').innerText()) > 45, 'Dragging the sun up should lengthen the block');
+    await page.getByLabel('Focus length in minutes').fill('30');
+    for (const width of [1440, 390, 320]) { await page.setViewportSize({ width, height: 900 }); await fitsViewport(); }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.screenshot({ path: 'output/playwright/setup-desktop.png' });
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await visible('.step[data-step="sky"]');
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button', { name: /^Pink noise/ }).click();
+    await page.getByRole('button', { name: /^Silence/ }).click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button', { name: 'Create my account', exact: true }).click();
+    assert((await page.locator('#start-message').innerText()).includes('email') && await page.evaluate(() => window.__fixture.calls.length) === 0, 'Setup must validate before reaching auth');
+    await page.getByLabel('Email address').fill('alex@example.com');
+    await page.getByLabel('Password', { exact: true }).fill('test-password');
+    await page.getByRole('button', { name: 'Create my account', exact: true }).click();
+    await page.waitForURL(origin + '/room.html');
+    await visible('#join-modal');
+    assert(await page.locator('#lobby-step').isVisible(), 'A name given during setup must not be asked for again');
+    assert(await page.evaluate(() => localStorage.getItem('flow_focus_minutes')) === '30', 'Setup choices should be kept for the room');
+    // A room created after setup starts with the chosen focus length and shows the first-session checklist.
+    await page.getByRole('button', { name: 'Create a room', exact: true }).click();
+    await page.waitForFunction(() => document.getElementById('time-display').textContent === '30:00');
+    await visible('#room-guidance');
+    await page.getByRole('button', { name: 'Start timer', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('[data-check="timer"]').classList.contains('done'));
+    await page.getByRole('button', { name: 'Leave', exact: true }).click();
+    await page.getByRole('button', { name: 'Leave room', exact: true }).click();
+    await visible('#join-modal');
+    await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
+
+    await page.goto(origin + '/?room=FOCUS6');
+    await page.waitForURL(origin + '/login.html?room=FOCUS6');
+    assert((await page.locator('#invite-note').innerText()).includes('FOCUS6'), 'An invite code should survive the trip through login');
+    await page.goto(origin + '/login.html');
     for (const width of [1440, 768, 390, 320]) {
         await page.setViewportSize({ width, height: 900 });
         await fitsViewport();
@@ -91,12 +103,9 @@ async (page) => {
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({ path: 'output/playwright/after-login-desktop.png' });
-    await page.getByRole('button', { name: 'Long break', exact: true }).click();
-    assert(await page.locator('#preview-time').textContent() === '15:00', 'Entry preview should respond to mode selection');
     await page.getByRole('button', { name: 'Show password', exact: true }).click();
     assert(await page.locator('#password-input').getAttribute('type') === 'text', 'Password visibility should toggle');
     await page.getByRole('button', { name: 'Hide password', exact: true }).click();
-    await page.getByRole('button', { name: 'Focus', exact: true }).click();
     await page.getByLabel('Your atmosphere').selectOption('midnight');
     await page.reload();
     assert(await page.locator('html').getAttribute('data-theme') === 'midnight', 'Theme should persist');
@@ -112,7 +121,7 @@ async (page) => {
     assert(!(await page.locator('#login-btn').isDisabled()), 'Login must recover after network failure');
     await page.evaluate(() => { window.__fixture.authFailure = false; window.__fixture.delay = 150; });
     await page.getByLabel('Password', { exact: true }).press('Enter');
-    await page.waitForURL(origin + '/');
+    await page.waitForURL(origin + '/room.html');
     await visible('#join-modal');
     await page.screenshot({ path: 'output/playwright/after-lobby-desktop.png' });
     await page.getByRole('button', { name: 'Join room', exact: true }).click();
@@ -180,6 +189,30 @@ async (page) => {
     await page.getByLabel('Focus (minutes)', { exact: true }).fill('30');
     await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
     assert(await page.locator('#time-display').innerText() === '30:00', 'Timer settings should apply');
+    // Shortcuts act on the room but never while a control has focus or a dialog is open.
+    await page.locator('.stage-header h1').click();
+    await page.keyboard.press('s');
+    await visible('[aria-label="Pause timer"]');
+    await page.keyboard.press('s');
+    await visible('[aria-label="Start timer"]');
+    await page.keyboard.press('?');
+    await visible('#shortcuts-modal');
+    await page.keyboard.press('s');
+    assert(await page.locator('#timer-toggle-btn').getAttribute('aria-pressed') === 'false', 'Shortcuts must pause while a dialog is open');
+    await page.keyboard.press('Escape');
+    await page.getByLabel('New shared task').fill('s');
+    assert(await page.locator('#timer-toggle-btn').getAttribute('aria-pressed') === 'false', 'Typing must not trigger shortcuts');
+    await page.getByLabel('New shared task').fill('');
+
+    // Soundscape buttons are exclusive toggles and generate audio locally.
+    await page.getByRole('tab', { name: 'Sound', exact: true }).click();
+    await page.getByRole('button', { name: 'Brown', exact: true }).click();
+    await page.getByRole('button', { name: 'Pink', exact: true }).click();
+    assert(await page.getByRole('button', { name: 'Brown', exact: true }).getAttribute('aria-pressed') === 'false' && await page.getByRole('button', { name: 'Pink', exact: true }).getAttribute('aria-pressed') === 'true', 'Only one soundscape plays at a time');
+    await page.getByRole('button', { name: 'Pink', exact: true }).click();
+    assert(await page.getByRole('button', { name: 'Pink', exact: true }).getAttribute('aria-pressed') === 'false', 'Clicking the active soundscape stops it');
+    await page.getByRole('tab', { name: 'Tasks', exact: true }).click();
+
     await page.getByRole('tab', { name: 'Tasks', exact: true }).focus();
     await page.keyboard.press('ArrowRight');
     assert(await page.getByRole('tab', { name: 'Chat', exact: true }).getAttribute('aria-selected') === 'true', 'Arrow key should activate Chat');
@@ -211,7 +244,7 @@ async (page) => {
     await page.getByRole('button', { name: 'Done', exact: true }).click();
 
     // All appearance themes maintain readable body text.
-    for (const theme of ['forest', 'midnight', 'warm', 'aqua', 'amethyst']) {
+    for (const theme of ['forest', 'midnight', 'warm', 'aqua', 'amethyst', 'daylight']) {
         await page.getByLabel('Room atmosphere').selectOption(theme);
         const contrast = await page.evaluate(() => {
             const style = getComputedStyle(document.body);
@@ -279,8 +312,10 @@ async (page) => {
     await page.keyboard.press('Escape');
 
     // Background media accepts actual YouTube hosts, not lookalike domains.
+    await page.getByRole('tab', { name: 'Sound', exact: true }).click();
     await page.getByLabel('YouTube video or playlist link').fill('https://youtube.com.attacker.example/watch?v=jfKfPfyJRdk');
     const previousSrc = await page.locator('#youtube-iframe').getAttribute('src');
+    assert(previousSrc === null, 'No third-party player should load before someone asks for one');
     await page.getByRole('button', { name: 'Share audio with room', exact: true }).click();
     assert(await page.locator('#youtube-iframe').getAttribute('src') === previousSrc, 'Invalid media URL must not load');
     await page.getByLabel('YouTube video or playlist link').fill('https://youtu.be/jfKfPfyJRdk');
@@ -455,6 +490,7 @@ async (page) => {
     await page.evaluate(() => { window.__fixture.handlers['broadcast:timer-updated']({ payload: { mode: 'focus', timeLeft: 0, duration: 60, isRunning: true } }); });
     await visible('#timer-alert-modal');
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    assert(await page.locator('#rounds i.done').count() === 1 && await page.locator('.mode-btn.active').innerText() === 'Break', 'A finished focus block should fill one round and move to a break');
 
     await page.waitForFunction(() => window.__fixture.tables.sessions.length === 1);
     await page.getByRole('button', { name: 'Edit your profile', exact: true }).click();
@@ -510,19 +546,20 @@ async (page) => {
     await page.evaluate(() => { window.__fixture.collision = false; });
     await page.getByRole('button', { name: 'Create a room', exact: true }).click();
     await visible('#app');
+    await page.evaluate(() => localStorage.removeItem('flow_user'));
     await page.goto(origin + '/login.html');
     await page.screenshot({ path: 'output/playwright/after-login-mobile.png', fullPage: true });
 
     await page.getByLabel('Email address').fill('alex@example.com');
     await page.getByLabel('Password', { exact: true }).fill('test-password');
     await page.getByRole('button', { name: 'Create an account', exact: true }).click();
-    await page.waitForURL(origin + '/');
+    await page.waitForURL(origin + '/room.html');
     await visible('#join-modal');
     await page.getByRole('link', { name: 'Log out', exact: true }).click();
     await page.waitForURL(origin + '/login.html');
     assert(await page.evaluate(() => localStorage.getItem('flow_user')) === null, 'Logout must clear login');
     await page.evaluate(() => localStorage.setItem('flow_user', '{malformed'));
-    await page.goto(origin + '/');
+    await page.goto(origin + '/room.html');
     await page.waitForURL(origin + '/login.html');
     assert(failures.length === 0, 'Uncaught browser errors: ' + failures.join('; '));
     return { passed: true, taskRows: 500, reconciliations: 5, taskRenderMs: taskTiming, incomingMessages: 1000, retainedMessages: 300, simulatedParticipants: 16, localWebRTC: rtcResult, cleanup, browserErrors: failures };

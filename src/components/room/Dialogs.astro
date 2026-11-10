@@ -1,90 +1,100 @@
 ---
 import GitHubStar from '../GitHubStar.astro';
+import Icon from '../Icon.astro';
+const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focus mode'], ['M', 'Mute or unmute your microphone'], ['V', 'Turn your camera on or off'], ['?', 'Show these shortcuts'], ['Esc', 'Close a dialog']];
 ---
 <div id="modal-overlay" class="modal-overlay">
-
-        <div id="join-modal" class="modal brutal-card" role="dialog" aria-modal="true" aria-labelledby="join-title">
-            <div class="lobby-intro">
-                <a href="/" class="brand lobby-brand">flow<span class="brand-period">.</span></a>
-                <div><h1 id="join-title">A room for<br>your next idea.</h1><p>Bring a goal. Invite your study group. Make progress together.</p></div>
-                <p class="lobby-intro-note">Your timer, tasks, audio, and study partners.<br>All in one focused space.</p>
-            </div>
-            <div class="lobby-form">
-                <h2>Settle into your session.</h2>
+    <div id="join-modal" class="modal lobby" role="dialog" aria-modal="true" aria-labelledby="join-title">
+        <div class="lobby-intro">
+            <a href="/" class="brand">flow<i></i></a>
+            <div><h1 id="join-title">A room for<br>your next idea.</h1><p>Bring a goal. Invite your study group. Make progress together.</p></div>
+            <p class="lobby-intro-note">Your timer, tasks, sound, and study partners,<br>all in one focused space.</p>
+        </div>
+        <div class="lobby-form">
+            <!-- First visit only: shown until the account has a display name. -->
+            <form id="welcome-step" class="hidden">
+                <h2>First, what should we call you?</h2>
+                <p class="lobby-description">Your study partners see this name on your video tile and next to your tasks.</p>
+                <label for="welcome-name-input">Your name</label>
+                <input type="text" id="welcome-name-input" class="input" maxlength="40" autocomplete="nickname" required>
+                <p id="welcome-error" class="inline-error hidden" role="alert"></p>
+                <button id="welcome-save-btn" class="btn btn-primary btn-lg btn-block">Save and continue</button>
+                <p class="lobby-note">You can change it any time from your profile.</p>
+            </form>
+            <div id="lobby-step">
+                <h2 id="lobby-greeting">Settle into your session.</h2>
                 <p class="lobby-description">Use your group’s code, or create a new room.</p>
-            <label for="room-code-input">Room code</label>
-            <input type="text" id="room-code-input" class="input-field room-code-field" aria-describedby="lobby-error" placeholder="Enter 6-character code" maxlength="6" autocomplete="off" spellcheck="false">
-            <label for="room-pin-input">Room PIN <span class="text-muted">(if required)</span></label>
-            <input type="password" id="room-pin-input" class="input-field" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" autocomplete="off">
-            <p id="lobby-error" class="inline-error hidden" role="alert"></p>
-            <button id="join-btn" class="btn btn-primary" disabled>Join room</button>
-            <div class="lobby-divider"><span>Or start your own</span></div>
-            <button id="host-btn" class="btn btn-secondary" disabled>Create a room</button>
-                <p class="lobby-note">An optional 4-digit PIN protects a new room.</p>
-                <div class="lobby-footer"><a href="#" id="logout-link" class="logout-link">Log out</a><GitHubStar /></div>
+                <label for="room-code-input">Room code</label>
+                <input type="text" id="room-code-input" class="input room-code-field" aria-describedby="lobby-error" placeholder="Enter 6-character code" maxlength="6" autocomplete="off" spellcheck="false">
+                <label for="room-pin-input">Room PIN <span class="muted">(if required)</span></label>
+                <input type="password" id="room-pin-input" class="input" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" autocomplete="off">
+                <p id="lobby-error" class="inline-error hidden" role="alert"></p>
+                <button id="join-btn" class="btn btn-primary btn-lg btn-block" disabled>Join room</button>
+                <div class="divider"><span>Or start your own</span></div>
+                <button id="host-btn" class="btn btn-lg btn-block" disabled>Create a room</button>
+                <p class="lobby-note">Type a 4-digit PIN above first if you want the new room locked.</p>
             </div>
+            <div class="lobby-footer"><a href="#" id="logout-link" class="logout-link">Log out</a><GitHubStar /></div>
         </div>
+    </div>
 
-
-        <div id="timer-settings-modal" class="modal brutal-card hidden" role="dialog" aria-modal="true" aria-label="Timer settings">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h2 style="margin: 0; font-size: 1.25rem;">Timer Settings</h2>
-                <button id="close-timer-settings-btn" class="icon-btn" aria-label="Close timer settings"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-            </div>
-
-            <div class="settings-group mb-2">
-                <label for="setting-focus-duration">Focus (minutes)</label>
-                <input type="number" id="setting-focus-duration" required class="brutal-input mt-1" value="25" min="1" max="120">
-            </div>
-            <div class="settings-group mb-2">
-                <label for="setting-short-break-duration">Short break (minutes)</label>
-                <input type="number" id="setting-short-break-duration" required class="brutal-input mt-1" value="5" min="1" max="60">
-            </div>
-            <div class="settings-group mb-4">
-                <label for="setting-long-break-duration">Long break (minutes)</label>
-                <input type="number" id="setting-long-break-duration" required class="brutal-input mt-1" value="15" min="1" max="60">
-            </div>
-            <button id="save-timer-settings-btn" class="btn btn-primary">Save Changes</button>
+    <div id="timer-settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="timer-settings-title">
+        <div class="modal-head"><h2 id="timer-settings-title">Timer settings</h2><button id="close-timer-settings-btn" class="icon-btn quiet" aria-label="Close timer settings"><Icon name="close" /></button></div>
+        <p class="dialog-description">Lengths apply to everyone in the room.</p>
+        <div class="settings-grid">
+            <div><label for="setting-focus-duration">Focus (minutes)</label><input type="number" id="setting-focus-duration" required class="input" value="25" min="1" max="120"></div>
+            <div><label for="setting-short-break-duration">Short break (minutes)</label><input type="number" id="setting-short-break-duration" required class="input" value="5" min="1" max="60"></div>
+            <div><label for="setting-long-break-duration">Long break (minutes)</label><input type="number" id="setting-long-break-duration" required class="input" value="15" min="1" max="60"></div>
         </div>
+        <label class="check"><input type="checkbox" id="setting-notify"><span>Send me a notification when a session ends<small>Only shown while Flow is in a background tab.</small></span></label>
+        <button id="save-timer-settings-btn" class="btn btn-primary btn-block">Save Changes</button>
+    </div>
 
-
-        <div id="profile-modal" class="modal brutal-card hidden" role="dialog" aria-modal="true" aria-label="Your profile">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h2 style="margin: 0; font-size: 1.25rem;">Your Profile</h2>
-                <button id="close-profile-btn" class="icon-btn" aria-label="Close profile"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-            </div>
-
-            <div class="profile-identity"><div id="profile-avatar" class="avatar">?</div><p>Your rhythm, at a glance.<br><span>Live focus is included below.</span></p></div>
-            <div class="profile-name-form">
+    <div id="profile-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+        <div class="modal-head"><h2 id="profile-title">Your profile</h2><button id="close-profile-btn" class="icon-btn quiet" aria-label="Close profile"><Icon name="close" /></button></div>
+        <div class="profile-name-form">
+            <div id="profile-avatar" class="avatar">?</div>
+            <div>
                 <label for="profile-display-name-input">Display name</label>
                 <div class="input-row">
-                    <input type="text" id="profile-display-name-input" required class="brutal-input" placeholder="Your name" maxlength="40">
+                    <input type="text" id="profile-display-name-input" required class="input" placeholder="Your name" maxlength="40">
                     <button id="save-profile-name-btn" class="btn btn-primary">Save Name</button>
                 </div>
             </div>
-            <div id="profile-stats" aria-live="polite"></div>
-            <p class="profile-footnote">Completed sessions are saved to your history. Unsaved live progress lasts for this visit.</p>
         </div>
+        <div id="profile-stats" aria-live="polite"></div>
+        <p class="profile-footnote">Finished focus sessions are saved to your history. Time from a session still in progress counts while this page stays open.</p>
+    </div>
 
+    <div id="timer-alert-modal" class="modal hidden centered" role="dialog" aria-modal="true" aria-labelledby="timer-alert-title">
+        <h2 id="timer-alert-title">Time’s up</h2>
+        <p id="timer-alert-msg" class="dialog-description">Great focus session.</p>
+        <button id="close-timer-alert-btn" class="btn btn-primary btn-block">Continue</button>
+    </div>
 
-        <div id="timer-alert-modal" class="modal brutal-card hidden" role="dialog" aria-modal="true" aria-label="Session complete" style="text-align: center;">
-            <h2 id="timer-alert-title" style="margin-bottom: 12px; font-size: 1.5rem;">Time's Up!</h2>
-            <p id="timer-alert-msg" style="margin-bottom: 24px; font-weight: 500; font-size: 1.1rem; color: var(--text-secondary);">Great focus session.</p>
-            <button id="close-timer-alert-btn" class="btn btn-primary" style="width: 100%;">Continue</button>
-        </div>
-        <div id="leave-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="leave-title">
-            <h2 id="leave-title">Leave this session?</h2>
-            <p class="dialog-description">Your camera and microphone will disconnect. You can rejoin with the room code; saved shared tasks stay in the room.</p>
-            <div class="dialog-actions">
-                <button id="cancel-leave-btn" class="btn btn-secondary">Stay in room</button>
-                <button id="confirm-leave-btn" class="btn btn-danger">Leave room</button>
-            </div>
-        </div>
-        <div id="invite-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="invite-title">
-            <h2 id="invite-title">Invite your study group</h2>
-            <p class="dialog-description">Copy this link and share it with your study partners.</p>
-            <label for="invite-link-input">Room link</label>
-            <input id="invite-link-input" class="brutal-input mt-1" readonly>
-            <button id="close-invite-btn" class="btn btn-primary mt-4">Done</button>
+    <div id="leave-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="leave-title">
+        <h2 id="leave-title">Leave this session?</h2>
+        <p class="dialog-description">Your camera and microphone will disconnect. You can rejoin with the room code; saved shared tasks stay in the room.</p>
+        <div class="dialog-actions">
+            <button id="cancel-leave-btn" class="btn">Stay in room</button>
+            <button id="confirm-leave-btn" class="btn btn-danger">Leave room</button>
         </div>
     </div>
+
+    <div id="invite-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="invite-title">
+        <h2 id="invite-title">Invite your study group</h2>
+        <p class="dialog-description">Anyone with this link can join after signing in. Room code <strong id="invite-code-text"></strong>.</p>
+        <label for="invite-link-input">Room link</label>
+        <div class="input-row">
+            <input id="invite-link-input" class="input" readonly>
+            <button id="copy-invite-btn" class="btn btn-primary"><Icon name="copy" size={16} /><span>Copy link</span></button>
+        </div>
+        <div class="dialog-actions"><button id="close-invite-btn" class="btn">Done</button></div>
+    </div>
+
+    <div id="shortcuts-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+        <div class="modal-head"><h2 id="shortcuts-title">Keyboard shortcuts</h2><button id="close-shortcuts-btn" class="icon-btn quiet" aria-label="Close shortcuts"><Icon name="close" /></button></div>
+        <dl class="shortcut-list">{shortcuts.map(([key, action]) => <div><dt><kbd>{key}</kbd></dt><dd>{action}</dd></div>)}</dl>
+        <p class="profile-footnote">Shortcuts pause while you’re typing.</p>
+    </div>
+</div>

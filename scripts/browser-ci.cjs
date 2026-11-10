@@ -33,9 +33,12 @@ const app = require('../server');
         const rtcHarness = await build({
             entryPoints: ['src/client/modules/rtc.ts'], bundle: true, write: false, format: 'esm',
             plugins: [{ name: 'rtc-test-signalling', setup(builder) {
-                builder.onResolve({ filter: /^\.\/socket$/ }, () => ({ path: 'socket', namespace: 'test' }));
-                builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({
+                builder.onResolve({ filter: /^\.\/(socket|api)$/ }, args => ({ path: args.path, namespace: 'test' }));
+                builder.onLoad({ filter: /socket$/, namespace: 'test' }, () => ({
                     contents: "export const getMyUserId = () => 'test-user'; export const sendSignal = (to, signal) => window.__fixture.calls.push({ value: { payload: { to, from: 'test-user', signal } } });"
+                }));
+                builder.onLoad({ filter: /api$/, namespace: 'test' }, () => ({
+                    contents: "export const api = (path, body, timeoutMs) => fetch(path, { method: 'POST', signal: AbortSignal.timeout(timeoutMs) });"
                 }));
             } }]
         });

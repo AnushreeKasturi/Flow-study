@@ -1,0 +1,56 @@
+/* Setup: one question at a time, standing on the ground under a sky that reacts to each answer. */
+.start { --horizon: 40svh; --sun-size: clamp(130px, 22svh, 210px); --sun-y: .5; position: relative; min-height: 100svh; }
+.start .sun { transition: top .7s var(--ease), left .9s var(--ease), width .9s var(--ease); }
+/* On the length step the sun becomes a handle. */
+.start[data-step="length"] .sun { pointer-events: auto; cursor: grab; touch-action: none; }
+.start[data-step="length"] .sun:active { cursor: grabbing; }
+.start.dragging .sun { transition: none; }
+@keyframes hum { 50% { scale: 1.06; } }
+.start.sounding .sun { animation: hum 2.4s ease-in-out infinite; }
+
+.start-nav { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: 26px clamp(20px, 5vw, 72px); }
+.start-main { position: relative; z-index: 1; display: flex; flex-direction: column; width: min(100%, 880px); min-height: calc(100svh - var(--horizon)); margin: calc(var(--horizon) - 92px) auto 0; padding: 28px clamp(20px, 5vw, 48px) 24px; }
+
+@keyframes step-in { from { opacity: 0; transform: translateY(22px); } }
+.step { animation: step-in .55s var(--ease); }
+.step h1 { font-size: clamp(2.2rem, 5.4vw, 4rem); font-weight: 800; line-height: .92; letter-spacing: -.03em; text-wrap: balance; }
+.step-hint { margin-top: 14px; color: var(--text-3); font-size: .92rem; }
+.step-hint a { color: var(--text); }
+
+.big-input { width: 100%; margin-top: 28px; padding: 6px 0 12px; border: 0; border-bottom: 2.5px solid color-mix(in srgb, var(--text) 30%, transparent); outline: 0; background: transparent; color: var(--text); font-size: clamp(1.6rem, 3.6vw, 2.4rem); font-weight: 600; caret-color: var(--sun); transition: border-color .2s; }
+.big-input::placeholder { color: color-mix(in srgb, var(--text) 32%, transparent); }
+.big-input:focus { border-color: var(--sun); }
+
+.start .swatches { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-top: 28px; }
+
+.length-read { margin-top: 14px; font-size: 1.2rem; color: var(--text-2); }
+.length-read strong { margin-right: 8px; font-size: clamp(3.2rem, 8vw, 4.8rem); color: var(--text); font-variant-numeric: tabular-nums; }
+#start-length { width: 100%; margin: 8px 0 14px; accent-color: var(--sun); }
+.presets { max-width: 420px; }
+
+.choices { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 28px; }
+.choices button { display: flex; flex-direction: column; gap: 6px; padding: 16px; border: 1.5px solid transparent; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text-2); font-size: .88rem; line-height: 1.4; text-align: left; cursor: pointer; transition: transform .2s var(--ease), border-color .15s; }
+.choices button:hover { transform: translateY(-3px); }
+.choices strong { color: var(--text); font-size: 1.05rem; }
+.choices button[aria-pressed="true"] { border-color: var(--text); }
+
+.account-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
+.account-fields label { margin-bottom: 8px; }
+.account-fields .input { padding: 14px; }
+#start-message { margin-top: 20px; }
+#start-message.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+
+.start-foot { display: flex; align-items: center; gap: 20px; margin-top: auto; padding-top: 24px; }
+.start-dots { display: flex; gap: 8px; margin-right: auto; }
+.start-dots i { width: 9px; height: 9px; border-radius: 50%; background: color-mix(in srgb, var(--text) 22%, transparent); transition: background-color .3s, width .3s var(--ease); }
+.start-dots i.on { width: 28px; border-radius: 9px; background: var(--sun); }
+#start-back[hidden] + .start-dots { margin-left: 0; }
+
+@media (max-width: 760px) {
+    .start { --horizon: 34svh; }
+    .start .swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .choices, .account-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (max-width: 420px) {
+    .account-fields { grid-template-columns: minmax(0, 1fr); }
+}

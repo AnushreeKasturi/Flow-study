@@ -1,7 +1,7 @@
 {
   "name": "flow",
   "version": "1.0.0",
-  "description": "Virtual Study Room",
+  "description": "A shared study room: one timer, shared tasks, and your study group on camera.",
   "main": "server.js",
   "engines": {
     "node": "^22.23.4 || ^24.0.0 || ^26.0.0"
@@ -15,9 +15,11 @@
     "preview:social": "node scripts/generate-social-preview.cjs",
     "build": "astro build",
     "check": "astro check",
-    "pretest": "npm run check && npm run build"
+    "pretest": "npm run check && npm run build",
+    "dev:demo": "FLOW_DEMO=1 astro dev"
   },
   "dependencies": {
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@supabase/supabase-js": "^2.110.0",
     "astro": "^7.4.4",
     "dotenv": "^17.4.2",

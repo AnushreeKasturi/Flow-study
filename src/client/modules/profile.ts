@@ -11,6 +11,15 @@ export const getMyProfile = async (userId: string) => {
     return data;
 };
 
+// False only when the account demonstrably has no name yet. A failed read
+// counts as "has one", so a network blip never re-runs first-run setup.
+export const hasDisplayName = async (userId: string) => {
+    try {
+        const { data, error } = await getSupabase().from('profiles').select('display_name').eq('id', userId).maybeSingle();
+        return error ? true : !!data?.display_name;
+    } catch { return true; }
+};
+
 export const saveDisplayName = async (userId: string, displayName: string) => {
     try {
         const { error } = await getSupabase().from('profiles').upsert({
@@ -61,11 +70,20 @@ export const getStats = async (userId: string) => {
     today.setHours(0, 0, 0, 0);
     const savedTodaySeconds = rows.filter(r => new Date(r.completed_at).getTime() >= today.getTime()).reduce((acc, r) => acc + r.duration_seconds, 0);
 
+    // Saved seconds for each of the last seven local calendar days, oldest first.
+    const weekSeconds = Array.from({ length: 7 }, (_, index) => {
+        const day = new Date(today);
+        day.setDate(day.getDate() - (6 - index));
+        const key = day.toDateString();
+        return rows.filter(r => new Date(r.completed_at).toDateString() === key).reduce((acc, r) => acc + r.duration_seconds, 0);
+    });
+
     const streak = computeStreak(rows.map(r => new Date(r.completed_at).toDateString()));
 
     return withLiveFocus({
         savedTotalSeconds,
         savedTodaySeconds,
+        weekSeconds,
         persistedIds: rows.map(row => row.id),
         streak,
         sessionsCompleted: rows.length,

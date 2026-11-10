@@ -3,53 +3,49 @@ import Page from '../layouts/Page.astro';
 import GitHubStar from '../components/GitHubStar.astro';
 import '../styles/login.css';
 ---
-<Page bodyClass="login-page">
-
-    <header class="login-header">
-        <a href="/" class="brand" aria-label="Flow home">flow<span class="brand-period">.</span></a>
+<Page title="Log in | Flow" bodyClass="login-page">
+    <Fragment slot="head">
+        <script is:inline>try { if (localStorage.getItem('flow_user')) location.replace('/room.html' + location.search); } catch (e) {}</script>
+    </Fragment>
+    <aside class="login-photo">
+        <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
+        <div>
+            <p class="login-quote">A room, a goal, and a little momentum.</p>
+            <p id="invite-note" class="invite-note hidden">You’ve been invited to room <strong id="invite-code"></strong>. Log in or create an account and you’ll go straight there.</p>
+        </div>
+        <GitHubStar label="Open source on GitHub" />
+    </aside>
+    <main class="login-main">
         <div class="theme-control">
             <label for="theme-picker">Your atmosphere</label>
-            <select id="theme-picker" class="brutal-input">
+            <select id="theme-picker" class="input">
                 <option value="forest">Forest</option>
                 <option value="midnight">Midnight</option>
                 <option value="warm">Warm</option>
                 <option value="aqua">Aqua</option>
                 <option value="amethyst">Amethyst</option>
+                <option value="daylight">Daylight</option>
             </select>
         </div>
-    </header>
-    <main class="login-layout">
-        <section class="login-intro" aria-labelledby="intro-title">
-            <h1 id="intro-title">A space to think.<br>A rhythm to work.</h1>
-            <p>Set a goal, settle into a session, and work alongside the people who keep you going.</p>
-            <div class="entry-preview" aria-label="Timer preview">
-                <div class="preview-heading"><span>Timer preview</span><span>Find your rhythm</span></div>
-                <div id="preview-time" class="preview-time">25:00</div>
-                <div class="preview-modes" role="group" aria-label="Preview timer modes">
-                    <button type="button" data-preview-minutes="25" aria-pressed="true">Focus</button>
-                    <button type="button" data-preview-minutes="5" aria-pressed="false">Short break</button>
-                    <button type="button" data-preview-minutes="15" aria-pressed="false">Long break</button>
-                </div>
-            </div>
-            <div class="entry-features"><span>Shared timers</span><span>Clear goals</span><span>Good company</span></div>
-        </section>
         <section class="login-card" aria-labelledby="login-title">
-            <h2 id="login-title">Welcome to your space.</h2>
-            <p class="login-description" id="subtitle-text">Log in to pick up where you left off.</p>
+            <h1 id="login-title">Welcome to your space.</h1>
+            <p class="login-description">Log in to pick up where you left off, or create an account with the same form.</p>
             <form id="auth-form">
                 <label for="email-input">Email address</label>
-                <input type="email" id="email-input" class="brutal-input" placeholder="you@example.com" autocomplete="email" required>
+                <input type="email" id="email-input" class="input" placeholder="you@example.com" autocomplete="email" required>
                 <label for="password-input">Password</label>
-                <div class="password-field"><input type="password" id="password-input" class="brutal-input" placeholder="At least 6 characters" autocomplete="current-password" minlength="6" required><button id="toggle-password" type="button" aria-label="Show password" aria-pressed="false">Show</button></div>
-                <button type="submit" id="login-btn" class="btn btn-primary">Log in</button>
-                <div class="signup-divider"><span>New to Flow?</span></div>
-                <button type="button" id="signup-btn" class="btn btn-secondary">Create an account</button>
+                <div class="password-field">
+                    <input type="password" id="password-input" class="input" placeholder="At least 6 characters" autocomplete="current-password" minlength="6" required>
+                    <button id="toggle-password" type="button" aria-label="Show password" aria-pressed="false">Show</button>
+                </div>
+                <div id="error-message" class="auth-message error-msg" role="alert"></div>
+                <div id="success-message" class="auth-message success-msg" role="status"></div>
+                <button type="submit" id="login-btn" class="btn btn-primary btn-lg btn-block">Log in</button>
+                <div class="divider"><span>New to Flow?</span></div>
+                <button type="button" id="signup-btn" class="btn btn-lg btn-block">Create an account</button>
             </form>
-            <div id="error-message" class="auth-message error-msg" role="alert"></div>
-            <div id="success-message" class="auth-message success-msg" role="status"></div>
-            <p class="login-note">A room, a goal, and a little momentum.</p>
+            <p class="login-note">New here? <a href="/start.html">Set up your space</a> in about a minute.</p>
         </section>
     </main>
-    <footer class="login-footer"><span>Study better, together.</span><GitHubStar /></footer>
-        <script>import '../client/login';</script>
+    <script>import '../client/login';</script>
 </Page>
