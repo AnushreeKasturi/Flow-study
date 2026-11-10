@@ -26,7 +26,6 @@ A shared study room for focused work. Bring your group, set a timer, and work th
 
 ![Flow setup](assets/ui-preview/setup-desktop.png)
 
-![Flow workspace](assets/ui-preview/workspace-amethyst.png)
 
 ## Run locally
 
