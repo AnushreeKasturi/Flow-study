@@ -1,0 +1,71 @@
+---
+import Page from '../layouts/Page.astro';
+import Sky from '../components/Sky.astro';
+import '../styles/start.css';
+
+const skies = [['forest', 'Forest'], ['midnight', 'Midnight'], ['warm', 'Warm'], ['aqua', 'Aqua'], ['amethyst', 'Amethyst'], ['daylight', 'Daylight']];
+const sounds = [
+    ['', 'Silence', 'Just the room.'],
+    ['brown', 'Brown noise', 'Low and deep, like a far-off waterfall.'],
+    ['pink', 'Pink noise', 'Soft and even, like steady rain.'],
+    ['white', 'White noise', 'Bright and full, like a fan.']
+];
+---
+<Page title="Set up your space | Flow" bodyClass="start">
+    <Sky />
+    <header class="start-nav">
+        <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
+        <a href="/login.html" class="btn" id="start-login">Log in</a>
+    </header>
+
+    <form id="start-form" class="start-main" novalidate>
+        <section class="step" data-step="name">
+            <h1 id="start-greeting">What should we call you?</h1>
+            <input type="text" id="start-name" class="big-input" placeholder="Your name" aria-label="Your name" maxlength="40" autocomplete="nickname">
+            <p class="step-hint">Your study partners see this on your tile and next to your tasks.</p>
+        </section>
+
+        <section class="step" data-step="sky" hidden>
+            <h1>Pick your sky<span data-name></span>.</h1>
+            <div class="swatches" role="group" aria-label="Sky">
+                {skies.map(([id, name]) => <button type="button" data-theme-choice={id} aria-pressed="false"><span class="swatch" data-theme={id} aria-hidden="true"></span>{name}</button>)}
+            </div>
+            <p class="step-hint">The whole room takes its colours from this. Change it whenever the mood does.</p>
+        </section>
+
+        <section class="step" data-step="length" hidden>
+            <h1>How long can you focus in one sitting?</h1>
+            <p class="length-read"><strong id="start-minutes" class="display">25</strong> minutes</p>
+            <input type="range" id="start-length" min="10" max="90" step="5" value="25" aria-label="Focus length in minutes">
+            <div class="segmented presets" role="group" aria-label="Common lengths">
+                {[15, 25, 45, 60].map(minutes => <button type="button" data-minutes={minutes} aria-pressed={minutes === 25 ? 'true' : 'false'}>{minutes} min</button>)}
+            </div>
+            <p class="step-hint">Drag the sun, or use the slider. A higher sun is a longer block, and it sets when your time is up.</p>
+        </section>
+
+        <section class="step" data-step="sound" hidden>
+            <h1>Want something playing underneath?</h1>
+            <div class="choices" role="group" aria-label="Soundscape">
+                {sounds.map(([id, name, text]) => <button type="button" data-sound-choice={id} aria-pressed={id === '' ? 'true' : 'false'}><strong>{name}</strong><span>{text}</span></button>)}
+            </div>
+            <p class="step-hint">Tap one to hear it. In a room, only you hear your soundscape.</p>
+        </section>
+
+        <section class="step" data-step="account" hidden>
+            <h1>Last step<span data-name></span>: save your space.</h1>
+            <div class="account-fields">
+                <div><label for="start-email">Email address</label><input type="email" id="start-email" class="input" placeholder="you@example.com" autocomplete="email"></div>
+                <div><label for="start-password">Password</label><input type="password" id="start-password" class="input" placeholder="At least 6 characters" autocomplete="new-password" minlength="6"></div>
+            </div>
+            <p class="step-hint">Flow stores your email, display name, tasks, and focus history. Nothing else.</p>
+        </section>
+
+        <p id="start-message" class="inline-error hidden" role="alert"></p>
+        <footer class="start-foot">
+            <button type="button" id="start-back" class="btn" hidden>Back</button>
+            <div id="start-dots" class="start-dots" role="img" aria-label="Step 1 of 5"></div>
+            <button type="submit" id="start-next" class="btn btn-primary btn-lg">Continue</button>
+        </footer>
+    </form>
+    <script>import '../client/start';</script>
+</Page>

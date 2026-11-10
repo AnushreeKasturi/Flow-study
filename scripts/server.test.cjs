@@ -3,17 +3,24 @@ const assert = require('node:assert/strict');
 process.env.GROQ_API_KEY = '';
 process.env.TWILIO_ACCOUNT_SID = '';
 process.env.TWILIO_AUTH_TOKEN = '';
-const app = require('../api/ai');
-
+const http = require('node:http');
+const { once } = require('node:events');
 test('HTTP boundaries and bounded local concurrency', async t => {
+    // Stand-in for Supabase's token check: only the bearer token "valid" belongs to a user.
+    const auth = http.createServer((req, res) => {
+        res.writeHead(req.url === '/auth/v1/user' && req.headers.authorization === 'Bearer valid' && req.headers.apikey ? 200 : 401).end('{}');
+    }).listen(0, '127.0.0.1');
+    await once(auth, 'listening');
+    process.env.PUBLIC_SUPABASE_URL = 'http://127.0.0.1:' + auth.address().port;
+    const app = require('../api/ai');
     const server = app.listen(0, '127.0.0.1');
-    await new Promise(resolve => server.once('listening', resolve));
-    t.after(() => new Promise(resolve => server.close(resolve)));
+    await once(server, 'listening');
+    t.after(() => new Promise(resolve => server.close(() => auth.close(resolve))));
     const origin = 'http://127.0.0.1:' + server.address().port;
-    const post = body => fetch(origin + '/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    const post = (body, token = 'valid') => fetch(origin + '/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body });
 
     await t.test('HTML, CSS, modules, missing files, and private files', async () => {
-        for (const path of ['/', '/login.html', '/favicon.svg']) assert.equal((await fetch(origin + path)).status, 200, path);
+        for (const path of ['/', '/start.html', '/login.html', '/room.html', '/favicon.svg', '/room-preview.webp']) assert.equal((await fetch(origin + path)).status, 200, path);
         const html = await (await fetch(origin + '/login.html')).text();
         const asset = html.match(/src="([^"]+\.js)"/)[1];
         assert.equal((await fetch(origin + asset)).status, 200);
@@ -56,6 +63,29 @@ test('HTTP boundaries and bounded local concurrency', async t => {
         assert.equal(png.readUInt32BE(20), 630);
         assert(png.length < 1000000, 'Preview should remain below 1 MB');
     });
+    await t.test('pages carry security headers and never ship the offline demo backend', async () => {
+        for (const path of ['/', '/start.html', '/login.html', '/room.html']) {
+            const response = await fetch(origin + path);
+            assert.match(response.headers.get('content-security-policy'), /frame-ancestors 'none'/, path);
+            assert.equal(response.headers.get('x-content-type-options'), 'nosniff', path);
+            assert.doesNotMatch(await response.text(), /__fixture/, path);
+        }
+    });
+    await t.test('provider endpoints reject callers who are not signed in', async t => {
+        // A second app instance, so these probes don't spend the rate-limit budget the burst test measures.
+        delete require.cache[require.resolve('../server')];
+        const fresh = require('../server').listen(0, '127.0.0.1');
+        await once(fresh, 'listening');
+        t.after(() => new Promise(resolve => fresh.close(resolve)));
+        const origin = 'http://127.0.0.1:' + fresh.address().port;
+        for (const path of ['/api/ai', '/api/turn-credentials']) {
+            for (const headers of [{}, { Authorization: 'Bearer forged' }, { Authorization: 'Basic valid' }]) {
+                const response = await fetch(origin + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: '{"message":"Hi"}' });
+                assert.equal(response.status, 401, path + ' ' + JSON.stringify(headers));
+                assert.equal(response.headers.get('cache-control'), 'private, no-store');
+            }
+        }
+    });
     await t.test('invalid payloads return JSON errors', async () => {
         for (const message of [null, 12, {}, [], '', '   ', 'a'.repeat(501)]) {
             const response = await post(JSON.stringify({ message }));
@@ -74,7 +104,7 @@ test('HTTP boundaries and bounded local concurrency', async t => {
         assert(responses.every(response => response.status === 429 || response.status === 503));
     });
     await t.test('TURN without configuration returns an error without a provider call', async () => {
-        const response = await fetch(origin + '/api/turn-credentials', { method: 'POST' });
+        const response = await fetch(origin + '/api/turn-credentials', { method: 'POST', headers: { Authorization: 'Bearer valid' } });
         assert.equal(response.status, 500);
         assert.equal(typeof (await response.json()).error, 'string');
     });

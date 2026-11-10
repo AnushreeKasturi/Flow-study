@@ -1,6 +1,7 @@
 import { byId } from '../dom';
 import { getSocket } from './socket';
 import { notify } from './feedback';
+import { api } from './api';
 
 let username: string | null = null;
 let aiPending = false;
@@ -60,10 +61,7 @@ async function sendMessage() {
     const pending = byId<HTMLElement>('ai-pending');
     pending.classList.remove('hidden');
     try {
-        const response = await fetch('/api/ai', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: query }), signal: AbortSignal.timeout(20000)
-        });
+        const response = await api('/api/ai', { message: query }, 20000);
         const data = await response.json();
         if (!response.ok) throw new Error('Assistant unavailable');
         if (typeof data.text !== 'string') throw new Error('Invalid assistant response');

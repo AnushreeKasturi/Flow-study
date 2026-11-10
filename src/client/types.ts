@@ -43,7 +43,7 @@ export interface SocketHandlers {
     onReaction?: (reaction: { userId: string; emoji: string }) => void;
 }
 export interface ProfileStats {
-    savedTotalSeconds: number; savedTodaySeconds: number; persistedIds: string[];
+    savedTotalSeconds: number; savedTodaySeconds: number; weekSeconds: number[]; persistedIds: string[];
     streak: number; sessionsCompleted: number; tasksCompleted: number;
     totalMinutes: number; todayMinutes: number; liveMinutes: number;
 }

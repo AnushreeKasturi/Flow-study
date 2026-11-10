@@ -1,20 +1,142 @@
 ---
 import Page from '../layouts/Page.astro';
-import Dialogs from '../components/room/Dialogs.astro';
-import Header from '../components/room/Header.astro';
-import PeopleAudio from '../components/room/PeopleAudio.astro';
-import VideoStage from '../components/room/VideoStage.astro';
-import SessionTools from '../components/room/SessionTools.astro';
-import '../styles/layout.css';
-import '../styles/animations.css';
+import GitHubStar from '../components/GitHubStar.astro';
+import Sky from '../components/Sky.astro';
+import '../styles/landing.css';
+
+const repo = 'https://github.com/ManasDasri/Flow-study';
+const features = [
+    ['One sun for everyone', 'Start a focus block and the sun starts sinking for the whole room. When it sets, the room moves to a break, with a longer one after every fourth block.'],
+    ['Your group on camera', 'Video and voice run directly between browsers over WebRTC. Mute or turn the camera off whenever you like.'],
+    ['A task list you finish together', 'Add goals for the session, assign them to people, and watch the room’s progress fill in.'],
+    ['Chat, with a study assistant', 'Message the room, or start a message with /ai to ask a question without leaving.'],
+    ['Sound for concentration', 'Brown, pink, and white noise are built in. Share a YouTube or Spotify link when the room wants music.'],
+    ['Your focus, counted', 'Finished focus blocks add up to a daily total, a streak, and a seven-day view.']
+];
+const steps = [
+    ['Create a room', 'You get a six-character code. Add a PIN if you want the room private.'],
+    ['Share the link', 'Your friends open it, sign in, and land in the same room.'],
+    ['Start the timer', 'Twenty-five minutes of focus, then a break. Change the lengths whenever you need to.']
+];
+const atmospheres = [
+    ['forest', 'Forest'], ['midnight', 'Midnight'], ['warm', 'Warm'], ['aqua', 'Aqua'], ['amethyst', 'Amethyst'], ['daylight', 'Daylight']
+];
 ---
-<Page>
-    <div id="toast" class="toast hidden" role="status" aria-live="polite" aria-atomic="true"></div>
-    <Dialogs />
-    <div id="app" class="app-container hidden">
-        <Header />
-        <div id="network-banner" class="network-banner hidden" role="status">You’re offline. Changes may not save until your connection returns.</div>
-        <div class="workspace-grid"><PeopleAudio /><VideoStage /><SessionTools /></div>
-    </div>
-    <script>import '../client/app';</script>
+<Page bodyClass="landing">
+    <Fragment slot="head">
+        <script is:inline>
+            // Invite links used to be /?room=CODE; keep them working.
+            if (/[?&]room=/.test(location.search)) location.replace('/room.html' + location.search);
+            // The opening plays once per browser session.
+            try {
+                if (sessionStorage.getItem('flow_intro')) document.documentElement.classList.add('intro-seen');
+                else sessionStorage.setItem('flow_intro', '1');
+            } catch (e) {}
+        </script>
+    </Fragment>
+
+    <Sky />
+    <div class="intro" aria-hidden="true"><div class="intro-word"><span>f</span><span>l</span><span>o</span><span>w</span><i></i></div></div>
+
+    <header class="site-nav">
+        <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
+        <nav aria-label="Main">
+            <a href="#room">What’s inside</a>
+            <a href="#how">How it works</a>
+            <a href="#open-source">Open source</a>
+        </nav>
+        <div class="site-nav-actions">
+            <GitHubStar label="Star" />
+            <a id="nav-login" href="/login.html" class="btn">Log in</a>
+        </div>
+    </header>
+
+    <section class="hero">
+        <h1>Study until<br>the sun sets.</h1>
+        <div class="hero-side">
+            <p>Flow is a study room you share with friends. Start a focus block and a sun starts sinking for everyone in the room. When it sets, you all take a break. It’s free, and the code is open.</p>
+            <div class="hero-actions">
+                <a href="/start.html" class="btn btn-primary btn-lg" data-start>Set up your space</a>
+                <a href="/login.html" class="btn btn-lg" data-login>I have an account</a>
+            </div>
+        </div>
+        <div class="demo">
+            <button id="preview-toggle" type="button" class="icon-btn active" aria-label="Play the demo">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 3l14 9-14 9z" /></svg>
+            </button>
+            <strong id="preview-time" class="display" role="timer">25:00</strong>
+            <span id="preview-label">Watch a 25-minute focus block in ten seconds.</span>
+        </div>
+    </section>
+
+    <main>
+        <section id="room" class="band">
+            <h2>One room holds the whole session.</h2>
+            <figure class="shot">
+                <img src="/room-preview.webp" width="1440" height="900" loading="lazy" decoding="async" alt="A Flow room: the sun and session clock on the left, study partners in the middle, and shared tasks on the right.">
+            </figure>
+            <dl class="features">
+                {features.map(([name, text]) => <div><dt>{name}</dt><dd>{text}</dd></div>)}
+            </dl>
+        </section>
+
+        <section id="how" class="band">
+            <h2>From a link to your first focus block.</h2>
+            <ol class="steps">
+                {steps.map(([name, text]) => <li><h3>{name}</h3><p>{text}</p></li>)}
+            </ol>
+        </section>
+
+        <section class="band atmospheres">
+            <div>
+                <h2>Pick your sky.</h2>
+                <p>Six skies, from a forest dusk to plain daylight. Choose one and this page changes with it. Your room will match.</p>
+            </div>
+            <div class="swatches" role="group" aria-label="Atmosphere">
+                {atmospheres.map(([id, name]) => (
+                    <button type="button" data-theme-choice={id} aria-pressed="false"><span class="swatch" data-theme={id} aria-hidden="true"></span>{name}</button>
+                ))}
+            </div>
+        </section>
+
+        <section id="open-source" class="band open">
+            <div class="open-copy">
+                <h2>Open source, start to finish.</h2>
+                <p>Every line of Flow is public on GitHub. Read how it works, run your own copy, or fix something and send a pull request.</p>
+                <ul>
+                    <li>Astro pages with strict TypeScript, and no client framework</li>
+                    <li>Supabase for sign-in, saved tasks, and realtime rooms</li>
+                    <li>Peer-to-peer video and voice over WebRTC</li>
+                    <li>Checked in CI on Node 22, 24, and 26, PostgreSQL 17, and Chromium</li>
+                </ul>
+                <div class="hero-actions">
+                    <a href={repo} class="btn btn-primary" target="_blank" rel="noopener noreferrer">View the source</a>
+                    <a href={repo + '/issues'} class="btn" target="_blank" rel="noopener noreferrer">Report an issue</a>
+                </div>
+            </div>
+            <figure class="terminal">
+                <figcaption>Run it on your machine. No accounts or keys needed.</figcaption>
+                <pre><code><span>$</span> git clone {repo}.git
+<span>$</span> cd Flow-study
+<span>$</span> npm ci
+<span>$</span> npm run dev:demo</code></pre>
+                <p><code>dev:demo</code> runs the whole app against a local stand-in for the backend, so you can explore a room offline.</p>
+            </figure>
+        </section>
+
+        <section class="band closing">
+            <h2>Your next session can start now.</h2>
+            <a href="/start.html" class="btn btn-primary btn-lg" data-start>Set up your space</a>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
+        <span>Study better, together.</span>
+        <nav aria-label="Footer">
+            <a href={repo} target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href="/login.html">Log in</a>
+        </nav>
+    </footer>
+    <script>import '../client/landing';</script>
 </Page>

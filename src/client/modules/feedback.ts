@@ -22,7 +22,8 @@ export function openModal(id: string) {
     container.classList.remove('hidden');
     reveal(byId(id), 'dialog');
     byId<HTMLElement>('app').inert = true;
-    requestAnimationFrame(() => byId(id).querySelector<HTMLElement>('input, button, a')?.focus());
+    // Land on the first field when there is one, otherwise the first control.
+    requestAnimationFrame(() => (byId(id).querySelector<HTMLElement>('input:not([readonly])') ?? byId(id).querySelector<HTMLElement>('input, button, a'))?.focus());
 }
 
 export function closeModal() {

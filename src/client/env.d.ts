@@ -7,5 +7,9 @@ declare global {
         si?: (command: 'beforeSend', callback: (event: VitalEvent) => VitalEvent | null) => void;
         siq?: IArguments[];
     }
+    interface ImportMetaEnv {
+        readonly PUBLIC_SUPABASE_URL?: string;
+        readonly PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
+    }
 }
 export {};

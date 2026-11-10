@@ -50,8 +50,12 @@ test('Supabase fetch has a deadline and preserves caller cancellation', async ()
     global.window = { supabase: { createClient: (url, key, config) => { options = config.global; return {}; } } };
     global.fetch = async (url, config) => { observedSignal = config.signal; return new Response('{}'); };
     try {
-        const module = compile('src/client/modules/supabase.ts');
-        await import('data:text/javascript;base64,' + Buffer.from(module).toString('base64'));
+        // The client now bundles the SDK, so load the module the way the site does: bundled.
+        const bundle = await require('esbuild').build({
+            entryPoints: ['src/client/modules/supabase.ts'], bundle: true, write: false, format: 'esm',
+            define: { 'import.meta.env.PUBLIC_SUPABASE_URL': '""', 'import.meta.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY': '""' }
+        });
+        await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
         await options.fetch('https://example.test');
         assert(observedSignal instanceof AbortSignal);
         assert.equal(observedSignal.aborted, false);

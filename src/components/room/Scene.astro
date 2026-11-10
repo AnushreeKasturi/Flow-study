@@ -1,0 +1,26 @@
+---
+import Icon from '../Icon.astro';
+---
+<!-- The session clock. The sun above it is the progress bar: it sinks through a focus block and rises through a break. -->
+<section class="scene" aria-label="Session timer">
+    <div class="scene-sky"></div>
+    <div class="pill-timer">
+        <div class="timer-heading">
+            <h2 id="timer-state-label">Ready to focus</h2>
+            <div id="rounds" class="rounds" role="img" aria-label="Round 1 of 4"><i></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="time-display display" id="time-display" role="timer">25:00</div>
+        <p class="breath">Breathe in as the sun grows, out as it shrinks.</p>
+        <div class="timer-controls">
+            <button id="timer-toggle-btn" class="icon-btn toggle" aria-label="Start timer" aria-pressed="false" title="Start or pause (S)"><Icon name="play" size={18} class="off" /><Icon name="pause" size={18} class="on" /></button>
+            <button id="timer-reset-btn" class="icon-btn" aria-label="Reset timer"><Icon name="reset" size={16} /></button>
+            <button id="focus-mode-toggle" class="icon-btn" title="Toggle Focus Mode" aria-pressed="false"><Icon name="expand" size={16} /></button>
+            <button id="open-timer-settings-btn" class="icon-btn" aria-label="Timer settings"><Icon name="settings" size={16} /></button>
+        </div>
+        <div class="timer-modes segmented" aria-label="Session mode">
+            <button class="mode-btn active" data-mode="focus" aria-pressed="true">Focus</button>
+            <button class="mode-btn" data-mode="shortBreak" aria-pressed="false">Break</button>
+            <button class="mode-btn" data-mode="longBreak" aria-pressed="false">Long break</button>
+        </div>
+    </div>
+</section>

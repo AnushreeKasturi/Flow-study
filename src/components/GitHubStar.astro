@@ -1,10 +1,8 @@
-<a class="github-star" href="https://github.com/ManasDasri/Flow-study" target="_blank" rel="noopener noreferrer" aria-label="Star Flow on GitHub (opens in a new tab)">
+---
+interface Props { label?: string; }
+const { label = 'Star on GitHub' } = Astro.props;
+---
+<a class="github-star" href="https://github.com/ManasDasri/Flow-study" target="_blank" rel="noopener noreferrer" aria-label={label + ' (opens in a new tab)'}>
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z" /></svg>
-    Star on GitHub
+    {label}<span data-stars></span>
 </a>
-
-<style>
-    .github-star { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; color: var(--text-secondary); font-size: .78rem; text-decoration: none; white-space: nowrap; }
-    .github-star:hover { color: var(--primary); text-decoration: underline; }
-    .github-star svg { flex-shrink: 0; }
-</style>

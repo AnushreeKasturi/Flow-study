@@ -6,20 +6,25 @@
 [![Node.js](https://img.shields.io/badge/Node.js-22%20%7C%2024%20%7C%2026-5f8056)](https://nodejs.org/)
 [![Open Flow](https://img.shields.io/badge/demo-flow--study.me-b6d3ac)](https://flow-study.me)
 
-A shared study room for focused work. Bring your group, set a timer, and work through your goals together.
+A shared study room for focused work. Bring your group, set a timer, and work through your goals together. Free to use and open source.
 
-![Flow login](assets/ui-preview/after-login-desktop.png)
+![Flow landing page](assets/ui-preview/landing-desktop.png)
 
 ## Inside a room
 
-- **Shared focus timer:** focus, short break, and long break modes with adjustable durations, room updates, and a distraction-free view.
-- **Study partners:** camera and microphone controls, presence, reactions, and peer-to-peer WebRTC calls.
+- **The sun is the timer:** every page is a sky over a horizon. Starting a focus block starts the sun sinking for the whole room; it rises again through the break. Focus, short break, and long break lengths are adjustable, four focus blocks make a set, and the fourth earns the long break. Focus mode strips the room down to sky, sun, clock, and people.
+- **Study partners:** camera and microphone controls, presence, reactions, raised hands, and peer-to-peer WebRTC calls.
 - **Shared tasks:** add, assign, complete, and remove room goals with persistent storage.
 - **Room chat:** send messages and ask the study assistant with `/ai`.
-- **Room audio:** share YouTube or Spotify content links through official embedded players. Everyone controls their own playback; playheads are not synchronized.
-- **Your focus:** the room card and profile include live focus from this visit. Pauses do not count. Completed focus sessions are saved to your history; unsaved progress is lost on refresh or leaving the page.
-- **Five atmospheres:** Forest, Midnight, Warm, Aqua, and Amethyst, with responsive tools, keyboard navigation, and reduced-motion support.
-- **Leave and rejoin:** confirm before disconnecting, then return using the room code and PIN. Saved tasks remain in the room.
+- **Soundscape:** brown, pink, and white noise generated in the browser. Only you hear it; no audio files are downloaded.
+- **Room audio:** share YouTube or Spotify links through the official embedded players. Everyone controls their own playback, and no player loads until someone asks for one.
+- **Your focus:** today's total, a streak, and a seven-day chart. Pauses do not count. Completed focus sessions are saved; progress from an unfinished session is lost on refresh.
+- **Six skies:** Forest, Midnight, Warm, Aqua, Amethyst, and Daylight. Sky, ground, and sun all take their colours from the one you choose.
+- **Keyboard shortcuts:** `S` timer, `F` focus mode, `M` microphone, `V` camera, `?` for the list.
+- **Optional notifications:** a system notification when a session ends while Flow is in a background tab.
+- **Interactive setup (`/start.html`):** name, sky, focus length (drag the sun), and a soundscape preview, then the account. The choices carry into the first room, which shows a short first-session checklist. An invite link survives sign-in.
+
+![Flow setup](assets/ui-preview/setup-desktop.png)
 
 ![Flow workspace](assets/ui-preview/workspace-amethyst.png)
 
@@ -31,11 +36,12 @@ Use Node.js 22.23.4 or newer. CI exercises the latest releases of Node 22, 24, a
 git clone https://github.com/ManasDasri/Flow-study.git
 cd Flow-study
 npm ci
-cp .env.example .env
-npm run dev
+npm run dev:demo
 ```
 
-Open `http://localhost:4321`. Astro provides live reload and forwards `/api/*` to the existing Express handlers.
+Open `http://localhost:4321`. `dev:demo` replaces Supabase with the in-browser stand-in the tests use ([`scripts/supabase-fixture.js`](scripts/supabase-fixture.js)), so the whole app runs offline with one fake account and no keys. Log in with any email and a six-character password. Add `?nocam` to the room URL to skip the camera prompt, or `?fresh` to see first-run setup.
+
+To develop against a real backend, copy `.env.example` to `.env` and run `npm run dev`. Astro provides live reload and forwards `/api/*` to the Express handlers.
 
 To run the production build locally:
 
@@ -46,7 +52,7 @@ npm start
 
 The production server uses `http://localhost:3000`; set `PORT` to change that port.
 
-The browser connects to the Supabase project configured in [`src/client/modules/supabase.ts`](src/client/modules/supabase.ts). For your own deployment, replace its project URL and **public publishable/anon key** with your project's values. Never put a service-role key in browser code.
+The Supabase project URL and **public publishable key** live in [`supabase.config.json`](supabase.config.json), shared by the browser bundle and the server. For your own deployment, edit that file or set `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Never put a service-role key there.
 
 ### Server configuration
 
@@ -54,6 +60,7 @@ The browser connects to the Supabase project configured in [`src/client/modules/
 | --- | --- |
 | `PORT` | HTTP port; defaults to `3000` |
 | `GROQ_API_KEY` | Optional; enables `/api/ai` for study-assistant questions |
+| `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Optional; override `supabase.config.json` at build time and on the server |
 | `TWILIO_ACCOUNT_SID` | Optional; used with the auth token to obtain TURN credentials |
 | `TWILIO_AUTH_TOKEN` | Optional; server-side Twilio credential |
 
@@ -78,7 +85,7 @@ Database RLS protects table access. Private Realtime Broadcast authorization nee
 
 ## Shared-link preview
 
-Both public pages include static Open Graph and large-image card metadata, with a branded 1200 × 630 PNG at `/social-preview.png`. Room invitations use the same generic preview; room codes and PINs are not included in the card metadata.
+All pages include static Open Graph and large-image card metadata, with a branded 1200 × 630 PNG at `/social-preview.png`. Room invitations use the same generic preview; room codes and PINs are not included in the card metadata.
 
 The artwork source is [`scripts/social-preview.html`](scripts/social-preview.html). After editing it, regenerate the committed image:
 
@@ -91,20 +98,23 @@ Generation loads Instrument Sans from Google Fonts; the deployed PNG has no font
 
 ## Architecture
 
-Astro generates static HTML from typed pages and reusable components. Strict TypeScript powers the interactive room modules, and Vite bundles and fingerprints JavaScript/CSS into `dist/_astro`. GSAP adds a single entry reveal and short responses to opening dialogs, switching panels, and completing tasks. Motion follows the system preference, including changes during a visit. Instrument Sans and an outlined `f.` mark preserve the visual identity.
+Astro generates four static pages: the landing page (`/`), setup (`/start.html`), sign-in (`/login.html`), and the room (`/room.html`). Strict TypeScript powers the room, Vite bundles and fingerprints everything into `dist/_astro`, and fonts are self-hosted, so the only third-party requests are to Supabase, plus YouTube or Spotify when a player is requested and GitHub for the landing page's star count. No client framework runtime is needed.
 
 | Location | Responsibility |
 | --- | --- |
-| `src/pages` | Login and room page templates |
-| `src/layouts`, `src/components` | Shared metadata, page layout, room sections, and dialogs |
-| `src/client` | Typed browser behavior, service models, and motion |
-| `src/styles` | Shared design tokens, themes, and responsive layouts |
+| `src/pages` | Landing, setup, login, and room templates |
+| `src/layouts`, `src/components` | Shared metadata, page layout, icons, room sections, and dialogs |
+| `src/client` | `landing.ts`, `start.ts`, `login.ts`, `room.ts`, and the room's modules (timer, tasks, realtime, WebRTC, soundscape, shortcuts) |
+| `src/styles` | Design tokens and shared controls (`global.css`), then one stylesheet per page |
 | `public` | Images, favicon, and social preview copied unchanged to the build |
 | `api`, `server.js` | AI/TURN functions and the conventional Node server |
+| `supabase.config.json`, `vercel.json` | Public backend settings; hosting config and the security headers Express reuses |
 
-No client framework runtime is needed. Pages are generated at build time, while rooms remain fully interactive in the browser.
+Supabase handles authentication, PostgreSQL persistence, task changes, presence, and room broadcasts. WebRTC carries camera and microphone media between peers, with TURN relay support when configured. Groq answers assistant requests through the server. Room chat and broadcasts are transient; tasks, profiles, and completed sessions are stored.
 
-Express serves the site and the AI/TURN endpoints. Supabase handles authentication, PostgreSQL persistence, task changes, presence, and room broadcasts. WebRTC carries camera and microphone media between peers, with TURN relay support when configured. Groq handles assistant requests through the server. Room chat and broadcasts are transient; tasks, profiles, and completed sessions are stored.
+`/api/ai` and `/api/turn-credentials` spend provider credit, so they require a signed-in user: the browser sends its Supabase access token and the server asks Supabase to validate it before calling Groq or Twilio. Both stay rate limited per address. Every page is served with a Content-Security-Policy and related headers, defined once in `vercel.json`.
+
+Old invite links (`/?room=CODE`) redirect to the room. The landing page's opening (the wordmark in the dark, then a sunrise) is CSS only, plays once per browser session, and is skipped under reduced motion. Type is Bricolage Grotesque, self-hosted.
 
 ## Checks and CI
 
@@ -128,7 +138,7 @@ GitHub Actions runs on pull requests to `main`, pushes/merges to `main`, and man
 
 | Check | What it verifies |
 | --- | --- |
-| Node.js 22 / 24 / 26 | Strict Astro/TypeScript checks, production builds, JavaScript parsing, HTTP boundaries, local concurrency, URL validation, and focus accounting |
+| Node.js 22 / 24 / 26 | Strict Astro/TypeScript checks, production builds, JavaScript parsing, HTTP boundaries, endpoint authentication, security headers, local concurrency, URL validation, and focus accounting |
 | PostgreSQL 17 | Both schema variants, migration repeatability, preserved data, room/PIN access, and task policies |
 | Chromium | Complete interactive flows, failure recovery, stress fixtures, and ten responsive tool layouts |
 | Dependency audit | Production dependencies fail the job on reported high/critical vulnerabilities |

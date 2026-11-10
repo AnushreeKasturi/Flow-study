@@ -1,6 +1,6 @@
 # Validation and coverage
 
-The UI refinement has repeatable checks across every shipped JavaScript module, the HTTP server, both HTML pages, all five themes, and the supplied database schemas. This is a coverage inventory, not a claim that every possible state or production environment has been tested.
+The UI refinement has repeatable checks across every shipped JavaScript module, the HTTP server, all four HTML pages, all six themes, and the supplied database schemas. This is a coverage inventory, not a claim that every possible state or production environment has been tested.
 
 ## Run the checks
 
@@ -15,7 +15,7 @@ The browser runner starts an ephemeral local server and closes it after checking
 
 The runner executes ui-smoke.js and then tools-layout.js in one browser context. The layout check covers ten viewport sizes, including 1366x600 and 1440x500, verifies composer and fullscreen control bounds, checks that labels fit inside their buttons, and exercises Shift+Enter versus Enter. It also verifies the outlined f. SVG favicon loads without a runtime font dependency.
 
-`npm test` first runs strict Astro/TypeScript diagnostics and a fresh production build. The browser suite serves that built output. Run `npm run build` before invoking the browser suite on its own. Its RTC harness compiles the real TypeScript media module with fixture signalling and is intercepted only by Playwright; it is never included in `dist` or deployed. The SDK fixture replaces the external Supabase SDK at the network boundary, while the actual bundled app handles interactions and callbacks.
+`npm test` first runs strict Astro/TypeScript diagnostics and a fresh production build. The browser suite serves that built output. Run `npm run build` before invoking the browser suite on its own. Its RTC harness compiles the real TypeScript media module with fixture signalling and is intercepted only by Playwright; it is never included in `dist` or deployed. The SDK fixture (`scripts/supabase-fixture.js`) is injected before page scripts and takes the place of the bundled Supabase client, while the actual bundled app handles interactions and callbacks. The same file powers `npm run dev:demo`; a server test asserts it never appears in built pages.
 
 The browser suite also exercises normal motion, closing a dialog during its entrance, changing to reduced motion during an entrance, and focus restoration. Use Playwright CLI against `npm run dev` for manual debugging; the complete automated fixture setup is owned by `scripts/browser-ci.cjs`.
 
@@ -36,7 +36,9 @@ The test server clears AI and Twilio provider credentials before loading Express
 | Area | Exercised behavior |
 | --- | --- |
 | `login.ts`, `login.astro` | Native form validation, Enter submission, service rejection recovery, signup, theme persistence, malformed stored login, logout, password visibility, interactive timer preview |
-| `app.ts`, `index.astro` | Room code/PIN validation, wrong PIN, rejected join, bounded code collisions, host/join exclusion, invite clipboard fallback, media links, leave cancellation and confirmation |
+| `landing.ts`, `index.astro` | Responsive fit, hero timer start/pause/modes, atmosphere swatches, legacy invite-link redirect, opening animation skipped under reduced motion |
+| `start.ts`, `start.astro` | Name validation and live greeting, sky choice, focus length by preset, slider and dragging the sun, soundscape choice, account validation, choices carried into the first room, first-session checklist |
+| `room.ts`, `room.astro` | Room code/PIN validation, wrong PIN, rejected join, bounded code collisions, host/join exclusion, invite clipboard fallback, media links, leave cancellation and confirmation |
 | `feedback.ts` | Inline feedback, toasts, dialog focus containment, Escape, focus restoration, inert background |
 | `ui.ts` | Task reconciliation, assignment, completion, pending controls, empty states, text escaping, presence cards, progress |
 | `tasks.ts` | Add/update/delete rejection, empty RLS write results, rollback, preserved draft text, in-flight duplicate prevention, task-load retry |
