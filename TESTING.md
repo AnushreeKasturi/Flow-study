@@ -38,7 +38,8 @@ The test server clears AI and Twilio provider credentials before loading Express
 | `login.ts`, `login.astro` | Native form validation, Enter submission, service rejection recovery, signup, theme persistence, malformed stored login, logout, password visibility, interactive timer preview |
 | `landing.ts`, `index.astro` | Responsive fit, hero timer start/pause/modes, atmosphere swatches, legacy invite-link redirect, opening animation skipped under reduced motion |
 | `start.ts`, `start.astro` | Name validation and live greeting, sky choice, focus length by preset, slider and dragging the sun, soundscape choice, account validation, choices carried into the first room, first-session checklist |
-| `groups.ts`, `board.ts`, `groups.astro` | Empty state, topic validation, one-click hosting with a listed room, unlisting on leave, full groups, taking a seat into the room, inert topic text |
+| `groups.ts`, `board.ts`, `groups.astro` | Empty state, topic validation, hosting with subject and house rules, closing seats, unlisting on leave, search and subject filters, live status text, saying you're in, two-step reports, planning for later, Find me a seat, read-only view when signed out, inert topic text |
+| Host controls (`room.ts`, `stage.ts`) | Removing a participant (database call, then the nudge), and ignoring a forged removal message |
 | `room.ts`, `room.astro` | Room code/PIN validation, wrong PIN, rejected join, bounded code collisions, host/join exclusion, invite clipboard fallback, media links, leave cancellation and confirmation |
 | `feedback.ts` | Inline feedback, toasts, dialog focus containment, Escape, focus restoration, inert background |
 | `ui.ts` | Task reconciliation, assignment, completion, pending controls, empty states, text escaping, presence cards, progress |

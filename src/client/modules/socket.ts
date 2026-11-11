@@ -1,6 +1,10 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { SocketHandlers, Participants, Participant, Signal, TimerState, AudioProvider } from '../types';
 import { getSupabase } from './supabase';
+import settings from '../../../supabase.config.json';
+
+// Off until sql/007 is applied; see SECURITY.md, "Turning on private room channels".
+const PRIVATE_CHANNELS = settings.privateRoomChannels === true;
 
 let channel: RealtimeChannel | null = null;
 let currentRoomId: string | null = null;
@@ -79,6 +83,7 @@ const connectChannel = () => {
 
     const activeChannel = channel = getSupabase().channel(`room:${roomId}`, {
         config: {
+            private: PRIVATE_CHANNELS,
             presence: { key: myUserId },
             broadcast: { ack: true, self: false }
         }
@@ -132,6 +137,11 @@ const connectChannel = () => {
 
     activeChannel.on('broadcast', { event: 'chat-message' }, ({ payload }) => {
         handlers.onChatMessage?.(payload);
+    });
+
+    // The host removed someone. The room page confirms with the database before acting on it.
+    activeChannel.on('broadcast', { event: 'removed' }, ({ payload }) => {
+        if (typeof payload?.userId === 'string') handlers.onRemoved?.(payload.userId);
     });
 
     activeChannel.on('broadcast', { event: 'reaction' }, ({ payload }) => {
@@ -274,6 +284,8 @@ export const updateCameraState = async (isVideoActive: boolean) => {
         isDummyMedia: !isVideoActive
     });
 };
+
+export const sendRemoved = (userId: string) => channel?.send({ type: 'broadcast', event: 'removed', payload: { userId } });
 
 export const sendReaction = (emoji: string) => {
     if (!channel) return;

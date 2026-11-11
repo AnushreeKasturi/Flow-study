@@ -1,33 +1,77 @@
-// The study-groups board: rooms their hosts have opened to anyone signed in.
-// Requires sql/005_open_rooms_and_limits.sql.
-import type { OpenRoom } from '../types';
+// The study-groups board: rooms open right now, and groups planned for later.
+// Requires sql/005 and sql/006.
+import type { GroupDetails, OpenRoom, PlannedGroup } from '../types';
 import { getSupabase } from './supabase';
 
-// room_id is not readable by design (see the migration), so it is never selected.
-const COLUMNS = 'id, host_id, host_name, topic, seats, seats_taken, last_seen';
+export * from './board-options';
+
+// room_id is not readable by design (see sql/005), so it is never selected.
+const OPEN = 'id, host_id, host_name, topic, subject, camera, vibe, seats, seats_taken, closed, timer_mode, timer_ends_at, last_seen';
+const PLANNED = 'id, host_id, host_name, topic, subject, camera, vibe, seats, starts_at, going';
 
 export async function fetchOpenRooms(): Promise<OpenRoom[]> {
-    const { data, error } = await getSupabase().from('open_rooms').select(COLUMNS).order('last_seen', { ascending: false }).limit(50);
+    const { data, error } = await getSupabase().from('open_rooms').select(OPEN).order('last_seen', { ascending: false }).limit(60);
     if (error) throw error;
     return data ?? [];
 }
 
+export async function fetchPlanned(): Promise<PlannedGroup[]> {
+    const { data, error } = await getSupabase().from('planned_groups').select(PLANNED).order('starts_at', { ascending: true }).limit(60);
+    if (error) throw error;
+    return data ?? [];
+}
+
+// Ids of the planned groups the signed-in user has said they're in for.
+export async function fetchMyPlans(): Promise<Set<string>> {
+    const { data } = await getSupabase().from('planned_group_members').select('group_id');
+    return new Set((data ?? []).map(row => row.group_id));
+}
+
+export const planGroup = async (plan: GroupDetails & { host_id: string; starts_at: string }) =>
+    !(await getSupabase().from('planned_groups').insert(plan)).error;
+export const cancelPlan = (id: string) => getSupabase().from('planned_groups').delete().eq('id', id);
+export const setGoing = (groupId: string, userId: string, going: boolean) => going
+    ? getSupabase().from('planned_group_members').insert({ group_id: groupId })
+    : getSupabase().from('planned_group_members').delete().eq('group_id', groupId).eq('user_id', userId);
+
+export const report = async (kind: 'open' | 'planned', target: string, topic: string) =>
+    !(await getSupabase().from('reports').insert({ kind, target, topic, reason: null })).error;
+
 // One listing per host; listing again replaces the previous one.
-export async function listRoom(listing: { host_id: string; room_id: string; host_name: string; topic: string; seats: number; seats_taken: number }) {
+export async function listRoom(listing: GroupDetails & { host_id: string; room_id: string; seats_taken: number; closed: boolean; timer_mode: string | null; timer_ends_at: string | null }) {
     const { error } = await getSupabase().from('open_rooms').upsert(listing, { onConflict: 'host_id' });
     return !error;
 }
 
-// Called on a timer while the host is in the room. A listing nobody refreshes
-// drops off the board by itself after two minutes.
-export const refreshListing = (hostId: string, seatsTaken: number) =>
-    getSupabase().from('open_rooms').update({ seats_taken: seatsTaken }).eq('host_id', hostId); // the database stamps last_seen itself
-
+// Called on a timer while the host is in the room: who is here, and what the
+// clock is doing. The database stamps last_seen itself, and a listing nobody
+// refreshes drops off the board after two minutes.
+export const refreshListing = (hostId: string, live: { seats_taken: number; timer_mode: string | null; timer_ends_at: string | null }) =>
+    getSupabase().from('open_rooms').update(live).eq('host_id', hostId);
+export const setClosed = (hostId: string, closed: boolean) => getSupabase().from('open_rooms').update({ closed }).eq('host_id', hostId);
 export const unlistRoom = (hostId: string) => getSupabase().from('open_rooms').delete().eq('host_id', hostId);
 
 // Returns the room's code, or says why there is no seat.
 export async function takeSeat(listingId: string): Promise<{ code: string } | { reason: string }> {
     const { data, error } = await getSupabase().rpc('join_open_room', { p_listing: listingId });
     if (data) return { code: data };
-    return { reason: error?.message?.includes('full') ? 'This group just filled up.' : error?.message?.includes('not found') ? 'This group has closed.' : 'Could not join this group. Check your connection and try again.' };
+    const message = error?.message ?? '';
+    return { reason: message.includes('full') ? 'This group just filled up.' : message.includes('not found') ? 'This group has closed.' : message.includes('Removed') ? 'The host removed you from this group.' : 'Could not join this group. Check your connection and try again.' };
+}
+
+// What a room is doing right now, in a few words.
+export function statusOf(room: Pick<OpenRoom, 'timer_mode' | 'timer_ends_at'>, now = Date.now()) {
+    if (!room.timer_mode) return 'Just opened';
+    const minutes = room.timer_ends_at ? Math.ceil((new Date(room.timer_ends_at).getTime() - now) / 60000) : 0;
+    const focus = room.timer_mode === 'focus';
+    if (minutes <= 0) return focus ? 'Between focus blocks' : 'On a break';
+    return `${focus ? 'Focusing' : 'On a break'}, ${minutes} min left`;
+}
+
+// Calls back whenever a listing or plan changes, so open boards stay current without polling.
+export function watchBoard(onChange: () => void) {
+    return getSupabase().channel('board')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'open_rooms' }, onChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'planned_groups' }, onChange)
+        .subscribe(() => {});
 }

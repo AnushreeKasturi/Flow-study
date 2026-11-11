@@ -114,6 +114,9 @@ body[data-timer="break"] .breath { display: block; }
 .left-note strong { font-size: 1.05rem; }
 .left-note small { color: var(--text-2); font-size: .78rem; }
 @keyframes wave { 0%, 100% { rotate: 0deg; } 25% { rotate: 18deg; } 50% { rotate: -8deg; } 75% { rotate: 14deg; } }
+.tile-remove { display: none; position: absolute; top: 10px; right: 10px; z-index: 22; padding: 5px 11px; border: 0; border-radius: 999px; background: #000a; color: #fff; font-size: .74rem; font-weight: 600; cursor: pointer; }
+.tile-remove:hover { background: var(--danger); color: #000; }
+.is-host .video-wrapper:is(:hover, :focus-within) .tile-remove { display: block; }
 .floating-reaction { position: absolute; left: 50%; top: 50%; z-index: 30; font-size: 2rem; pointer-events: none; animation: reactionFloat 1.8s ease-out forwards; }
 .hand-raised-badge { position: absolute; top: 10px; right: 10px; z-index: 20; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: #000a; }
 .reactions-menu { position: absolute; bottom: 10px; left: 10px; z-index: 25; }
@@ -205,6 +208,15 @@ body[data-timer="break"] .breath { display: block; }
 .board-form-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 .board-form-row label { margin: 0; }
 .board-form-row select { width: 76px; margin-right: auto; }
+.board-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.board-form-grid select { border-radius: var(--radius-sm); }
+.board-form .check { margin: 14px 0 0; }
+/* Lobby home: what happened last time, and what's going on now. */
+.lobby-home { display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
+.lobby-home p { padding: 10px 14px; border-radius: var(--radius-sm); background: var(--field); color: var(--text-2); font-size: .86rem; line-height: 1.5; }
+.lobby-home p:empty { display: none; }
+.lobby-home a { color: var(--text); font-weight: 600; }
+.lobby-home strong { color: var(--text); }
 
 /* Lobby: its own small sky on the left, the way in on the right. */
 #join-modal { width: min(940px, 100%); padding: 0; display: grid; grid-template-columns: 5fr 6fr; overflow: hidden; }

@@ -550,37 +550,85 @@ async (page) => {
     await page.getByRole('button', { name: 'Create a room', exact: true }).click();
     await visible('#app');
 
-    // Study-groups board: hosting opens a listed room, and a seat on the board leads straight into the room.
+    // Study-groups board: hosting opens a listed room, and the host can close seats and remove people.
     await page.goto(origin + '/groups.html');
-    await visible('.group-empty');
+    await page.locator('.group-empty').first().waitFor();
     for (const width of [1440, 390, 320]) { await page.setViewportSize({ width, height: 900 }); await fitsViewport(); }
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.getByRole('button', { name: 'Open a room', exact: true }).click();
     assert(new URL(page.url()).pathname === '/groups.html', 'Hosting needs a topic');
     await page.getByLabel('What are you studying?').fill('<b>Linear algebra</b> problem set');
+    await page.getByLabel('Subject', { exact: true }).selectOption('maths');
+    await page.getByLabel('Cameras', { exact: true }).selectOption('off');
     await page.getByRole('button', { name: 'Open a room', exact: true }).click();
     await page.waitForURL(url => url.pathname === '/room.html');
     await page.waitForFunction(() => window.__fixture.tables.open_rooms.length === 1 && !document.getElementById('new-task-input').disabled);
-    assert(await page.evaluate(() => { const row = window.__fixture.tables.open_rooms[0]; return row.seats === 4 && row.seats_taken === 1 && row.host_id === 'test-user'; }), 'A hosted room should be listed with its seats');
+    assert(await page.evaluate(() => { const row = window.__fixture.tables.open_rooms[0]; return row.seats === 4 && row.seats_taken === 1 && row.host_id === 'test-user' && row.subject === 'maths' && row.camera === 'off' && row.timer_mode === 'focus' && row.closed === false && !('last_seen' in row); }), 'A hosted room should be listed with its details, and never send its own last-seen time');
     await page.getByRole('button', { name: 'Invite', exact: true }).click();
     await visible('#board-unlist-btn');
+    await page.getByLabel('Stop new people joining').check();
+    await page.waitForFunction(() => window.__fixture.tables.open_rooms[0].closed === true);
     await page.getByRole('button', { name: 'Done', exact: true }).click();
+    // The room's creator can remove someone; the database call comes first, then the nudge to their browser.
+    await page.evaluate(() => window.__fixture.handlers['presence:join']({ key: 'zz-guest', newPresences: [{ username: 'Guest', isDummyMedia: true }] }));
+    await page.locator('#video-wrapper-zz-guest').hover();
+    await page.getByRole('button', { name: 'Remove Guest from the room', exact: true }).click();
+    await visible('#remove-modal');
+    await page.getByRole('button', { name: 'Remove from room', exact: true }).click();
+    await page.waitForFunction(() => window.__fixture.calls.some(call => call.name === 'remove_participant') && window.__fixture.calls.some(call => call.value?.event === 'removed' && call.value.payload.userId === 'zz-guest'));
+    // A "removed" message is only believed once the database agrees.
+    await page.evaluate(() => window.__fixture.handlers['broadcast:removed']({ payload: { userId: 'test-user' } }));
+    await page.waitForFunction(() => window.__fixture.calls.filter(call => call.name === 'join_room').length >= 2);
+    assert(await page.locator('#app').isVisible(), 'A forged removal message must not eject anyone');
     await page.getByRole('button', { name: 'Leave', exact: true }).click();
     await page.getByRole('button', { name: 'Leave room', exact: true }).click();
     await visible('#join-modal');
     assert(await page.evaluate(() => window.__fixture.tables.open_rooms.length) === 0, 'Leaving takes the room off the board');
+    assert((await page.locator('#lobby-recap').innerText()).startsWith('Last session:'), 'The lobby should recap the session just left');
+    await page.locator('#lobby-board a').waitFor();
+
+    // Browsing: search, subjects, plans, reports, and a seat that leads straight into the room.
     await page.goto(origin + '/groups.html?board');
     await page.locator('.group').first().waitFor();
-    await page.screenshot({ path: 'output/playwright/groups-desktop.png' });
+    await page.screenshot({ path: 'output/playwright/groups-desktop.png', fullPage: true });
+    assert(await page.locator('#board-list .group').count() === 3 && await page.locator('#planned-list .group').count() === 2, 'Open and planned groups are listed separately');
+    assert((await page.locator('#board-list .group-status').first().innerText()).startsWith('Focusing, 14 min'), 'A card should say what the room is doing');
     assert(await page.getByRole('button', { name: 'Full', exact: true }).isDisabled(), 'A full group cannot be joined');
+    await page.getByLabel('Search topics').fill('essay');
+    assert(await page.locator('#board-list .group').count() === 1, 'Search should narrow the board');
+    await page.getByLabel('Search topics').fill('');
+    await page.getByRole('button', { name: 'Languages', exact: true }).click();
+    assert(await page.locator('#board-list .group').count() === 0 && await page.locator('#planned-list .group').count() === 1, 'Subject chips filter both lists');
+    await page.getByRole('button', { name: 'All', exact: true }).click();
+    await page.getByRole('button', { name: 'I’m in', exact: true }).first().click();
+    await page.getByRole('button', { name: 'You’re in', exact: true }).waitFor();
+    assert(await page.evaluate(() => window.__fixture.tables.planned_groups[0].going) === 4, 'Saying you are in should count');
+    await page.getByRole('button', { name: 'Report', exact: true }).first().click();
+    assert(await page.evaluate(() => window.__fixture.tables.reports.length) === 0, 'One click must not file a report');
+    await page.getByRole('button', { name: 'Report this listing?', exact: true }).click();
+    await page.waitForFunction(() => window.__fixture.tables.reports.length === 1);
+    await page.getByLabel('What are you studying?').fill('Thermodynamics problem sheet');
+    await page.getByLabel('Later').check();
+    await page.getByRole('button', { name: 'Put it on the board', exact: true }).click();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).waitFor();
+    assert(await page.evaluate(() => { const plan = window.__fixture.tables.planned_groups.at(-1); return plan.host_id === 'test-user' && plan.host_name === 'Alex' && new Date(plan.starts_at) > new Date(); }), 'A planned group should be saved with a future start');
+    assert(await page.getByRole('button', { name: 'Start now', exact: true }).isDisabled(), 'A plan cannot be started long before its time');
     assert(await page.locator('.group b, .group img').count() === 0, 'Group topics must stay inert');
-    await page.getByRole('button', { name: 'Take a seat', exact: true }).click();
+    await page.getByRole('button', { name: 'Find me a seat', exact: true }).click();
     await page.waitForURL(url => url.pathname === '/room.html' && url.searchParams.get('room') === 'FOCUS6');
     await visible('#app');
     // A link alone must never put someone in a room: it fills in the code and waits for a click.
     await page.goto(origin + '/room.html?room=FOCUS6&join=1');
     await visible('#join-modal');
     assert(await page.locator('#app').isHidden() && await page.locator('#room-code-input').inputValue() === 'FOCUS6', 'A URL must not auto-join a room');
+    // Signed out, the board is readable but nothing on it can be used.
+    await page.evaluate(() => localStorage.removeItem('flow_user'));
+    await page.goto(origin + '/groups.html?board');
+    await page.locator('.group').first().waitFor();
+    assert(await page.getByRole('link', { name: 'Log in to join', exact: true }).count() === 5 && await page.locator('#host-form').isHidden() && await page.getByRole('button', { name: 'Report', exact: true }).count() === 0, 'Visitors can read the board but not act on it');
+    await page.goto(origin + '/');
+    await page.locator('#live-groups.live').waitFor({ timeout: 1 }).catch(() => {});
+    await page.evaluate(() => localStorage.setItem('flow_user', JSON.stringify({ id: 'test-user', email: 'alex@example.com' })));
     await page.goto(origin + '/docs.html');
     for (const width of [1440, 390, 320]) { await page.setViewportSize({ width, height: 900 }); await fitsViewport(); }
     await page.setViewportSize({ width: 1440, height: 1000 });

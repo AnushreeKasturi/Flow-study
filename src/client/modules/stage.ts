@@ -30,7 +30,11 @@ export function ensureTile(userId: string, partner?: Participant) {
         Object.assign(document.createElement('div'), { className: 'avatar', textContent: initial(name) }),
         Object.assign(document.createElement('div'), { className: 'text', textContent: 'Camera off' })
     );
-    wrapper.append(video, tag, placeholder);
+    // Shown to the room's host only (CSS keys off body.is-host).
+    const remove = Object.assign(document.createElement('button'), { className: 'tile-remove', type: 'button', textContent: 'Remove' });
+    remove.setAttribute('aria-label', `Remove ${name} from the room`);
+    remove.addEventListener('click', () => document.dispatchEvent(new CustomEvent('flow-remove', { detail: userId })));
+    wrapper.append(video, tag, placeholder, remove);
     videoGrid.appendChild(wrapper);
     if (partner) labelTile(userId, partner);
     return video;

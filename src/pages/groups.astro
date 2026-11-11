@@ -2,34 +2,67 @@
 import Page from '../layouts/Page.astro';
 import Sky from '../components/Sky.astro';
 import '../styles/pages.css';
+import { SUBJECTS, CAMERAS, VIBES } from '../client/modules/board-options';
 ---
 <Page title="Study groups | Flow" bodyClass="plain-page">
-    <Fragment slot="head">
-        <script is:inline>try { if (!localStorage.getItem('flow_user')) location.replace('/login.html'); } catch (e) {}</script>
-    </Fragment>
     <Sky />
     <header class="plain-nav">
         <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
-        <nav aria-label="Main"><a href="/docs.html">Docs</a><a href="/room.html" class="btn">Your room</a></nav>
+        <nav aria-label="Main"><a href="/docs.html">Docs</a><a href="/room.html" class="btn" id="board-room-link">Your room</a></nav>
     </header>
     <main class="plain-main">
-        <h1>Study groups, open right now.</h1>
-        <p class="lead">Take a seat in someone’s room, or open your own. Groups hold two to six people, so nobody gets lost in a crowd.</p>
+        <h1>Find people to study with.</h1>
+        <p class="lead">Take a seat in a group that’s open now, say you’re in for one later, or host your own. Groups hold two to six people.</p>
+
+        <div class="board-tools">
+            <input type="search" id="board-search" class="input" placeholder="Search topics" aria-label="Search topics">
+            <div class="chips" role="group" aria-label="Filter by subject">
+                <button type="button" data-subject="" aria-pressed="true">All</button>
+                {SUBJECTS.map(([id, name]) => <button type="button" data-subject={id} aria-pressed="false">{name}</button>)}
+            </div>
+            <button type="button" id="find-seat" class="btn btn-primary">Find me a seat</button>
+        </div>
+        <p id="board-message" class="board-message" role="status"></p>
+
         <div class="board">
-            <section aria-labelledby="open-heading">
-                <div class="board-head"><h2 id="open-heading">Open groups</h2><button id="board-refresh" type="button" class="btn">Refresh</button></div>
-                <p id="board-message" class="board-message" role="status"></p>
-                <ul id="board-list" class="board-list"></ul>
-            </section>
+            <div>
+                <section aria-labelledby="open-heading">
+                    <h2 id="open-heading">Open now <span id="open-count" class="count"></span></h2>
+                    <ul id="board-list" class="board-list"></ul>
+                </section>
+                <section aria-labelledby="planned-heading" class="planned">
+                    <h2 id="planned-heading">Coming up <span id="planned-count" class="count"></span></h2>
+                    <ul id="planned-list" class="board-list"></ul>
+                </section>
+            </div>
+
             <form id="host-form" class="host-card">
                 <h2>Host a group</h2>
                 <label for="host-topic">What are you studying?</label>
                 <input type="text" id="host-topic" class="input" minlength="3" maxlength="80" required placeholder="Organic chemistry revision">
-                <label for="host-seats">Seats, including you</label>
-                <select id="host-seats" class="input">{[2, 3, 4, 5, 6].map(n => <option value={n} selected={n === 4}>{n} people</option>)}</select>
-                <button class="btn btn-primary btn-lg btn-block">Open a room</button>
-                <p>You’ll land in a new room that’s already listed here. It leaves the board when you leave the room.</p>
+                <div class="host-row">
+                    <div><label for="host-subject">Subject</label><select id="host-subject" class="input">{SUBJECTS.map(([id, name]) => <option value={id} selected={id === 'other'}>{name}</option>)}</select></div>
+                    <div><label for="host-seats">Seats</label><select id="host-seats" class="input" aria-label="Seats, including you">{[2, 3, 4, 5, 6].map(n => <option value={n} selected={n === 4}>{n}</option>)}</select></div>
+                </div>
+                <div class="host-row">
+                    <div><label for="host-camera">Cameras</label><select id="host-camera" class="input">{CAMERAS.map(([id, name]) => <option value={id}>{name.replace('Cameras ', '').replace(/^./, letter => letter.toUpperCase())}</option>)}</select></div>
+                    <div><label for="host-vibe">Talking</label><select id="host-vibe" class="input">{VIBES.map(([id, name]) => <option value={id}>{name}</option>)}</select></div>
+                </div>
+                <fieldset class="host-when">
+                    <legend>When</legend>
+                    <label><input type="radio" name="when" value="now" checked> Now</label>
+                    <label><input type="radio" name="when" value="later"> Later</label>
+                    <input type="datetime-local" id="host-start" class="input hidden" aria-label="Start time">
+                </fieldset>
+                <button id="host-submit" class="btn btn-primary btn-lg btn-block">Open a room</button>
+                <p id="host-note">You’ll land in a new room that’s already listed here. It leaves the board when you leave the room.</p>
             </form>
+            <div id="host-signed-out" class="host-card hidden">
+                <h2>Want to join or host?</h2>
+                <p>Anyone can look. Taking a seat or hosting needs a free account, which takes about a minute.</p>
+                <a href="/start.html" class="btn btn-primary btn-lg btn-block">Set up your space</a>
+                <a href="/login.html" class="btn btn-block">Log in</a>
+            </div>
         </div>
     </main>
     <script>import '../client/groups';</script>

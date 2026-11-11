@@ -18,7 +18,8 @@ A shared study room for focused work. Bring your group, set a timer, and work th
 - **Shared tasks:** add, assign, complete, and remove room goals with persistent storage.
 - **Room chat:** send messages and ask the study assistant with `/ai`.
 - **Soundscapes:** rain, ocean, fireplace, wind, night, and a deep hum, each synthesized in the browser from filtered noise. Only you hear them; no audio files are downloaded.
-- **Study groups (`/groups.html`):** open your room to a public board with a topic and two to six seats, or take a seat in someone else's. Listings disappear when the host leaves.
+- **Study groups (`/groups.html`):** a board anyone can read. Open your room with a topic, subject, house rules, and two to six seats, or plan a group for later and let people say they're in. Cards show what each room is doing right now. Search, filter by subject, or press "Find me a seat".
+- **Host controls:** the person who created a room can remove someone for good and stop new people joining. Listings can be reported.
 - **Arrivals and departures:** a soft chime, and a tile that says who left before it clears.
 - **Room audio:** share YouTube or Spotify links through the official embedded players. Everyone controls their own playback, and no player loads until someone asks for one.
 - **Your focus:** today's total, a streak, and a seven-day chart. Pauses do not count. Completed focus sessions are saved; progress from an unfinished session is lost on refresh.
@@ -78,7 +79,9 @@ For a **new, empty database**, run these files in order in the Supabase SQL edit
 2. [`sql/002_profiles.sql`](sql/002_profiles.sql)
 3. [`sql/003_task_assignment.sql`](sql/003_task_assignment.sql)
 4. [`sql/004_room_access_compatibility.sql`](sql/004_room_access_compatibility.sql)
-5. [`sql/005_open_rooms_and_limits.sql`](sql/005_open_rooms_and_limits.sql) (study-groups board and text size limits; the board page reports that it is not set up until this has run)
+5. [`sql/005_open_rooms_and_limits.sql`](sql/005_open_rooms_and_limits.sql) (study-groups board and text size limits)
+6. [`sql/006_board_v2_and_host_controls.sql`](sql/006_board_v2_and_host_controls.sql) (subjects, planned groups, reports, host controls, seat limits; the board reports that it is not set up until 005 and 006 have run)
+7. Optional: [`sql/007_private_room_channels.sql`](sql/007_private_room_channels.sql), as one step of [turning on private room channels](SECURITY.md#turning-on-private-room-channels)
 
 **`schema.sql` drops existing tables. Do not run it as an upgrade on a database with data.** For an existing installation, use the additive migration sequence and compatibility notes in [TESTING.md](TESTING.md#supabase-compatibility).
 
@@ -127,7 +130,7 @@ Flow is released under the [MIT License](LICENSE).
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to run, test, and send a change.
 - [SECURITY.md](SECURITY.md): what is protected today, what is not yet, and how to report a problem.
-- [marketing/launch-kit.md](marketing/launch-kit.md): descriptions, posts, and the image list for sharing Flow.
+- [marketing/launch-kit.md](marketing/launch-kit.md): descriptions, posts, 16:9 images, and a demo GIF for sharing Flow (`npm run marketing:images` regenerates them).
 
 ## Checks and CI
 

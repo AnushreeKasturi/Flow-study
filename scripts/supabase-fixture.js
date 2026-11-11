@@ -5,11 +5,17 @@ window.supabase = { createClient() {
         const user = { id: 'test-user', email: 'alex@example.com' };
         // ?fresh starts without a saved name, to show first-run setup.
         const tables = { profiles: new URLSearchParams(location.search).has('fresh') ? [] : [{ id: user.id, display_name: 'Alex' }], rooms: [], tasks: [], sessions: [],
-            // ?board seeds two listings so the study-groups page has something to show.
+            // ?board seeds the study-groups page so it has something to show.
             open_rooms: new URLSearchParams(location.search).has('board') ? [
-                { id: 'listing-1', host_id: 'riya', host_name: 'Riya', topic: 'Organic chemistry: reaction mechanisms', seats: 4, seats_taken: 2, last_seen: new Date().toISOString() },
-                { id: 'listing-2', host_id: 'sam', host_name: 'Sam', topic: 'Quiet essay writing, cameras optional', seats: 2, seats_taken: 2, last_seen: new Date().toISOString() }
-            ] : [] };
+                { id: 'listing-1', host_id: 'riya', host_name: 'Riya', topic: 'Organic chemistry: reaction mechanisms', subject: 'science', camera: 'optional', vibe: 'quiet', seats: 4, seats_taken: 2, closed: false, timer_mode: 'focus', timer_ends_at: new Date(Date.now() + 14 * 60000).toISOString(), last_seen: new Date().toISOString() },
+                { id: 'listing-2', host_id: 'sam', host_name: 'Sam', topic: 'Quiet essay writing, cameras off', subject: 'writing', camera: 'off', vibe: 'quiet', seats: 2, seats_taken: 2, closed: false, timer_mode: 'shortBreak', timer_ends_at: new Date(Date.now() + 3 * 60000).toISOString(), last_seen: new Date().toISOString() },
+                { id: 'listing-3', host_id: 'ines', host_name: 'Inés', topic: 'LeetCode mediums, talk through solutions', subject: 'programming', camera: 'on', vibe: 'chatty', seats: 5, seats_taken: 3, closed: false, timer_mode: null, timer_ends_at: null, last_seen: new Date().toISOString() }
+            ] : [],
+            planned_groups: new URLSearchParams(location.search).has('board') ? [
+                { id: 'plan-1', host_id: 'noor', host_name: 'Noor', topic: 'Calculus II past papers', subject: 'maths', camera: 'optional', vibe: 'quiet', seats: 6, going: 3, base: 3, starts_at: new Date(Date.now() + 3 * 3600000).toISOString() },
+                { id: 'plan-2', host_id: 'kai', host_name: 'Kai', topic: 'Spanish conversation practice', subject: 'languages', camera: 'on', vibe: 'chatty', seats: 4, going: 1, base: 1, starts_at: new Date(Date.now() + 26 * 3600000).toISOString() }
+            ] : [],
+            planned_group_members: [], reports: [] };
         const fixture = window.__fixture = { tables, calls: [], delay: 0, fail: null, authFailure: false, collision: false, rpcError: null, channelCount: 0, handlers: {} };
         async function authResult() {
             fixture.calls.push({ action: 'auth' });
@@ -40,11 +46,14 @@ window.supabase = { createClient() {
                     if (fixture.collision && table === 'rooms' && action === 'select') return { data: [{ id: 'collision' }], error: null };
                     let rows = tables[table].filter(row => filters.every(filter => filter(row)));
                     if (action === 'insert') {
-                        rows = (Array.isArray(payload) ? payload : [payload]).map(row => ({ id: crypto.randomUUID(), ...row }));
+                        // Stands in for column defaults: a new room belongs to whoever made it.
+                        rows = (Array.isArray(payload) ? payload : [payload]).map(row => ({ id: crypto.randomUUID(), ...(table === 'rooms' ? { created_by: user.id } : {}), ...(table === 'planned_groups' ? { going: 1, base: 1 } : {}), ...row }));
                         tables[table].push(...rows);
                     }
                     if (action === 'update') rows.forEach(row => Object.assign(row, payload));
                     if (action === 'delete') tables[table] = tables[table].filter(row => !rows.includes(row));
+                    // Stands in for the database trigger that keeps "going" in step with sign-ups.
+                    if (table === 'planned_group_members' && action !== 'select') tables.planned_groups.forEach(group => { group.going = group.base + tables.planned_group_members.filter(member => member.group_id === group.id).length; });
                     return { data: single ? rows[0] || null : structuredClone(rows), error: null, count: rows.length };
                     })().then(resolve, reject);
                 }

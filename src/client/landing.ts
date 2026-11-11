@@ -65,3 +65,16 @@ markTheme();
         if (/^\d+$/.test(stars)) document.querySelectorAll('[data-stars]').forEach(el => { el.textContent = Number(stars).toLocaleString(); });
     } catch { /* Offline or rate limited. */ }
 })();
+
+// How many groups are studying right now. The board code (and Supabase with it)
+// loads only after the page is idle, so it never delays the landing page itself.
+const whenIdle = window.requestIdleCallback ?? ((run: () => void) => setTimeout(run, 1500));
+whenIdle(async () => {
+    try {
+        const { fetchOpenRooms, fetchPlanned } = await import('./modules/board');
+        const [open, planned] = await Promise.all([fetchOpenRooms(), fetchPlanned()]);
+        const link = byId<HTMLAnchorElement>('live-groups');
+        if (open.length) { link.textContent = `${open.length} study group${open.length === 1 ? '' : 's'} open right now`; link.classList.add('live'); }
+        else if (planned.length) link.textContent = `${planned.length} study group${planned.length === 1 ? '' : 's'} planned`;
+    } catch { /* The plain link stays. */ }
+});

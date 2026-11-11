@@ -16,7 +16,8 @@
     "build": "astro build",
     "check": "astro check",
     "pretest": "npm run check && npm run build",
-    "dev:demo": "FLOW_DEMO=1 astro dev"
+    "dev:demo": "FLOW_DEMO=1 astro dev",
+    "marketing:images": "node scripts/generate-marketing.cjs"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",

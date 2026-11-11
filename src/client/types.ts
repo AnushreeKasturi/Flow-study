@@ -41,6 +41,7 @@ export interface SocketHandlers {
     onYouTubeSync?: (url: string) => void;
     onAudioSync?: (provider: AudioProvider, url: string) => void;
     onReaction?: (reaction: { userId: string; emoji: string }) => void;
+    onRemoved?: (userId: string) => void;
 }
 export interface ProfileStats {
     savedTotalSeconds: number; savedTodaySeconds: number; weekSeconds: number[]; persistedIds: string[];
@@ -48,8 +49,10 @@ export interface ProfileStats {
     totalMinutes: number; todayMinutes: number; liveMinutes: number;
 }
 interface Session { id: string; user_id: string; room_id: string; mode: string; duration_seconds: number; completed_at: string; }
-interface Room { id: string; room_code: string; is_locked: boolean; pin: string | null; created_at: string; }
-export interface OpenRoom { id: string; host_id: string; host_name: string; topic: string; seats: number; seats_taken: number; last_seen: string; }
+interface Room { id: string; room_code: string; is_locked: boolean; pin: string | null; created_at: string; created_by?: string | null; }
+export interface GroupDetails { host_name: string; topic: string; subject: string; camera: string; vibe: string; seats: number; }
+export interface OpenRoom extends GroupDetails { id: string; host_id: string; seats_taken: number; closed: boolean; timer_mode: string | null; timer_ends_at: string | null; last_seen: string; }
+export interface PlannedGroup extends GroupDetails { id: string; host_id: string; starts_at: string; going: number; }
 interface Profile { id: string; display_name: string | null; created_at: string; updated_at: string; }
 type Table<Row, Insert = Partial<Row>> = { Row: { [K in keyof Row]: Row[K] }; Insert: { [K in keyof Insert]: Insert[K] }; Update: Partial<{ [K in keyof Row]: Row[K] }>; Relationships: [] };
 export interface Database {
@@ -59,12 +62,16 @@ export interface Database {
             sessions: Table<Session>;
             rooms: Table<Room>;
             profiles: Table<Profile>;
-            open_rooms: Table<OpenRoom & { room_id: string }, Omit<OpenRoom, 'id' | 'last_seen'> & { room_id: string; last_seen?: string }>;
+            open_rooms: Table<OpenRoom & { room_id: string }, Omit<OpenRoom, 'id' | 'last_seen'> & { room_id: string }>;
+            planned_groups: Table<PlannedGroup, Omit<PlannedGroup, 'id' | 'going'>>;
+            planned_group_members: Table<{ group_id: string; user_id: string }, { group_id: string }>;
+            reports: Table<{ kind: string; target: string; topic: string | null; reason: string | null }>;
         };
         Views: Record<string, never>;
         Functions: {
             join_room: { Args: { p_room_code: string; p_pin: string }; Returns: string };
             join_open_room: { Args: { p_listing: string }; Returns: string };
+            remove_participant: { Args: { p_room: string; p_user: string }; Returns: undefined };
         };
         Enums: Record<string, never>;
         CompositeTypes: Record<string, never>;
