@@ -20,7 +20,8 @@ Please don't open a public issue. Use GitHub's private reporting: **Security →
 | Pages | Content-Security-Policy, `nosniff`, a referrer policy, a permissions policy limiting camera and microphone to this site, HSTS, and no framing by other sites |
 | Video and voice | Encrypted by WebRTC (DTLS-SRTP) with keys negotiated between the two browsers on each call. Media goes directly between browsers when a direct path exists; otherwise a TURN relay forwards the encrypted packets without being able to read them. Flow's servers never receive media |
 | Disruptive people | The person who created a room can remove someone: the database deletes their membership and refuses every later join, by code or from the board. A "you were removed" message is only acted on after the database confirms it, so it cannot be forged to eject others |
-| Abusive listings | Any signed-in user can report a listing; three reports from different people hide it from everyone but its host. Reports are write-only and are read in the Supabase table editor |
+| Abusive listings | Any signed-in user can report a listing. Reports are recorded against the host by the database, and three different reporters within a week hide everything that host has on the board, including anything posted afterwards. Reports are write-only and are read in the Supabase table editor |
+| Listings | One per room, and only by the room's creator, so a second listing cannot be used to close a room or get around its seat limit |
 | Seat limits | A listed room's seat count, and "closed to new people", are enforced in the database for joins by code as well as from the board |
 | Abuse inside a room | Timer messages are throttled when sent and flood-limited when received; ICE candidates are capped per peer |
 
