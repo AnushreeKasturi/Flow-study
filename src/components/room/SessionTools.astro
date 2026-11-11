@@ -1,5 +1,6 @@
 ---
 import GitHubStar from '../GitHubStar.astro';
+import { SOUNDS } from '../../client/modules/soundscape';
 ---
 <aside class="right-sidebar" aria-label="Room tools">
     <div class="tabs-header" role="tablist" aria-label="Room tools">
@@ -35,11 +36,9 @@ import GitHubStar from '../GitHubStar.astro';
     <div id="sound-tab" class="tab-content" role="tabpanel" aria-labelledby="sound-tab-button">
         <section class="sound-block" aria-labelledby="sound-heading">
             <h2 id="sound-heading" class="panel-heading">Soundscape</h2>
-            <p class="panel-description">Steady noise to mask distractions. Only you hear it.</p>
-            <div class="segmented" role="group" aria-label="Soundscape">
-                <button type="button" data-sound="brown" aria-pressed="false">Brown</button>
-                <button type="button" data-sound="pink" aria-pressed="false">Pink</button>
-                <button type="button" data-sound="white" aria-pressed="false">White</button>
+            <p class="panel-description">Background sound made in your browser. Only you hear it.</p>
+            <div class="sound-grid" role="group" aria-label="Soundscape">
+                {SOUNDS.map(([id, name, text]) => <button type="button" data-sound={id} aria-pressed="false" title={text}>{name}</button>)}
             </div>
             <label class="volume"><span>Volume</span><input type="range" id="sound-volume" min="0" max="100" value="40"></label>
         </section>

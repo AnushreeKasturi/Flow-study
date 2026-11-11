@@ -120,7 +120,13 @@ const connectChannel = () => {
         if (payload?.provider === 'spotify' && typeof payload.url === 'string') handlers.onAudioSync?.(payload.provider, payload.url);
     });
 
+    // Flood guard: a client stuck in a loop (or a hostile one) cannot lock up
+    // everyone's clock. Past 20 timer messages in five seconds, the rest of that window is dropped.
+    let timerWindow = 0, timerCount = 0;
     activeChannel.on('broadcast', { event: 'timer-updated' }, ({ payload }) => {
+        const now = Date.now();
+        if (now - timerWindow > 5000) { timerWindow = now; timerCount = 0; }
+        if (++timerCount > 20) return;
         handlers.onTimerUpdated(payload);
     });
 
@@ -228,13 +234,21 @@ export const sendSignal = (to: string, signal: Signal) => {
     });
 };
 
+// Timer changes go out at most every 250 ms. A burst of clicks collapses into
+// its first and last state, so the room always ends up where the sender did.
+let lastTimerSend = 0;
+let trailingTimerSend: ReturnType<typeof setTimeout> | undefined;
 export const updateTimer = (_roomId: string | null, action: string, payload: Partial<TimerState>) => {
-    if (!channel) return;
-    channel.send({
-        type: 'broadcast',
-        event: 'timer-updated',
-        payload: { action, ...payload }
-    });
+    const send = () => {
+        lastTimerSend = Date.now();
+        channel?.send({ type: 'broadcast', event: 'timer-updated', payload: { action, ...payload } });
+    };
+    const wait = 250 - (Date.now() - lastTimerSend);
+    // The periodic time-only sync never displaces a real state change that is waiting to go out.
+    if (wait > 0 && trailingTimerSend && payload.mode === undefined) return;
+    clearTimeout(trailingTimerSend);
+    trailingTimerSend = undefined;
+    if (wait <= 0) send(); else trailingTimerSend = setTimeout(() => { trailingTimerSend = undefined; send(); }, wait);
 };
 
 export const updatePresence = async (_roomId: string | null, status: string, nowPlaying?: string | null) => {

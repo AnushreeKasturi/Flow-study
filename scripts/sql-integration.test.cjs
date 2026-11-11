@@ -58,6 +58,35 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.throws(() => asUser(two, `INSERT INTO public.tasks(room_id,title,created_by) VALUES('${room}','Spoofed author','${one}');`), /Command failed/);
             asUser(two, `INSERT INTO public.tasks(room_id,title,created_by) VALUES('${room}','Valid task','${two}');`);
             assert.equal(run(database, "SELECT count(*) FROM pg_publication_tables WHERE pubname='supabase_realtime';").trim(), '2', 'Existing publication members survive');
+
+            // 005: size limits and the study-groups board. Run twice to prove it is repeatable.
+            const board = readFileSync('sql/005_open_rooms_and_limits.sql', 'utf8');
+            run(database, board);
+            run(database, board);
+            assert.throws(() => asUser(two, `INSERT INTO public.tasks(room_id,title,created_by) VALUES('${room}',repeat('x',201),'${two}');`), /Command failed/, 'Oversized task titles are refused');
+            assert.equal(run(database, 'SELECT count(*) FROM public.tasks;').trim(), '2', 'Existing tasks survive the new limits');
+            const openRoom = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+            const three = '33333333-3333-4333-8333-333333333333';
+            run(database, `INSERT INTO auth.users VALUES ('${three}'); INSERT INTO public.rooms(id,room_code,is_locked) VALUES('${openRoom}','OPEN22',false);`);
+            const list = (id, roomId, extra = '') => asUser(id, `INSERT INTO public.open_rooms(room_id,host_name,topic,seats${extra ? ',host_id' : ''}) VALUES('${roomId}','Alex','Organic chemistry revision',2${extra});`);
+            assert.throws(() => list(one, openRoom), /Command failed/, 'Only someone in the room may list it');
+            asUser(one, "SELECT public.join_room('OPEN22', NULL);");
+            assert.throws(() => list(two, room), /Command failed/, 'A PIN-locked room cannot be listed');
+            assert.throws(() => list(one, openRoom, `,'${two}'`), /Command failed/, 'A listing cannot be created in someone else\'s name');
+            list(one, openRoom);
+            assert.throws(() => asUser(two, 'SELECT room_id FROM public.open_rooms;'), /Command failed/, 'The room id stays hidden from the board');
+            const listing = asUser(two, 'SELECT id FROM public.open_rooms;');
+            assert.match(listing, /^[0-9a-f-]{36}$/, 'Signed-in users see fresh listings');
+            assert.throws(() => run(database, `SET ROLE anon; SELECT public.join_open_room('${listing}');`), /Command failed/, 'Signed-out callers cannot take a seat');
+            assert.equal(asUser(two, `SELECT public.join_open_room('${listing}');`), 'OPEN22', 'A free seat returns the room code');
+            assert.equal(asUser(two, `SELECT public.join_open_room('${listing}');`), 'OPEN22', 'Rejoining does not take a second seat');
+            assert.equal(run(database, 'SELECT seats_taken FROM public.open_rooms;').trim(), '2');
+            assert.throws(() => asUser(three, `SELECT public.join_open_room('${listing}');`), /Command failed/, 'A full group refuses another seat');
+            asUser(two, "UPDATE public.open_rooms SET topic = 'Taken over';");
+            assert.equal(run(database, 'SELECT topic FROM public.open_rooms;').trim(), 'Organic chemistry revision', 'Only the host may edit a listing');
+            run(database, "UPDATE public.open_rooms SET last_seen = now() - interval '5 minutes';");
+            assert.equal(asUser(two, 'SELECT count(*) FROM public.open_rooms;'), '0', 'Stale listings disappear from the board');
+            assert.equal(asUser(one, 'SELECT count(*) FROM public.open_rooms;'), '1', 'The host still sees their own listing');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

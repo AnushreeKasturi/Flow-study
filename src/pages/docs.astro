@@ -1,0 +1,72 @@
+---
+import Page from '../layouts/Page.astro';
+import Sky from '../components/Sky.astro';
+import '../styles/pages.css';
+import { SOUNDS } from '../client/modules/soundscape';
+const repo = 'https://github.com/ManasDasri/Flow-study';
+const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focus mode'], ['M', 'Mute or unmute your microphone'], ['V', 'Turn your camera on or off'], ['?', 'Show the shortcut list']];
+---
+<Page title="Docs | Flow" bodyClass="plain-page">
+    <Sky />
+    <header class="plain-nav">
+        <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
+        <nav aria-label="Main"><a href="/groups.html">Study groups</a><a href={repo} target="_blank" rel="noopener noreferrer">GitHub</a><a href="/start.html" class="btn">Get started</a></nav>
+    </header>
+    <main class="plain-main docs">
+        <h1>How Flow works.</h1>
+        <p class="lead">Everything you need to run a study session, on one page.</p>
+
+        <nav class="docs-toc" aria-label="On this page">
+            <a href="#start">Getting started</a><a href="#timer">The sun timer</a><a href="#rooms">Rooms and invites</a><a href="#groups">Study groups</a><a href="#sound">Sound</a><a href="#shortcuts">Shortcuts</a><a href="#data">Your data</a><a href="#self-host">Run your own copy</a>
+        </nav>
+
+        <section id="start">
+            <h2>Getting started</h2>
+            <p><a href="/start.html">Setup</a> asks four things: your name, a sky, how long you like to focus, and whether you want background sound. Then you create an account with an email and password. Your choices are saved in your browser and applied to the first room you create.</p>
+            <p>After that you land in the lobby, where you either create a room or enter a six-character code someone sent you.</p>
+        </section>
+
+        <section id="timer">
+            <h2>The sun timer</h2>
+            <p>The timer is shared: when anyone starts, pauses, or resets it, it changes for everyone in the room. The sun shows progress. It sinks during a focus block and has set when the block ends; during a break it rises again and slowly grows and shrinks as a breathing pace.</p>
+            <p>Four focus blocks make a set. After the first three the room moves to a short break, and after the fourth to a long one. The default lengths are 25, 5, and 15 minutes; change them from the settings button under the clock, and the new lengths apply to the whole room.</p>
+            <p>Focus mode (the expand button, or <kbd>F</kbd>) hides everything except the sky, the clock, and the people you’re with.</p>
+        </section>
+
+        <section id="rooms">
+            <h2>Rooms and invites</h2>
+            <p>A room has a six-character code. Press Invite to copy a link that carries the code; anyone who opens it signs in and arrives in your room. Type a four-digit PIN before creating a room if you want it locked.</p>
+            <p>Video and voice go directly between browsers. You can turn your camera or microphone off at any time, and Flow works fine with both off. Tasks are shared with the room and stay there after you leave. Chat is not stored: it exists only while the room is open. Start a message with <kbd>/ai</kbd> to ask the study assistant a question.</p>
+        </section>
+
+        <section id="groups">
+            <h2>Study groups</h2>
+            <p>The <a href="/groups.html">study-groups board</a> lists rooms whose hosts have opened them to anyone signed in. Each shows what the group is studying and how many of its seats are free. Groups hold two to six people.</p>
+            <p>To host, use “Host a group” on the board, or open Invite inside any room without a PIN and list it. Your room stays on the board while you’re in it and comes off when you leave. If your browser closes unexpectedly, the listing disappears within two minutes.</p>
+        </section>
+
+        <section id="sound">
+            <h2>Sound</h2>
+            <p>The Sound tab has two separate things. Soundscapes are made in your own browser and only you hear them:</p>
+            <ul>{SOUNDS.map(([, name, text]) => <li><strong>{name}.</strong> {text}</li>)}</ul>
+            <p>Room audio shares a YouTube or Spotify link with everyone. Each person presses play themselves and controls their own volume; playback is not synchronised.</p>
+        </section>
+
+        <section id="shortcuts">
+            <h2>Shortcuts</h2>
+            <dl class="docs-keys">{shortcuts.map(([key, action]) => <div><dt><kbd>{key}</kbd></dt><dd>{action}</dd></div>)}</dl>
+            <p>Shortcuts are ignored while you’re typing or a dialog is open.</p>
+        </section>
+
+        <section id="data">
+            <h2>Your data</h2>
+            <p>Flow stores your email, your display name, the tasks you add to rooms, and a record of each focus block you finish (when, and how long). If you list a room on the board, its topic and your display name are visible to other signed-in users until you leave.</p>
+            <p>Video, voice, and chat are not stored. A question sent with <kbd>/ai</kbd> goes to the assistant’s provider to be answered and is not kept by Flow. Security details, including what is not protected yet, are in <a href={repo + '/blob/main/SECURITY.md'} target="_blank" rel="noopener noreferrer">SECURITY.md</a>.</p>
+        </section>
+
+        <section id="self-host">
+            <h2>Run your own copy</h2>
+            <p>Flow is open source. Clone the <a href={repo} target="_blank" rel="noopener noreferrer">repository</a> and run <code>npm ci</code> then <code>npm run dev:demo</code> to explore it offline with no accounts or keys. The README covers connecting your own Supabase project and deploying, and CONTRIBUTING.md covers sending changes.</p>
+        </section>
+    </main>
+</Page>

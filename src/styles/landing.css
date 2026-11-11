@@ -68,7 +68,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 24px; }
 
 .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px; margin-top: 60px; list-style: none; counter-reset: step; }
 .steps li { counter-increment: step; }
-.steps li::before { content: counter(step); display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 24px; border-radius: 50%; background: var(--sun); color: var(--bg); font-size: 2rem; font-weight: 800; font-stretch: 78%; font-variation-settings: 'wdth' 78; }
+.steps li::before { content: counter(step); display: block; margin-bottom: 16px; color: var(--primary); font-size: 4.4rem; font-weight: 800; font-stretch: 78%; font-variation-settings: 'wdth' 78; line-height: .9; }
 .steps h3 { font-size: 1.5rem; }
 .steps p { margin-top: 10px; }
 
@@ -108,6 +108,6 @@ html { scroll-behavior: smooth; scroll-padding-top: 24px; }
     .hero { margin-top: calc(var(--horizon) - 80px + 20px); padding-bottom: 48px; }
     .features, .steps { grid-template-columns: minmax(0, 1fr); gap: 36px; }
     .demo { flex-wrap: wrap; }
-    .swatches { grid-template-columns: repeat(2, 1fr); }
+    .swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .site-footer { flex-wrap: wrap; }
 }

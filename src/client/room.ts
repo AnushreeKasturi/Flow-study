@@ -15,11 +15,15 @@ import supabase from './modules/supabase';
 import { initAudio, loadRoomAudio } from './modules/audio';
 import { notify, openModal, closeModal, initDialogs } from './modules/feedback';
 import { getStoredUser } from './modules/utils';
-import { ensureTile, attachStream, removeTile, setCameraOff, showReaction, setHandRaised } from './modules/stage';
-import { playSound, stopSound, setSoundVolume, type Sound } from './modules/soundscape';
+import { ensureTile, attachStream, removeTile, markLeft, setCameraOff, showReaction, setHandRaised } from './modules/stage';
+import { playSound, stopSound, setSoundVolume, isSound, type Sound } from './modules/soundscape';
+import { chime } from './modules/chime';
+import { listRoom, refreshListing, unlistRoom } from './modules/board';
 import { initShortcuts } from './modules/shortcuts';
 
+let currentRoomId = '';
 let currentRoomCode = '';
+let listed = false; // this room is on the study-groups board, and we are its host
 let currentUsername = '';
 let partners: Participants = {};
 let handRaised = false;
@@ -42,7 +46,12 @@ const on = <T extends HTMLElement = HTMLElement>(id: string, handler: (event: Mo
 // of rebuilding the peer connection and video tile for someone who never left.
 const pendingLeaves: Record<string, ReturnType<typeof setTimeout>> = {};
 const LEAVE_GRACE_MS = 18000;
-const cancelLeave = (userId: string) => { clearTimeout(pendingLeaves[userId]); delete pendingLeaves[userId]; };
+const cancelLeave = (userId: string) => {
+    if (!(userId in pendingLeaves)) return;
+    clearTimeout(pendingLeaves[userId]);
+    delete pendingLeaves[userId];
+    markLeft(userId, false); // they were only gone for a moment
+};
 
 // Excludes look-alike characters (0/O, 1/I/L) so a code read aloud can't be mistyped into another valid one.
 const ROOM_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -180,6 +189,7 @@ async function joinRoom() {
                 : 'Could not join this room. Check your connection and try again.');
             return;
         }
+        currentRoomId = roomUuid;
         currentRoomCode = roomCode;
         // A saved display name overrides the email-derived default.
         currentUsername = (await getMyProfile(user.id))?.display_name || user.email.split('@')[0];
@@ -203,6 +213,7 @@ async function enterRoom(roomId: string, roomCode: string) {
     reveal(appContainer, 'room');
     const roomUrl = new URL(window.location.href);
     roomUrl.searchParams.set('room', roomCode);
+    roomUrl.searchParams.delete('join');
     history.replaceState(null, '', roomUrl);
     sessionStorage.setItem('flow_last_room', roomCode);
     UI.updateRoomInfo(roomCode, 1);
@@ -225,8 +236,11 @@ async function enterRoom(roomId: string, roomCode: string) {
         micBtn.title = 'No microphone detected';
     }
 
-    const countPeople = () => UI.updateRoomInfo(roomCode, Object.keys(partners).length + 1);
+    // People inside their leave grace period are already gone as far as the room is concerned.
+    const countPeople = () => UI.updateRoomInfo(roomCode, Object.keys(partners).filter(id => !(id in pendingLeaves)).length + 1);
     const welcome = (userId: string, data: Participants[string]) => {
+        // A new face gets a chime; someone returning from a blip does not.
+        if (!partners[userId]) chime('join');
         cancelLeave(userId);
         partners[userId] = data;
         countPeople();
@@ -239,20 +253,24 @@ async function enterRoom(roomId: string, roomCode: string) {
         onConnectionStatus: connectionStatus,
         onRoomState: state => {
             const users = state.participants || {};
-            UI.updateRoomInfo(roomCode, Object.keys(users).length);
+            Object.keys(users).forEach(cancelLeave);
             // Add and update only. Presence "sync" fires on every track() call,
             // and a momentarily incomplete snapshot must not read as a
             // departure; removal belongs to the "leave" event below.
             Object.keys(users).forEach(userId => {
                 if (userId === getMyUserId()) return;
-                cancelLeave(userId);
                 partners[userId] = users[userId];
                 updatePartnerUI(userId);
             });
+            countPeople();
         },
         onUserJoined: data => welcome(data.userId, data),
         onUserLeft: userId => {
-            cancelLeave(userId);
+            if (!partners[userId]) return;
+            // Say so at once: chime, a note on their tile, and one fewer in the count.
+            // The connection itself is only torn down after the grace period.
+            if (!(userId in pendingLeaves)) { chime('leave'); markLeft(userId, true, partners[userId].username); }
+            clearTimeout(pendingLeaves[userId]);
             pendingLeaves[userId] = setTimeout(() => {
                 delete pendingLeaves[userId];
                 delete partners[userId];
@@ -261,6 +279,7 @@ async function enterRoom(roomId: string, roomCode: string) {
                 countPeople();
                 rerenderTasks();
             }, LEAVE_GRACE_MS);
+            countPeople();
         },
         // Heals a presence "join" that never arrived; a no-op for people we already know.
         onPresenceHeartbeat: data => { if (!partners[data.userId]) welcome(data.userId, data); },
@@ -316,7 +335,7 @@ async function enterRoom(roomId: string, roomCode: string) {
 
     // The soundscape chosen during setup starts with the room; the Sound tab turns it off.
     const sound = localStorage.getItem('flow_sound');
-    if (sound) document.querySelector<HTMLButtonElement>(`[data-sound="${CSS.escape(sound)}"]`)?.click();
+    if (isSound(sound)) document.querySelector<HTMLButtonElement>(`[data-sound="${sound}"]`)?.click();
     if (!localStorage.getItem('flow_first_session')) byId<HTMLElement>('room-guidance').classList.remove('hidden');
 }
 
@@ -340,6 +359,23 @@ function updatePartnerUI(userId: string) {
     setHandRaised(userId, !!partner.handRaised);
     setCameraOff(userId, !!partner.isDummyMedia);
 }
+
+// ── Study-groups board ─────────────────────────────────────────────────────
+
+const peopleHere = () => Object.keys(partners).filter(id => !(id in pendingLeaves)).length + 1;
+
+async function listOnBoard(topic: string, seats: number) {
+    const status = byId<HTMLElement>('board-status');
+    listed = await listRoom({ host_id: getMyUserId(), room_id: currentRoomId, host_name: currentUsername.slice(0, 40), topic, seats, seats_taken: peopleHere() });
+    status.textContent = listed ? `Listed as “${topic}” with ${seats} seats. It comes off the board when you leave.` : 'This room could not be listed. Rooms with a PIN can’t go on the board.';
+    byId<HTMLElement>('board-unlist-btn').classList.toggle('hidden', !listed);
+    byId<HTMLButtonElement>('board-list-btn').textContent = listed ? 'Update listing' : 'List this room';
+    if (listed) notify('Your room is on the study-groups board.');
+    return listed;
+}
+// While listed, keep the seat count and "still here" time fresh. A listing
+// nobody refreshes disappears from the board within two minutes.
+setInterval(() => { if (listed) refreshListing(getMyUserId(), peopleHere()).then(undefined, () => {}); }, 45000);
 
 // ── Profile ────────────────────────────────────────────────────────────────
 
@@ -513,6 +549,20 @@ function bindRoomControls() {
         }
     });
     on('close-invite-btn', closeModal);
+    byId<HTMLFormElement>('board-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = byId<HTMLButtonElement>('board-list-btn');
+        button.disabled = true;
+        try { await listOnBoard(byId<HTMLInputElement>('board-topic').value.trim(), Number(byId<HTMLSelectElement>('board-seats').value)); }
+        finally { button.disabled = false; }
+    });
+    on('board-unlist-btn', async () => {
+        await unlistRoom(getMyUserId());
+        listed = false;
+        byId<HTMLElement>('board-unlist-btn').classList.add('hidden');
+        byId<HTMLButtonElement>('board-list-btn').textContent = 'List this room';
+        byId<HTMLElement>('board-status').textContent = 'Removed from the board. People already here stay.';
+    });
 
     // Soundscape
     const soundButtons = document.querySelectorAll<HTMLButtonElement>('[data-sound]');
@@ -559,7 +609,8 @@ function bindRoomControls() {
         event.currentTarget.disabled = true;
         cleanupMedia();
         stopSound();
-        try { await Promise.race([disconnectSocket(), new Promise(resolve => setTimeout(resolve, 1500))]); }
+        const goodbye = [disconnectSocket(), listed ? unlistRoom(getMyUserId()) : null];
+        try { await Promise.race([Promise.allSettled(goodbye), new Promise(resolve => setTimeout(resolve, 1500))]); }
         finally { window.location.replace('/room.html'); }
     });
 
@@ -605,6 +656,22 @@ async function start() {
 
     await firstRunName(user.id);
     setRoomBusy(false);
+
+    // Arriving from the study-groups board: either to host a new group, or with a seat already taken.
+    const hosting = sessionStorage.getItem('flow_host');
+    sessionStorage.removeItem('flow_host');
+    if (hosting) {
+        const { topic, seats } = JSON.parse(hosting);
+        roomCodeInput.value = pinInput.value = '';
+        await createRoom();
+        if (currentRoomId && typeof topic === 'string') {
+            byId<HTMLInputElement>('board-topic').value = topic;
+            byId<HTMLSelectElement>('board-seats').value = String(seats);
+            await listOnBoard(topic, Math.min(6, Math.max(2, Number(seats) || 4)));
+        }
+    } else if (new URLSearchParams(location.search).has('join') && roomCodeInput.value) {
+        await joinRoom();
+    }
 }
 
 start().catch(() => showLobbyError('Flow could not start. Refresh this page to try again.'));

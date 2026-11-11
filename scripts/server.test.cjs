@@ -20,7 +20,7 @@ test('HTTP boundaries and bounded local concurrency', async t => {
     const post = (body, token = 'valid') => fetch(origin + '/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body });
 
     await t.test('HTML, CSS, modules, missing files, and private files', async () => {
-        for (const path of ['/', '/start.html', '/login.html', '/room.html', '/favicon.svg', '/room-preview.webp']) assert.equal((await fetch(origin + path)).status, 200, path);
+        for (const path of ['/', '/start.html', '/login.html', '/room.html', '/groups.html', '/docs.html', '/favicon.svg', '/room-preview.webp']) assert.equal((await fetch(origin + path)).status, 200, path);
         const html = await (await fetch(origin + '/login.html')).text();
         const asset = html.match(/src="([^"]+\.js)"/)[1];
         assert.equal((await fetch(origin + asset)).status, 200);
@@ -64,10 +64,11 @@ test('HTTP boundaries and bounded local concurrency', async t => {
         assert(png.length < 1000000, 'Preview should remain below 1 MB');
     });
     await t.test('pages carry security headers and never ship the offline demo backend', async () => {
-        for (const path of ['/', '/start.html', '/login.html', '/room.html']) {
+        for (const path of ['/', '/start.html', '/login.html', '/room.html', '/groups.html', '/docs.html']) {
             const response = await fetch(origin + path);
             assert.match(response.headers.get('content-security-policy'), /frame-ancestors 'none'/, path);
             assert.equal(response.headers.get('x-content-type-options'), 'nosniff', path);
+            assert.equal(response.headers.get('x-powered-by'), null, path);
             assert.doesNotMatch(await response.text(), /__fixture/, path);
         }
     });

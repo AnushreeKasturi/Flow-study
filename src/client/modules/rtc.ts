@@ -7,6 +7,10 @@ let mediaGeneration = 0;
 const peers: Record<string, RTCPeerConnection> = {};
 const makingOffer: Record<string, boolean> = {};
 const candidateQueues: Record<string, RTCIceCandidateInit[]> = {};
+// A real negotiation produces a few dozen candidates. Past this many from one
+// peer, the rest are ignored, so a flood cannot tie up the browser's ICE agent.
+const MAX_CANDIDATES_PER_PEER = 200;
+const candidateCounts: Record<string, number> = {};
 const pendingPeers: Partial<Record<string, Promise<RTCPeerConnection>>> = {};
 const remoteStreams: Record<string, MediaStream> = {};
 
@@ -298,6 +302,8 @@ export const handleSignal = async (data: SignalMessage, onRemoteStream: RemoteSt
             await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
             await flushCandidates(from, pc);
         } else if (signal.type === 'candidate' && signal.candidate) {
+            candidateCounts[from] = (candidateCounts[from] || 0) + 1;
+            if (candidateCounts[from] > MAX_CANDIDATES_PER_PEER) return;
             if (pc.remoteDescription) {
                 await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
             } else {
@@ -335,6 +341,7 @@ export const removePeer = (userId: string) => {
     }
     delete makingOffer[userId];
     delete candidateQueues[userId];
+    delete candidateCounts[userId];
     delete pendingPeers[userId];
     delete remoteStreams[userId];
     delete disconnectedSince[userId];

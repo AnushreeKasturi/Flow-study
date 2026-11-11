@@ -69,7 +69,7 @@ async (page) => {
     await visible('.step[data-step="sky"]');
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
-    await page.getByRole('button', { name: /^Pink noise/ }).click();
+    await page.getByRole('button', { name: /^Ocean/ }).click();
     await page.getByRole('button', { name: /^Silence/ }).click();
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.getByRole('button', { name: 'Create my account', exact: true }).click();
@@ -206,11 +206,12 @@ async (page) => {
 
     // Soundscape buttons are exclusive toggles and generate audio locally.
     await page.getByRole('tab', { name: 'Sound', exact: true }).click();
-    await page.getByRole('button', { name: 'Brown', exact: true }).click();
-    await page.getByRole('button', { name: 'Pink', exact: true }).click();
-    assert(await page.getByRole('button', { name: 'Brown', exact: true }).getAttribute('aria-pressed') === 'false' && await page.getByRole('button', { name: 'Pink', exact: true }).getAttribute('aria-pressed') === 'true', 'Only one soundscape plays at a time');
-    await page.getByRole('button', { name: 'Pink', exact: true }).click();
-    assert(await page.getByRole('button', { name: 'Pink', exact: true }).getAttribute('aria-pressed') === 'false', 'Clicking the active soundscape stops it');
+    for (const name of ['Rain', 'Ocean', 'Fireplace', 'Wind', 'Night', 'Deep hum']) await page.getByRole('button', { name, exact: true }).click();
+    await page.getByRole('button', { name: 'Rain', exact: true }).click();
+    await page.getByRole('button', { name: 'Ocean', exact: true }).click();
+    assert(await page.getByRole('button', { name: 'Rain', exact: true }).getAttribute('aria-pressed') === 'false' && await page.getByRole('button', { name: 'Ocean', exact: true }).getAttribute('aria-pressed') === 'true', 'Only one soundscape plays at a time');
+    await page.getByRole('button', { name: 'Ocean', exact: true }).click();
+    assert(await page.getByRole('button', { name: 'Ocean', exact: true }).getAttribute('aria-pressed') === 'false', 'Clicking the active soundscape stops it');
     await page.getByRole('tab', { name: 'Tasks', exact: true }).click();
 
     await page.getByRole('tab', { name: 'Tasks', exact: true }).focus();
@@ -244,7 +245,7 @@ async (page) => {
     await page.getByRole('button', { name: 'Done', exact: true }).click();
 
     // All appearance themes maintain readable body text.
-    for (const theme of ['forest', 'midnight', 'warm', 'aqua', 'amethyst', 'daylight']) {
+    for (const theme of ['forest', 'midnight', 'warm', 'aqua', 'amethyst', 'desert', 'aurora', 'storm', 'dawn', 'daylight']) {
         await page.getByLabel('Room atmosphere').selectOption(theme);
         const contrast = await page.evaluate(() => {
             const style = getComputedStyle(document.body);
@@ -463,6 +464,8 @@ async (page) => {
         for (let i = 0; i < 16; i++) window.__fixture.handlers['presence:leave']({ key: 'zz-test-' + i });
         window.__fixture.handlers['presence:join']({ key: 'zz-test-0', newPresences: [{ username: 'Returning partner', isDummyMedia: true }] });
     });
+    assert(await page.locator('.video-wrapper.left .left-note').count() === 15 && await page.locator('#count').innerText() === '2', 'A departure should show on the tile and in the count at once');
+    assert(await page.locator('#video-wrapper-zz-test-0.left').count() === 0, 'A returning partner must not be shown as gone');
     await page.clock.fastForward(18001);
     assert(await page.locator('.video-wrapper').count() === 2, 'Only genuinely departed participants should be removed');
 
@@ -546,6 +549,38 @@ async (page) => {
     await page.evaluate(() => { window.__fixture.collision = false; });
     await page.getByRole('button', { name: 'Create a room', exact: true }).click();
     await visible('#app');
+
+    // Study-groups board: hosting opens a listed room, and a seat on the board leads straight into the room.
+    await page.goto(origin + '/groups.html');
+    await visible('.group-empty');
+    for (const width of [1440, 390, 320]) { await page.setViewportSize({ width, height: 900 }); await fitsViewport(); }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.getByRole('button', { name: 'Open a room', exact: true }).click();
+    assert(new URL(page.url()).pathname === '/groups.html', 'Hosting needs a topic');
+    await page.getByLabel('What are you studying?').fill('<b>Linear algebra</b> problem set');
+    await page.getByRole('button', { name: 'Open a room', exact: true }).click();
+    await page.waitForURL(url => url.pathname === '/room.html');
+    await page.waitForFunction(() => window.__fixture.tables.open_rooms.length === 1 && !document.getElementById('new-task-input').disabled);
+    assert(await page.evaluate(() => { const row = window.__fixture.tables.open_rooms[0]; return row.seats === 4 && row.seats_taken === 1 && row.host_id === 'test-user'; }), 'A hosted room should be listed with its seats');
+    await page.getByRole('button', { name: 'Invite', exact: true }).click();
+    await visible('#board-unlist-btn');
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await page.getByRole('button', { name: 'Leave', exact: true }).click();
+    await page.getByRole('button', { name: 'Leave room', exact: true }).click();
+    await visible('#join-modal');
+    assert(await page.evaluate(() => window.__fixture.tables.open_rooms.length) === 0, 'Leaving takes the room off the board');
+    await page.goto(origin + '/groups.html?board');
+    await page.locator('.group').first().waitFor();
+    await page.screenshot({ path: 'output/playwright/groups-desktop.png' });
+    assert(await page.getByRole('button', { name: 'Full', exact: true }).isDisabled(), 'A full group cannot be joined');
+    assert(await page.locator('.group b, .group img').count() === 0, 'Group topics must stay inert');
+    await page.getByRole('button', { name: 'Take a seat', exact: true }).click();
+    await page.waitForURL(url => url.pathname === '/room.html' && url.searchParams.get('room') === 'FOCUS6');
+    await visible('#app');
+    await page.goto(origin + '/docs.html');
+    for (const width of [1440, 390, 320]) { await page.setViewportSize({ width, height: 900 }); await fitsViewport(); }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
     await page.evaluate(() => localStorage.removeItem('flow_user'));
     await page.goto(origin + '/login.html');
     await page.screenshot({ path: 'output/playwright/after-login-mobile.png', fullPage: true });

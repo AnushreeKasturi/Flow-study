@@ -1,0 +1,66 @@
+/* Plain content pages (study groups, docs): a strip of sky, then the page on the ground. */
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+.plain-page { --horizon: 190px; --sun-x: 82%; --sun-size: 120px; --sun-y: .5; position: relative; }
+.plain-nav { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px clamp(20px, 5vw, 72px); }
+.plain-nav nav { display: flex; align-items: center; gap: 24px; font-size: .92rem; font-weight: 500; }
+.plain-nav nav a:not(.btn) { text-decoration: none; }
+.plain-nav nav a:not(.btn):hover { text-decoration: underline; }
+.plain-main { position: relative; z-index: 1; max-width: 1120px; margin: calc(var(--horizon) - 88px + 40px) auto 0; padding: 0 clamp(20px, 5vw, 72px) 96px; }
+.plain-main h1 { font-size: clamp(2.8rem, 7vw, 5.6rem); font-weight: 800; line-height: .9; letter-spacing: -.03em; text-wrap: balance; }
+.lead { max-width: 56ch; margin-top: 20px; color: var(--text-2); font-size: 1.1rem; line-height: 1.6; }
+
+/* Board */
+.board { display: grid; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; gap: 40px; margin-top: 48px; }
+.board h2 { font-size: 1.8rem; }
+.board-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.board-message { margin-top: 12px; color: var(--accent); font-size: .92rem; }
+.board-message:empty { display: none; }
+.board-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; list-style: none; }
+.group { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 24px; padding: 18px 20px; border-radius: var(--radius-md); background: var(--surface); }
+.group h3 { font-size: 1.35rem; overflow-wrap: anywhere; }
+.group p { margin-top: 6px; color: var(--text-3); font-size: .86rem; }
+.group-seats { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; color: var(--text-2); font-size: .8rem; white-space: nowrap; }
+/* Seats are drawn as chairs in a row: filled is taken, outlined is free. */
+.seats { display: flex; gap: 5px; }
+.seats i { width: 16px; height: 16px; border: 1.5px solid color-mix(in srgb, var(--text) 45%, transparent); border-radius: 5px; }
+.seats i.taken { border-color: var(--text); background: var(--text); }
+.group-empty { display: flex; flex-direction: column; gap: 6px; padding: 40px 24px; border: 1.5px dashed var(--line); border-radius: var(--radius-md); color: var(--text-3); text-align: center; }
+.group-empty strong { color: var(--text); font-size: 1.2rem; }
+.host-card { display: flex; flex-direction: column; padding: 24px; border-radius: var(--radius-md); background: var(--surface); }
+.host-card label { margin: 18px 0 8px; }
+.host-card select.input { border-radius: var(--radius-sm); padding-block: 12px; }
+.host-card .btn { margin-top: 22px; }
+.host-card p { margin-top: 14px; color: var(--text-3); font-size: .82rem; line-height: 1.55; }
+
+/* Docs */
+.docs { max-width: 780px; }
+.docs-toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 36px 0 8px; }
+.docs-toc a { padding: 6px 14px; border-radius: 999px; background: var(--surface); font-size: .86rem; font-weight: 500; text-decoration: none; }
+.docs-toc a:hover { background: var(--hover); }
+.docs section { padding-top: 48px; }
+.docs h2 { margin-bottom: 16px; font-size: 2.2rem; }
+.docs p, .docs li { max-width: 68ch; color: var(--text-2); font-size: 1.02rem; line-height: 1.7; }
+.docs p + p, .docs ul + p, .docs p + ul, .docs dl + p { margin-top: 14px; }
+.docs ul { padding-left: 20px; }
+.docs strong { color: var(--text); }
+.docs a { color: var(--text); }
+.docs kbd, .docs code { padding: 2px 7px; border-radius: 6px; background: var(--hover); font: 600 .84em ui-monospace, 'SF Mono', Menlo, monospace; color: var(--text); }
+.docs kbd { font-family: inherit; }
+.docs-keys > div { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-top: 1px solid var(--line); }
+.docs-keys dt { width: 44px; }
+.docs-keys dd { color: var(--text-2); }
+
+@media (max-width: 860px) {
+    .board { grid-template-columns: minmax(0, 1fr); }
+    .host-card { order: -1; }
+    .group { grid-template-columns: minmax(0, 1fr) auto; }
+    .group .btn { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+    .plain-page { --horizon: 150px; --sun-size: 84px; }
+    .plain-nav nav { gap: 14px; font-size: .84rem; }
+    .plain-nav nav a:not(.btn):not(:first-child) { display: none; }
+    .plain-nav .btn { padding-inline: 14px; }
+    .plain-main h1 { font-size: 2.4rem; }
+    .docs p, .docs li { overflow-wrap: anywhere; }
+}

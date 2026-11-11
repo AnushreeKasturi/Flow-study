@@ -3,38 +3,26 @@
 <head>
     <meta charset="utf-8">
     <title>Flow social preview artwork</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap">
     <style>
+        /* The same self-hosted face the site uses; no network needed to generate the image. */
+        @font-face { font-family: 'Bricolage'; src: url('../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wdth-normal.woff2') format('woff2'); font-weight: 200 800; font-stretch: 75% 100%; }
         * { box-sizing: border-box; margin: 0; }
-        body { width: 1200px; height: 630px; overflow: hidden; font-family: 'Instrument Sans', sans-serif; color: #eff3e9; background: #101b16; }
-        .coast { position: absolute; inset: 0 0 0 610px; background: linear-gradient(90deg, #101b16, #101b1626 35%, #0b181d55), url('../public/thunderstorm_wp.png') center / cover; }
-        .copy { position: relative; z-index: 1; width: 640px; height: 100%; padding: 60px 64px; display: flex; flex-direction: column; }
-        .brand { font-size: 44px; font-weight: 600; letter-spacing: -.075em; line-height: 1; }
-        .brand span { color: #b6d3ac; }
-        h1 { margin-top: 72px; font-size: 76px; font-weight: 600; line-height: 1.02; letter-spacing: -.055em; }
-        .description { margin-top: 26px; max-width: 400px; color: #becbbd; font-size: 22px; line-height: 1.5; }
-        .domain { margin-top: auto; color: #becbbd; font-size: 18px; }
-        .timer { position: absolute; z-index: 1; top: 180px; right: 64px; width: 360px; padding: 28px; border: 1px solid #d1ddd840; border-radius: 20px; background: #101b16d9; box-shadow: 0 24px 70px #0003; }
-        .timer-label { display: flex; align-items: center; gap: 9px; color: #becbbd; font-size: 17px; }
-        .timer-label::before { content: ''; width: 7px; height: 7px; background: #b6d3ac; border-radius: 50%; }
-        .time { font-size: 98px; font-weight: 400; font-variant-numeric: tabular-nums; line-height: 1.2; letter-spacing: -.065em; margin: 18px 0 24px; }
-        .modes { display: flex; gap: 4px; padding: 4px; border: 1px solid #35483b; border-radius: 9px; font-size: 14px; color: #becbbd; }
-        .modes span { flex: 1; text-align: center; padding: 9px 4px; white-space: nowrap; }
-        .modes .selected { border-radius: 5px; background: #b6d3ac; color: #101b16; font-weight: 600; }
+        body { position: relative; width: 1200px; height: 630px; overflow: hidden; font-family: 'Bricolage', sans-serif; color: #fdf0e6; background: #1f1024; }
+        .sky { position: absolute; inset: 0 0 auto; height: 300px; overflow: hidden; background: linear-gradient(#40204a, #e8744c); }
+        .sky::before { content: ''; position: absolute; inset: 0; background: radial-gradient(55% 70% at 78% 100%, #ffd98a99, transparent 72%); }
+        .sun { position: absolute; left: 78%; top: 96px; width: 330px; height: 330px; translate: -50% 0; border-radius: 50%; background: radial-gradient(circle at 50% 46%, #fff3d4 0%, #ffd98a 58%, #fbc77f 100%); box-shadow: 0 0 20px #ffd98af2, 0 0 90px #ffd98a8c, 0 0 260px #ffd98a52; }
+        .brand { position: absolute; left: 64px; top: 48px; display: flex; align-items: baseline; font-size: 54px; font-weight: 800; font-stretch: 80%; letter-spacing: -.045em; line-height: 1; }
+        .brand i { width: 11px; height: 11px; margin-left: 3px; border-radius: 50%; background: #ffd98a; }
+        h1 { position: absolute; left: 64px; top: 322px; font-size: 136px; font-weight: 800; font-stretch: 78%; line-height: .86; letter-spacing: -.035em; }
+        p { position: absolute; left: 64px; bottom: 44px; font-size: 26px; color: #dcc4cf; }
+        .clock { position: absolute; right: 64px; bottom: 40px; font-size: 76px; font-weight: 800; font-stretch: 78%; font-variant-numeric: tabular-nums; line-height: 1; }
     </style>
 </head>
 <body>
-    <div class="coast"></div>
-    <div class="copy">
-        <div class="brand">flow<span>.</span></div>
-        <h1>Study better.<br>Together.</h1>
-        <p class="description">A shared space for focused work.<br>Your timer, goals, and study group.</p>
-        <div class="domain">flow-study.me</div>
-    </div>
-    <div class="timer">
-        <div class="timer-label">Your next focus session</div>
-        <div class="time">25:00</div>
-        <div class="modes"><span class="selected">Focus</span><span>Break</span><span>Long break</span></div>
-    </div>
+    <div class="sky"><div class="sun"></div></div>
+    <div class="brand">flow<i></i></div>
+    <h1>Study until<br>the sun sets.</h1>
+    <p>A shared study room. Free and open source. flow-study.me</p>
+    <div class="clock">25:00</div>
 </body>
 </html>

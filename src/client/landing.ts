@@ -26,6 +26,7 @@ toggle.addEventListener('click', () => {
     playing = true;
     toggle.disabled = true;
     label.textContent = 'The sun sinks as the block runs…';
+    root.classList.add('sun-driven'); // frame-by-frame position; the usual easing would fight it
     const started = performance.now();
     const frame = (now: number) => {
         const progress = Math.min(1, (now - started) / DEMO_MS);
@@ -35,6 +36,7 @@ toggle.addEventListener('click', () => {
         if (progress < 1) return requestAnimationFrame(frame);
         label.textContent = 'Sunset. Everyone in the room takes a break together.';
         setTimeout(() => {
+            root.classList.remove('sun-driven');
             root.style.removeProperty('--sun-y');
             time.textContent = '25:00';
             label.textContent = 'Watch a 25-minute focus block in ten seconds.';

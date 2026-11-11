@@ -1,0 +1,36 @@
+---
+import Page from '../layouts/Page.astro';
+import Sky from '../components/Sky.astro';
+import '../styles/pages.css';
+---
+<Page title="Study groups | Flow" bodyClass="plain-page">
+    <Fragment slot="head">
+        <script is:inline>try { if (!localStorage.getItem('flow_user')) location.replace('/login.html'); } catch (e) {}</script>
+    </Fragment>
+    <Sky />
+    <header class="plain-nav">
+        <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
+        <nav aria-label="Main"><a href="/docs.html">Docs</a><a href="/room.html" class="btn">Your room</a></nav>
+    </header>
+    <main class="plain-main">
+        <h1>Study groups, open right now.</h1>
+        <p class="lead">Take a seat in someone’s room, or open your own. Groups hold two to six people, so nobody gets lost in a crowd.</p>
+        <div class="board">
+            <section aria-labelledby="open-heading">
+                <div class="board-head"><h2 id="open-heading">Open groups</h2><button id="board-refresh" type="button" class="btn">Refresh</button></div>
+                <p id="board-message" class="board-message" role="status"></p>
+                <ul id="board-list" class="board-list"></ul>
+            </section>
+            <form id="host-form" class="host-card">
+                <h2>Host a group</h2>
+                <label for="host-topic">What are you studying?</label>
+                <input type="text" id="host-topic" class="input" minlength="3" maxlength="80" required placeholder="Organic chemistry revision">
+                <label for="host-seats">Seats, including you</label>
+                <select id="host-seats" class="input">{[2, 3, 4, 5, 6].map(n => <option value={n} selected={n === 4}>{n} people</option>)}</select>
+                <button class="btn btn-primary btn-lg btn-block">Open a room</button>
+                <p>You’ll land in a new room that’s already listed here. It leaves the board when you leave the room.</p>
+            </form>
+        </div>
+    </main>
+    <script>import '../client/groups';</script>
+</Page>

@@ -49,6 +49,7 @@ export interface ProfileStats {
 }
 interface Session { id: string; user_id: string; room_id: string; mode: string; duration_seconds: number; completed_at: string; }
 interface Room { id: string; room_code: string; is_locked: boolean; pin: string | null; created_at: string; }
+export interface OpenRoom { id: string; host_id: string; host_name: string; topic: string; seats: number; seats_taken: number; last_seen: string; }
 interface Profile { id: string; display_name: string | null; created_at: string; updated_at: string; }
 type Table<Row, Insert = Partial<Row>> = { Row: { [K in keyof Row]: Row[K] }; Insert: { [K in keyof Insert]: Insert[K] }; Update: Partial<{ [K in keyof Row]: Row[K] }>; Relationships: [] };
 export interface Database {
@@ -58,9 +59,13 @@ export interface Database {
             sessions: Table<Session>;
             rooms: Table<Room>;
             profiles: Table<Profile>;
+            open_rooms: Table<OpenRoom & { room_id: string }, Omit<OpenRoom, 'id' | 'last_seen'> & { room_id: string; last_seen?: string }>;
         };
         Views: Record<string, never>;
-        Functions: { join_room: { Args: { p_room_code: string; p_pin: string }; Returns: string } };
+        Functions: {
+            join_room: { Args: { p_room_code: string; p_pin: string }; Returns: string };
+            join_open_room: { Args: { p_listing: string }; Returns: string };
+        };
         Enums: Record<string, never>;
         CompositeTypes: Record<string, never>;
     };

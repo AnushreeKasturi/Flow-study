@@ -34,7 +34,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
                 <button id="host-btn" class="btn btn-lg btn-block" disabled>Create a room</button>
                 <p class="lobby-note">Type a 4-digit PIN above first if you want the new room locked.</p>
             </div>
-            <div class="lobby-footer"><a href="#" id="logout-link" class="logout-link">Log out</a><GitHubStar /></div>
+            <div class="lobby-footer"><a href="#" id="logout-link" class="logout-link">Log out</a><a href="/groups.html" class="logout-link">Browse study groups</a><GitHubStar /></div>
         </div>
     </div>
 
@@ -89,6 +89,18 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
             <input id="invite-link-input" class="input" readonly>
             <button id="copy-invite-btn" class="btn btn-primary"><Icon name="copy" size={16} /><span>Copy link</span></button>
         </div>
+        <form id="board-form" class="board-form">
+            <h3>Or open it to the study-groups board</h3>
+            <p id="board-status" class="panel-description" role="status">Anyone signed in can find it and take a seat. Rooms with a PIN can’t be listed.</p>
+            <label for="board-topic">What are you studying?</label>
+            <input type="text" id="board-topic" class="input" minlength="3" maxlength="80" required placeholder="Organic chemistry revision">
+            <div class="board-form-row">
+                <label for="board-seats">Seats</label>
+                <select id="board-seats" class="input" aria-label="Seats, including you">{[2, 3, 4, 5, 6].map(n => <option value={n} selected={n === 4}>{n}</option>)}</select>
+                <button id="board-list-btn" class="btn btn-primary">List this room</button>
+                <button type="button" id="board-unlist-btn" class="btn hidden">Remove from the board</button>
+            </div>
+        </form>
         <div class="dialog-actions"><button id="close-invite-btn" class="btn">Done</button></div>
     </div>
 

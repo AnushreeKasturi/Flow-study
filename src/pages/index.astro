@@ -3,6 +3,7 @@ import Page from '../layouts/Page.astro';
 import GitHubStar from '../components/GitHubStar.astro';
 import Sky from '../components/Sky.astro';
 import '../styles/landing.css';
+import { SKIES as atmospheres } from '../client/theme';
 
 const repo = 'https://github.com/ManasDasri/Flow-study';
 const features = [
@@ -10,16 +11,13 @@ const features = [
     ['Your group on camera', 'Video and voice run directly between browsers over WebRTC. Mute or turn the camera off whenever you like.'],
     ['A task list you finish together', 'Add goals for the session, assign them to people, and watch the room’s progress fill in.'],
     ['Chat, with a study assistant', 'Message the room, or start a message with /ai to ask a question without leaving.'],
-    ['Sound for concentration', 'Brown, pink, and white noise are built in. Share a YouTube or Spotify link when the room wants music.'],
-    ['Your focus, counted', 'Finished focus blocks add up to a daily total, a streak, and a seven-day view.']
+    ['Sound for concentration', 'Rain, ocean, a fireplace, wind, a quiet night. Share a YouTube or Spotify link when the room wants music.'],
+    ['Open study groups', 'List your room on the board and people studying the same thing can take a seat. Groups hold two to six.']
 ];
 const steps = [
     ['Create a room', 'You get a six-character code. Add a PIN if you want the room private.'],
     ['Share the link', 'Your friends open it, sign in, and land in the same room.'],
     ['Start the timer', 'Twenty-five minutes of focus, then a break. Change the lengths whenever you need to.']
-];
-const atmospheres = [
-    ['forest', 'Forest'], ['midnight', 'Midnight'], ['warm', 'Warm'], ['aqua', 'Aqua'], ['amethyst', 'Amethyst'], ['daylight', 'Daylight']
 ];
 ---
 <Page bodyClass="landing">
@@ -42,7 +40,8 @@ const atmospheres = [
         <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
         <nav aria-label="Main">
             <a href="#room">What’s inside</a>
-            <a href="#how">How it works</a>
+            <a href="/groups.html">Study groups</a>
+            <a href="/docs.html">Docs</a>
             <a href="#open-source">Open source</a>
         </nav>
         <div class="site-nav-actions">
@@ -90,7 +89,7 @@ const atmospheres = [
         <section class="band atmospheres">
             <div>
                 <h2>Pick your sky.</h2>
-                <p>Six skies, from a forest dusk to plain daylight. Choose one and this page changes with it. Your room will match.</p>
+                <p>Ten skies, from a forest dusk to plain daylight. Choose one and this page changes with it. Your room will match.</p>
             </div>
             <div class="swatches" role="group" aria-label="Atmosphere">
                 {atmospheres.map(([id, name]) => (
@@ -134,6 +133,8 @@ const atmospheres = [
         <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
         <span>Study better, together.</span>
         <nav aria-label="Footer">
+            <a href="/groups.html">Study groups</a>
+            <a href="/docs.html">Docs</a>
             <a href={repo} target="_blank" rel="noopener noreferrer">GitHub</a>
             <a href="/login.html">Log in</a>
         </nav>

@@ -81,7 +81,7 @@ const sky = document.querySelector<HTMLElement>('.sky')!;
 sun.addEventListener('pointerdown', event => {
     if (steps[index] !== 'length') return;
     sun.setPointerCapture(event.pointerId);
-    document.body.classList.add('dragging');
+    document.body.classList.add('sun-driven');
     const grab = event.clientY - sun.getBoundingClientRect().top;
     const move = (e: PointerEvent) => {
         const box = sky.getBoundingClientRect();
@@ -92,7 +92,7 @@ sun.addEventListener('pointerdown', event => {
     sun.addEventListener('pointermove', move);
     sun.addEventListener('pointerup', () => {
         sun.removeEventListener('pointermove', move);
-        document.body.classList.remove('dragging');
+        document.body.classList.remove('sun-driven');
     }, { once: true });
 });
 
