@@ -272,7 +272,11 @@ async function enterRoom(roomId: string, roomCode: string) {
     const countPeople = () => UI.updateRoomInfo(roomCode, Object.keys(partners).filter(id => !(id in pendingLeaves)).length + 1);
     // One path for every kind of departure: say so at once (chime, a note on the
     // tile, one fewer in the count), then clear the tile after `grace`.
-    const partnerLeft = (userId: string, grace: number) => {
+    // `unverified` is for a goodbye message, which anyone in the room could send
+    // in someone else's name. It marks the tile at once (harmless, and undone by
+    // that person's next heartbeat) but nothing is torn down while their call is
+    // still connected: a real leaver's call drops within seconds, a faked one doesn't.
+    const partnerLeft = (userId: string, grace: number, unverified = false) => {
         if (!partners[userId]) return;
         if (!(userId in pendingLeaves)) {
             chime('leave');
@@ -280,7 +284,8 @@ async function enterRoom(roomId: string, roomCode: string) {
             pushNote(`${partners[userId].username || 'Someone'} left the room.`);
         }
         clearTimeout(pendingLeaves[userId]);
-        pendingLeaves[userId] = setTimeout(() => {
+        const finish = () => {
+            if (unverified && isPeerConnected(userId)) { pendingLeaves[userId] = setTimeout(finish, 3000); return; }
             delete pendingLeaves[userId];
             delete partners[userId];
             delete lastHeard[userId];
@@ -288,7 +293,8 @@ async function enterRoom(roomId: string, roomCode: string) {
             removeTile(userId);
             countPeople();
             rerenderTasks();
-        }, grace);
+        };
+        pendingLeaves[userId] = setTimeout(finish, grace);
         countPeople();
     };
     // Last line of defence, for when neither presence nor a goodbye arrives (a
@@ -334,8 +340,8 @@ async function enterRoom(roomId: string, roomCode: string) {
         onUserJoined: data => welcome(data.userId, data),
         // Presence says they left. It also says so during a reconnect blip, hence the long grace.
         onUserLeft: userId => partnerLeft(userId, LEAVE_GRACE_MS),
-        // They said goodbye themselves: no doubt about it.
-        onBye: userId => partnerLeft(userId, CERTAIN_LEAVE_MS),
+        // A goodbye message: fast, but only a hint until their call is seen to drop.
+        onBye: userId => partnerLeft(userId, CERTAIN_LEAVE_MS, true),
         // Proof of life. Heals a presence "join" that never arrived, and cancels a departure that turned out to be a blip.
         onPresenceHeartbeat: data => {
             lastHeard[data.userId] = Date.now();
