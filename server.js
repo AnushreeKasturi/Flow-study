@@ -34,24 +34,35 @@ app.use('/api', (req, res, next) => {
 });
 
 // Both endpoints spend provider credit, so they only answer signed-in Flow
-// users. Supabase validates the caller's access token; no secret is needed.
-async function requireUser(req, res, next) {
+// users, within a per-account quota. One database call does both: api_allow()
+// (sql/008) runs as the caller, so it fails without a valid token, and it
+// counts the request in one place for every server instance.
+const refuse = (res, status, text) => res.status(status).json({ text, error: text });
+const supabaseCall = (path, token, body) => fetch(SUPABASE_URL + path, {
+    method: body ? 'POST' : 'GET',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(4000)
+});
+const requireUser = kind => async (req, res, next) => {
     const token = /^Bearer (\S+)$/.exec(req.get('authorization') || '')?.[1];
-    if (!token) return res.status(401).json({ text: 'Sign in to use this.', error: 'Sign in to use this.' });
+    if (!token) return refuse(res, 401, 'Sign in to use this.');
     try {
-        const response = await fetch(SUPABASE_URL + '/auth/v1/user', {
-            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token },
-            signal: AbortSignal.timeout(4000)
-        });
-        if (response.ok) return next();
-        const expired = response.status === 401 || response.status === 403;
-        res.status(expired ? 401 : 503).json(expired
-            ? { text: 'Your sign-in has expired. Log in again.', error: 'Your sign-in has expired. Log in again.' }
-            : { text: 'Sign-in could not be checked. Try again shortly.', error: 'Sign-in could not be checked.' });
+        let response = await supabaseCall('/rest/v1/rpc/api_allow', token, { p_kind: kind });
+        if (response.status === 404) {
+            // The quota function is not installed (sql/008 not run): fall back to checking the sign-in only.
+            response = await supabaseCall('/auth/v1/user', token);
+            if (response.ok) return next();
+        } else if (response.ok) {
+            if (await response.json() === true) return next();
+            return refuse(res, 429, 'You have reached the limit for now. Try again in a little while.');
+        }
+        if (response.status === 401 || response.status === 403) return refuse(res, 401, 'Your sign-in has expired. Log in again.');
+        refuse(res, 503, 'Sign-in could not be checked. Try again shortly.');
     } catch {
-        res.status(503).json({ text: 'Sign-in could not be checked. Try again shortly.', error: 'Sign-in could not be checked.' });
+        refuse(res, 503, 'Sign-in could not be checked. Try again shortly.');
     }
-}
+};
 
 const limiter = max => rateLimit({
     windowMs: 60 * 1000, limit: max, standardHeaders: true, legacyHeaders: false,
@@ -61,7 +72,7 @@ const limiter = max => rateLimit({
 const hasGroqApiKey = Boolean(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here');
 const groq = hasGroqApiKey ? new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: 15000, maxRetries: 0 }) : null;
 
-app.post('/api/ai', limiter(10), requireUser, async (req, res) => {
+app.post('/api/ai', limiter(10), requireUser('ai'), async (req, res) => {
     try {
         const message = req.body?.message;
         if (typeof message !== 'string' || !message.trim() || message.length > 500) {
@@ -75,7 +86,8 @@ app.post('/api/ai', limiter(10), requireUser, async (req, res) => {
                 { role: 'user', content: message }
             ],
             // Groq retired llama-3.1-8b-instant on 2026-08-16; this is its designated replacement.
-            model: 'openai/gpt-oss-20b'
+            model: 'openai/gpt-oss-20b',
+            max_completion_tokens: 700 // an answer for a chat panel, and a bound on what one request can cost
         });
         res.json({ text: completion.choices[0].message.content });
     } catch (error) {
@@ -84,14 +96,14 @@ app.post('/api/ai', limiter(10), requireUser, async (req, res) => {
     }
 });
 
-app.post('/api/turn-credentials', limiter(20), requireUser, async (req, res) => {
+app.post('/api/turn-credentials', limiter(20), requireUser('turn'), async (req, res) => {
     try {
         const accountSid = process.env.TWILIO_ACCOUNT_SID;
         const authToken = process.env.TWILIO_AUTH_TOKEN;
         if (!accountSid || !authToken) return res.status(500).json({ error: 'Twilio credentials not configured on server.' });
 
         const client = twilio(accountSid, authToken, { timeout: 4000, autoRetry: false });
-        const token = await client.tokens.create();
+        const token = await client.tokens.create({ ttl: 3600 }); // relay credentials good for one hour, not Twilio's default day
         res.json({ iceServers: token.iceServers });
     } catch (error) {
         console.error('TURN error:', error);

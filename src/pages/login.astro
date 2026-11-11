@@ -4,10 +4,7 @@ import GitHubStar from '../components/GitHubStar.astro';
 import '../styles/login.css';
 import { SKIES } from '../client/theme';
 ---
-<Page title="Log in | Flow" bodyClass="login-page">
-    <Fragment slot="head">
-        <script is:inline>try { if (localStorage.getItem('flow_user')) location.replace('/room.html' + location.search); } catch (e) {}</script>
-    </Fragment>
+<Page page="login" title="Log in | Flow" bodyClass="login-page">
     <aside class="login-photo">
         <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
         <div>

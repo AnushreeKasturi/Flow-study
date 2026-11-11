@@ -15,7 +15,9 @@ const supabase: SupabaseClient<Database> = create<Database>(url, key, {
         fetch: (input, options = {}) => {
             const signal = options.signal ?? (input instanceof Request ? input.signal : null);
             const timeout = AbortSignal.timeout(15000);
-            return fetch(input, { ...options, signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
+            // While the page is being closed, let the request outlive it (the goodbye message is sent then).
+            const keepalive = options.keepalive ?? (typeof document !== 'undefined' && document.visibilityState === 'hidden');
+            return fetch(input, { ...options, keepalive, signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
         }
     }
 });

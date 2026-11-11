@@ -72,7 +72,12 @@ window.supabase = { createClient() {
         return {
             from, channel: () => { fixture.channelCount++; return channel; }, async removeChannel() { fixture.removed = true; },
             realtime: { setAuth: async () => {} },
-            rpc: async name => {
+            rpc: async (name, args) => {
+                // Room messages go through the database; record them the way a broadcast would be.
+                if (name === 'room_send') {
+                    fixture.calls.push({ action: 'send', value: { event: args.p_event, payload: args.p_payload } });
+                    return fixture.sendStatus && fixture.sendStatus !== 'ok' ? { data: null, error: { message: 'send failed' } } : { data: null, error: null };
+                }
                 fixture.calls.push({ action: 'rpc', name });
                 await new Promise(resolve => setTimeout(resolve, fixture.delay));
                 if (fixture.rpcError === 'throw') throw new Error('Network unavailable');

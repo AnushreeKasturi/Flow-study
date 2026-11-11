@@ -208,7 +208,9 @@ async function joinRoom() {
     try {
         const { data: roomUuid, error } = await supabase.rpc('join_room', { p_room_code: roomCode, p_pin: pin });
         if (error || !roomUuid) {
-            showLobbyError(error?.message?.includes('Incorrect PIN') ? 'This room needs a different PIN. Enter it above and try again.'
+            showLobbyError(!error ? 'No room matches that code and PIN. Check both and try again.'
+                : error.message?.includes('Too many attempts') ? 'Too many wrong codes. Wait ten minutes, then try again.'
+                : error.message?.includes('Incorrect PIN') ? 'This room needs a different PIN. Enter it above and try again.'
                 : error?.message?.includes('Room not found') ? 'Room not found. Check the code and try again.'
                 : error?.message?.includes('Authentication required') ? 'Your sign-in has expired. Log out and log in again.'
                 : error?.message?.includes('Room is full') ? 'This group is full or not taking new people right now.'

@@ -125,7 +125,7 @@ async function createAccount() {
     const email = byId<HTMLInputElement>('start-email').value.trim();
     const password = byId<HTMLInputElement>('start-password').value;
     if (!email.includes('@')) return say('Enter a valid email address.');
-    if (password.length < 6) return say('Use a password with at least 6 characters.');
+    if (password.length < 8) return say('Use a password with at least 8 characters.');
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return say(/already registered|already exists|user already/i.test(error.message) ? 'An account with this email already exists. Use “Log in” at the top instead.' : error.message);
     if (data.session && data.user) return finish(data.user);

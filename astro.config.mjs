@@ -7,6 +7,8 @@ export default defineConfig({
     output: 'static',
     build: { format: 'file' },
     vite: {
+        // Never inline a script into the page: the Content-Security-Policy forbids inline scripts.
+        build: { assetsInlineLimit: 0 },
         plugins: [{
             name: 'flow-local-api',
             configureServer(server) {

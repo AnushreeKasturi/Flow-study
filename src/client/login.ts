@@ -60,8 +60,8 @@ const handleAuth = async (action: 'login' | 'signup') => {
         showError('Please enter a valid email address.');
         return;
     }
-    if (password.length < 6) {
-        showError('Password must be at least 6 characters.');
+    if (password.length < (action === 'signup' ? 8 : 6)) {
+        showError(action === 'signup' ? 'Choose a password with at least 8 characters.' : 'Password must be at least 6 characters.');
         return;
     }
     const btn = action === 'login' ? loginBtn : signupBtn;

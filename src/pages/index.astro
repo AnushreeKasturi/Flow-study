@@ -20,18 +20,7 @@ const steps = [
     ['Start the timer', 'Twenty-five minutes of focus, then a break. Change the lengths whenever you need to.']
 ];
 ---
-<Page bodyClass="landing">
-    <Fragment slot="head">
-        <script is:inline>
-            // Invite links used to be /?room=CODE; keep them working.
-            if (/[?&]room=/.test(location.search)) location.replace('/room.html' + location.search);
-            // The opening plays once per browser session.
-            try {
-                if (sessionStorage.getItem('flow_intro')) document.documentElement.classList.add('intro-seen');
-                else sessionStorage.setItem('flow_intro', '1');
-            } catch (e) {}
-        </script>
-    </Fragment>
+<Page page="home" bodyClass="landing">
 
     <Sky />
     <div class="intro" aria-hidden="true"><div class="intro-word"><span>f</span><span>l</span><span>o</span><span>w</span><i></i></div></div>

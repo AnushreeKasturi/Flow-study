@@ -83,7 +83,9 @@ For a **new, empty database**, run these files in order in the Supabase SQL edit
 4. [`sql/004_room_access_compatibility.sql`](sql/004_room_access_compatibility.sql)
 5. [`sql/005_open_rooms_and_limits.sql`](sql/005_open_rooms_and_limits.sql) (study-groups board and text size limits)
 6. [`sql/006_board_v2_and_host_controls.sql`](sql/006_board_v2_and_host_controls.sql) (subjects, planned groups, reports, host controls, seat limits; the board reports that it is not set up until 005 and 006 have run)
-7. Optional: [`sql/007_private_room_channels.sql`](sql/007_private_room_channels.sql), as one step of [turning on private room channels](SECURITY.md#turning-on-private-room-channels)
+7. [`sql/007_private_room_channels.sql`](sql/007_private_room_channels.sql), as one step of [turning on private room channels](SECURITY.md#turning-on-private-room-channels)
+8. [`sql/008_security_hardening.sql`](sql/008_security_hardening.sql) (room visibility, join attempt limits, quotas, verified message senders)
+9. [`sql/009_only_stamped_room_messages.sql`](sql/009_only_stamped_room_messages.sql), the last step of [verified senders](SECURITY.md#verified-senders), after checking rooms work
 
 **`schema.sql` drops existing tables. Do not run it as an upgrade on a database with data.** For an existing installation, use the additive migration sequence and compatibility notes in [TESTING.md](TESTING.md#supabase-compatibility).
 

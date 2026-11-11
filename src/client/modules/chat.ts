@@ -1,5 +1,5 @@
 import { byId } from '../dom';
-import { getSocket } from './socket';
+import { sendToRoom } from './socket';
 import { notify } from './feedback';
 import { api } from './api';
 
@@ -43,11 +43,10 @@ async function sendMessage() {
     if (!text || text.length > 300) return;
     const isAi = /^\/ai(?:\s|$)/.test(text);
     if (isAi && aiPending) return;
-    const channel = getSocket();
     if (!isAi) {
         chatInput.value = '';
         try {
-            const status = await channel?.send({ type: 'broadcast', event: 'chat-message', payload: { sender: username, text } });
+            const status = await sendToRoom('chat-message', { sender: username, text });
             if (status && status !== 'ok') throw new Error('Message delivery failed');
             handleIncomingMessage({ sender: username, text });
         } catch {
@@ -70,7 +69,7 @@ async function sendMessage() {
         if (typeof data.text !== 'string') throw new Error('Invalid assistant response');
         const message = { sender: 'AI Assistant', text: data.text };
         handleIncomingMessage(message);
-        await channel?.send({ type: 'broadcast', event: 'chat-message', payload: message });
+        await sendToRoom('chat-message', message);
     } catch {
         if (!chatInput.value) chatInput.value = text;
         notify('The study assistant is unavailable. Your question is ready to retry.', 'error');
