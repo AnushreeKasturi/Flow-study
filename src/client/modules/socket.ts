@@ -139,6 +139,12 @@ const connectChannel = () => {
         handlers.onChatMessage?.(payload);
     });
 
+    // Someone said they are leaving. Presence should report this too, but its
+    // "leave" does not always arrive, so the leaver says it themselves as well.
+    activeChannel.on('broadcast', { event: 'bye' }, ({ payload }) => {
+        if (typeof payload?.userId === 'string' && payload.userId !== myUserId) handlers.onBye?.(payload.userId);
+    });
+
     // The host removed someone. The room page confirms with the database before acting on it.
     activeChannel.on('broadcast', { event: 'removed' }, ({ payload }) => {
         if (typeof payload?.userId === 'string') handlers.onRemoved?.(payload.userId);
@@ -285,6 +291,7 @@ export const updateCameraState = async (isVideoActive: boolean) => {
     });
 };
 
+export const sendBye = () => channel?.send({ type: 'broadcast', event: 'bye', payload: { userId: myUserId } });
 export const sendRemoved = (userId: string) => channel?.send({ type: 'broadcast', event: 'removed', payload: { userId } });
 
 export const sendReaction = (emoji: string) => {

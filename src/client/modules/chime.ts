@@ -5,7 +5,8 @@ let context: AudioContext | null = null;
 const TUNES = {
     join: [523.25, 659.25],             // C5 up to E5: someone arrived
     leave: [659.25, 493.88],            // E5 down to B4: someone left
-    done: [659.25, 783.99, 1046.5]      // E5, G5, C6: a session finished
+    done: [659.25, 783.99, 1046.5],     // E5, G5, C6: a session finished
+    message: [880]                      // A5, once: a chat message while you're elsewhere
 } as const;
 
 export function chime(kind: keyof typeof TUNES) {

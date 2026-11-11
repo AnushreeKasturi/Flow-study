@@ -20,7 +20,9 @@ A shared study room for focused work. Bring your group, set a timer, and work th
 - **Soundscapes:** rain, ocean, fireplace, wind, night, and a deep hum, each synthesized in the browser from filtered noise. Only you hear them; no audio files are downloaded.
 - **Study groups (`/groups.html`):** a board anyone can read. Open your room with a topic, subject, house rules, and two to six seats, or plan a group for later and let people say they're in. Cards show what each room is doing right now. Search, filter by subject, or press "Find me a seat".
 - **Host controls:** the person who created a room can remove someone for good and stop new people joining. Listings can be reported.
-- **Arrivals and departures:** a soft chime, and a tile that says who left before it clears.
+- **Home screen:** after signing in, one screen with your profile and focus history, and three choices: start a room (private or listed), join with a code, or sit in an open group.
+- **Notifications:** a bell in the room collects chat messages you didn't see, arrivals, departures, and finished sessions; unread chat shows on the Chat tab; optional system notifications while Flow is in the background.
+- **Arrivals and departures:** a soft chime, and a tile that says who left before it clears. Departures are detected three ways (presence, an explicit goodbye, and silence with no live call), so a closed laptop doesn't leave a ghost.
 - **Room audio:** share YouTube or Spotify links through the official embedded players. Everyone controls their own playback, and no player loads until someone asks for one.
 - **Your focus:** today's total, a streak, and a seven-day chart. Pauses do not count. Completed focus sessions are saved; progress from an unfinished session is lost on refresh.
 - **Ten skies:** Forest, Midnight, Warm, Aqua, Amethyst, Desert, Aurora, Storm, Dawn, and Daylight. Sky, ground, and sun all take their colours from the one you choose.

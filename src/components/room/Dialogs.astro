@@ -5,13 +5,27 @@ import { SUBJECTS, CAMERAS, VIBES } from '../../client/modules/board-options';
 const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focus mode'], ['M', 'Mute or unmute your microphone'], ['V', 'Turn your camera on or off'], ['?', 'Show these shortcuts'], ['Esc', 'Close a dialog']];
 ---
 <div id="modal-overlay" class="modal-overlay">
-    <div id="join-modal" class="modal lobby" role="dialog" aria-modal="true" aria-labelledby="join-title">
-        <div class="lobby-intro">
+    <!-- Home: the first thing after signing in. Who you are on the left, what you can do on the right. -->
+    <div id="join-modal" class="modal home" role="dialog" aria-modal="true" aria-labelledby="join-title">
+        <aside class="home-profile">
             <a href="/" class="brand">flow<i></i></a>
-            <div><h1 id="join-title">A room for<br>your next idea.</h1><p>Bring a goal. Invite your study group. Make progress together.</p></div>
-            <p class="lobby-intro-note">Your timer, tasks, sound, and study partners,<br>all in one focused space.</p>
-        </div>
-        <div class="lobby-form">
+            <div class="home-me">
+                <div class="avatar" id="home-avatar">?</div>
+                <div>
+                    <h1 id="join-title">Welcome back.</h1>
+                    <button type="button" id="home-edit-name" class="link-btn">Change name</button>
+                </div>
+            </div>
+            <form id="home-name-form" class="input-row hidden">
+                <input type="text" id="home-name-input" class="input" aria-label="Your display name" maxlength="40" required>
+                <button class="btn btn-primary">Save</button>
+            </form>
+            <div id="home-stats" class="home-stats" aria-live="polite"></div>
+            <p id="lobby-recap" class="home-recap"></p>
+            <div class="lobby-footer"><a href="#" id="logout-link" class="logout-link">Log out</a><a href="/docs.html" class="logout-link">How Flow works</a><GitHubStar label="Star" /></div>
+        </aside>
+
+        <div class="home-main">
             <!-- First visit only: shown until the account has a display name. -->
             <form id="welcome-step" class="hidden">
                 <h2>First, what should we call you?</h2>
@@ -20,22 +34,54 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
                 <input type="text" id="welcome-name-input" class="input" maxlength="40" autocomplete="nickname" required>
                 <p id="welcome-error" class="inline-error hidden" role="alert"></p>
                 <button id="welcome-save-btn" class="btn btn-primary btn-lg btn-block">Save and continue</button>
-                <p class="lobby-note">You can change it any time from your profile.</p>
+                <p class="lobby-note">You can change it any time from this screen.</p>
             </form>
+
             <div id="lobby-step">
-                <h2 id="lobby-greeting">Settle into your session.</h2>
-                <div class="lobby-home"><p id="lobby-recap"></p><p id="lobby-today"></p><p id="lobby-board"></p></div>
-                <label for="room-code-input">Room code</label>
-                <input type="text" id="room-code-input" class="input room-code-field" aria-describedby="lobby-error" placeholder="Enter 6-character code" maxlength="6" autocomplete="off" spellcheck="false">
-                <label for="room-pin-input">Room PIN <span class="muted">(if required)</span></label>
-                <input type="password" id="room-pin-input" class="input" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" autocomplete="off">
+                <h2 id="lobby-greeting">What would you like to do?</h2>
                 <p id="lobby-error" class="inline-error hidden" role="alert"></p>
-                <button id="join-btn" class="btn btn-primary btn-lg btn-block" disabled>Join room</button>
-                <div class="divider"><span>Or start your own</span></div>
-                <button id="host-btn" class="btn btn-lg btn-block" disabled>Create a room</button>
-                <p class="lobby-note">Type a 4-digit PIN above first if you want the new room locked.</p>
+                <div class="home-actions">
+                    <section class="home-card" aria-labelledby="start-heading">
+                        <h3 id="start-heading">Start a room</h3>
+                        <p>Your own room, ready in a second.</p>
+                        <fieldset class="home-choice">
+                            <legend>Who is it for?</legend>
+                            <label><input type="radio" name="audience" value="private" checked><span><strong>People I invite</strong>Share the link or code with friends.</span></label>
+                            <label><input type="radio" name="audience" value="open"><span><strong>Anyone studying this</strong>Listed on the study-groups board.</span></label>
+                        </fieldset>
+                        <div id="create-private">
+                            <label for="create-pin-input">Lock it with a PIN <span class="muted">(optional)</span></label>
+                            <input type="text" id="create-pin-input" class="input" placeholder="4 digits" maxlength="4" inputmode="numeric" autocomplete="off">
+                        </div>
+                        <div id="create-open" class="hidden">
+                            <label for="create-topic">Topic for the board</label>
+                            <input type="text" id="create-topic" class="input" maxlength="80" placeholder="Organic chemistry revision">
+                            <div class="home-row">
+                                <div><label for="create-subject">Subject</label><select id="create-subject" class="input">{SUBJECTS.map(([id, name]) => <option value={id} selected={id === 'other'}>{name}</option>)}</select></div>
+                                <div><label for="create-seats">Seats</label><select id="create-seats" class="input">{[2, 3, 4, 5, 6].map(n => <option value={n} selected={n === 4}>{n}</option>)}</select></div>
+                            </div>
+                        </div>
+                        <button id="host-btn" class="btn btn-primary btn-lg btn-block" disabled>Create a room</button>
+                    </section>
+
+                    <section class="home-card" aria-labelledby="join-heading">
+                        <h3 id="join-heading">Join with a code</h3>
+                        <p>Someone sent you a link or a six-character code.</p>
+                        <label for="room-code-input">Room code</label>
+                        <input type="text" id="room-code-input" class="input room-code-field" aria-describedby="lobby-error" placeholder="ABC123" maxlength="6" autocomplete="off" spellcheck="false" data-autofocus>
+                        <label for="room-pin-input">Room PIN <span class="muted">(only if it has one)</span></label>
+                        <input type="text" id="room-pin-input" class="input" placeholder="4 digits" maxlength="4" inputmode="numeric" autocomplete="off">
+                        <button id="join-btn" class="btn btn-lg btn-block" disabled>Join room</button>
+                    </section>
+
+                    <section class="home-card" aria-labelledby="find-heading">
+                        <h3 id="find-heading">Find a study group</h3>
+                        <p id="lobby-board">Sit down with people studying the same thing.</p>
+                        <ul id="home-groups" class="home-groups"></ul>
+                        <a href="/groups.html" class="btn btn-lg btn-block">Browse all groups</a>
+                    </section>
+                </div>
             </div>
-            <div class="lobby-footer"><a href="#" id="logout-link" class="logout-link">Log out</a><a href="/groups.html" class="logout-link">Browse study groups</a><GitHubStar /></div>
         </div>
     </div>
 
@@ -47,7 +93,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
             <div><label for="setting-short-break-duration">Short break (minutes)</label><input type="number" id="setting-short-break-duration" required class="input" value="5" min="1" max="60"></div>
             <div><label for="setting-long-break-duration">Long break (minutes)</label><input type="number" id="setting-long-break-duration" required class="input" value="15" min="1" max="60"></div>
         </div>
-        <label class="check"><input type="checkbox" id="setting-notify"><span>Send me a notification when a session ends<small>Only shown while Flow is in a background tab.</small></span></label>
+        <label class="check"><input type="checkbox" id="setting-notify"><span>Send me system notifications<small>For finished sessions and new chat messages, only while Flow is in a background tab.</small></span></label>
         <button id="save-timer-settings-btn" class="btn btn-primary btn-block">Save Changes</button>
     </div>
 

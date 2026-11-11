@@ -56,6 +56,8 @@ const fetchTurnCredentials = async () => {
 };
 
 export const hasPeer = (userId: string) => !!peers[userId];
+// True only while media is actually flowing to this person.
+export const isPeerConnected = (userId: string) => peers[userId]?.connectionState === 'connected';
 
 // 'disconnected' is a normal transient ICE blip that usually self-recovers
 // in a second or two — tearing down on it immediately just recreates the

@@ -9,8 +9,10 @@ const chatMessages = byId<HTMLElement>('chat-messages');
 const chatInput = byId<HTMLTextAreaElement>('chat-input');
 const sendBtn = byId<HTMLButtonElement>('send-chat-btn');
 
-export const initChat = (_roomId: string, user: string) => {
+let onOthers: ((sender: string, text: string) => void) | undefined;
+export const initChat = (_roomId: string, user: string, onMessageFromOthers?: (sender: string, text: string) => void) => {
     username = user;
+    onOthers = onMessageFromOthers;
     sendBtn.onclick = sendMessage;
     chatInput.onkeydown = event => {
         if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); sendMessage(); }
@@ -33,6 +35,7 @@ export const handleIncomingMessage = (message: unknown) => {
     // Keep this ephemeral conversation bounded during long study sessions.
     while (chatMessages.children.length > 300) chatMessages.firstElementChild!.remove();
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (sender !== username) onOthers?.(sender, text);
 };
 
 async function sendMessage() {

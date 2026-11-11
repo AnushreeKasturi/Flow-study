@@ -38,9 +38,14 @@ export const report = async (kind: 'open' | 'planned', target: string, topic: st
     !(await getSupabase().from('reports').insert({ kind, target, topic, reason: null })).error;
 
 // One listing per host; listing again replaces the previous one.
+// Deliberately delete-then-insert, not upsert: an upsert has to read the columns
+// it overwrites, and room_id is not readable by anyone (see sql/005), so the
+// database refuses it. A plain insert only needs permission to write.
 export async function listRoom(listing: GroupDetails & { host_id: string; room_id: string; seats_taken: number; closed: boolean; timer_mode: string | null; timer_ends_at: string | null }) {
-    const { error } = await getSupabase().from('open_rooms').upsert(listing, { onConflict: 'host_id' });
-    return !error;
+    await getSupabase().from('open_rooms').delete().eq('host_id', listing.host_id);
+    const { error } = await getSupabase().from('open_rooms').insert(listing);
+    if (error) console.error('Listing failed:', error.message);
+    return error ? (error.message.includes('row-level security') ? 'locked' : 'failed') : 'listed';
 }
 
 // Called on a timer while the host is in the room: who is here, and what the
