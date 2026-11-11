@@ -10,8 +10,7 @@ ALTER TABLE public.open_rooms
     ADD COLUMN IF NOT EXISTS vibe TEXT NOT NULL DEFAULT 'quiet',
     ADD COLUMN IF NOT EXISTS timer_mode TEXT,
     ADD COLUMN IF NOT EXISTS timer_ends_at TIMESTAMPTZ,
-    ADD COLUMN IF NOT EXISTS closed BOOLEAN NOT NULL DEFAULT false,
-    ADD COLUMN IF NOT EXISTS reports INT NOT NULL DEFAULT 0;
+    ADD COLUMN IF NOT EXISTS closed BOOLEAN NOT NULL DEFAULT false;
 
 DO $$ BEGIN
   ALTER TABLE public.open_rooms ADD CONSTRAINT open_rooms_details CHECK (
@@ -27,10 +26,7 @@ GRANT SELECT (id, host_id, host_name, topic, seats, seats_taken, last_seen, crea
 GRANT INSERT (subject, camera, vibe, timer_mode, timer_ends_at, closed), UPDATE (subject, camera, vibe, timer_mode, timer_ends_at, closed)
     ON public.open_rooms TO authenticated;
 
--- Three reports from different people hide a listing from everyone but its host.
-DROP POLICY IF EXISTS open_rooms_select ON public.open_rooms;
-CREATE POLICY open_rooms_select ON public.open_rooms FOR SELECT TO anon, authenticated
-    USING ((last_seen > now() - interval '2 minutes' AND reports < 3) OR host_id = auth.uid());
+-- (The read policy is defined after the reports section, which it depends on.)
 
 -- ── Planned groups ──────────────────────────────────────────────────────────
 -- "Organic chemistry, tonight at 8". People say they're in; at start time the
@@ -46,7 +42,6 @@ CREATE TABLE IF NOT EXISTS public.planned_groups (
     seats INT NOT NULL CHECK (seats BETWEEN 2 AND 6),
     starts_at TIMESTAMPTZ NOT NULL,
     going INT NOT NULL DEFAULT 1,
-    reports INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS public.planned_group_members (
@@ -62,9 +57,6 @@ GRANT SELECT (id, host_id, host_name, topic, subject, camera, vibe, seats, start
 GRANT INSERT (host_id, host_name, topic, subject, camera, vibe, seats, starts_at), DELETE ON public.planned_groups TO authenticated;
 GRANT SELECT, INSERT, DELETE ON public.planned_group_members TO authenticated;
 
-DROP POLICY IF EXISTS planned_select ON public.planned_groups;
-CREATE POLICY planned_select ON public.planned_groups FOR SELECT TO anon, authenticated
-    USING ((starts_at > now() - interval '2 hours' AND reports < 3) OR host_id = auth.uid());
 DROP POLICY IF EXISTS planned_insert ON public.planned_groups;
 CREATE POLICY planned_insert ON public.planned_groups FOR INSERT TO authenticated
     WITH CHECK (host_id = auth.uid() AND starts_at > now() - interval '5 minutes' AND starts_at < now() + interval '14 days');
@@ -103,11 +95,14 @@ CREATE TRIGGER planned_groups_count AFTER INSERT OR DELETE ON public.planned_gro
 
 -- ── Reports ─────────────────────────────────────────────────────────────────
 -- Write-only for users; read them in the Supabase table editor.
+-- A report is recorded against the host, not just the listing, so deleting a
+-- listing and posting it again does not wipe the slate.
 CREATE TABLE IF NOT EXISTS public.reports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     reporter_id UUID NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
     kind TEXT NOT NULL CHECK (kind IN ('open', 'planned')),
     target UUID NOT NULL,
+    host_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     topic TEXT CHECK (topic IS NULL OR char_length(topic) <= 80),
     reason TEXT CHECK (reason IS NULL OR char_length(reason) <= 300),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -119,17 +114,36 @@ GRANT INSERT (kind, target, topic, reason) ON public.reports TO authenticated;
 DROP POLICY IF EXISTS reports_insert ON public.reports;
 CREATE POLICY reports_insert ON public.reports FOR INSERT TO authenticated WITH CHECK (reporter_id = auth.uid());
 
-CREATE OR REPLACE FUNCTION public.reports_count() RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+-- The database, not the reporter, decides who a report is about.
+CREATE OR REPLACE FUNCTION public.reports_resolve() RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF NEW.kind = 'open' THEN
-    UPDATE public.open_rooms SET reports = reports + 1 WHERE id = NEW.target;
+    SELECT host_id INTO NEW.host_id FROM public.open_rooms WHERE id = NEW.target;
   ELSE
-    UPDATE public.planned_groups SET reports = reports + 1 WHERE id = NEW.target;
+    SELECT host_id INTO NEW.host_id FROM public.planned_groups WHERE id = NEW.target;
   END IF;
-  RETURN NULL;
+  IF NEW.host_id IS NULL THEN RAISE EXCEPTION 'Listing not found'; END IF;
+  IF NEW.host_id = NEW.reporter_id THEN RAISE EXCEPTION 'You cannot report your own listing'; END IF;
+  RETURN NEW;
 END $$;
 DROP TRIGGER IF EXISTS reports_count ON public.reports;
-CREATE TRIGGER reports_count AFTER INSERT ON public.reports FOR EACH ROW EXECUTE FUNCTION public.reports_count();
+DROP TRIGGER IF EXISTS reports_resolve ON public.reports;
+CREATE TRIGGER reports_resolve BEFORE INSERT ON public.reports FOR EACH ROW EXECUTE FUNCTION public.reports_resolve();
+
+-- Three different people reporting the same host within a week hides everything
+-- that host has on the board, including anything they post afterwards.
+CREATE OR REPLACE FUNCTION public.is_flagged(p_host UUID) RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT count(DISTINCT reporter_id) >= 3 FROM public.reports WHERE host_id = p_host AND created_at > now() - interval '7 days';
+$$;
+REVOKE ALL ON FUNCTION public.is_flagged(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_flagged(UUID) TO anon, authenticated;
+
+DROP POLICY IF EXISTS open_rooms_select ON public.open_rooms;
+CREATE POLICY open_rooms_select ON public.open_rooms FOR SELECT TO anon, authenticated
+    USING ((last_seen > now() - interval '2 minutes' AND NOT public.is_flagged(host_id)) OR host_id = auth.uid());
+DROP POLICY IF EXISTS planned_select ON public.planned_groups;
+CREATE POLICY planned_select ON public.planned_groups FOR SELECT TO anon, authenticated
+    USING ((starts_at > now() - interval '2 hours' AND NOT public.is_flagged(host_id)) OR host_id = auth.uid());
 
 -- ── Host controls ───────────────────────────────────────────────────────────
 -- The person who created a room is its host. Rooms made before this migration have no host.
@@ -144,6 +158,29 @@ CREATE TABLE IF NOT EXISTS public.room_bans (
 );
 ALTER TABLE public.room_bans ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.room_bans FROM anon, authenticated;
+
+-- One listing per room, posted by the room's creator. Otherwise any participant
+-- could post a second listing and use it to close the room or dodge its seat limit.
+-- (Rooms from before this migration have no creator; any one participant may list those.)
+DELETE FROM public.open_rooms older USING public.open_rooms newer WHERE older.room_id = newer.room_id AND older.last_seen < newer.last_seen;
+CREATE UNIQUE INDEX IF NOT EXISTS open_rooms_one_per_room ON public.open_rooms (room_id);
+
+DROP POLICY IF EXISTS open_rooms_insert ON public.open_rooms;
+CREATE POLICY open_rooms_insert ON public.open_rooms FOR INSERT TO authenticated WITH CHECK (
+    host_id = auth.uid() AND EXISTS (
+        SELECT 1 FROM public.room_participants p JOIN public.rooms r ON r.id = p.room_id
+        WHERE p.room_id = open_rooms.room_id AND p.user_id = auth.uid() AND r.is_locked IS NOT TRUE
+          AND (r.created_by IS NULL OR r.created_by = auth.uid())
+    )
+);
+DROP POLICY IF EXISTS open_rooms_update ON public.open_rooms;
+CREATE POLICY open_rooms_update ON public.open_rooms FOR UPDATE TO authenticated USING (host_id = auth.uid()) WITH CHECK (
+    host_id = auth.uid() AND EXISTS (
+        SELECT 1 FROM public.room_participants p JOIN public.rooms r ON r.id = p.room_id
+        WHERE p.room_id = open_rooms.room_id AND p.user_id = auth.uid() AND r.is_locked IS NOT TRUE
+          AND (r.created_by IS NULL OR r.created_by = auth.uid())
+    )
+);
 
 -- Removes someone from a room for good: they lose access to its tasks and cannot rejoin.
 CREATE OR REPLACE FUNCTION public.remove_participant(p_room UUID, p_user UUID)
@@ -196,7 +233,7 @@ BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
 
   SELECT * INTO v_listing FROM public.open_rooms
-  WHERE id = p_listing AND last_seen > now() - interval '2 minutes' AND reports < 3
+  WHERE id = p_listing AND last_seen > now() - interval '2 minutes' AND NOT public.is_flagged(host_id)
   FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Group not found'; END IF;
   IF EXISTS (SELECT 1 FROM public.room_bans WHERE room_id = v_listing.room_id AND user_id = auth.uid()) THEN
