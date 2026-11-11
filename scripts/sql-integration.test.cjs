@@ -102,6 +102,7 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.equal(asAnon('SELECT count(*) FROM public.open_rooms;'), '1', 'Visitors can read the board');
             assert.throws(() => asAnon('SELECT room_id FROM public.open_rooms;'), /Command failed/, 'Visitors never see room ids');
             assert.throws(() => asAnon(`SELECT public.join_open_room('${listing}');`), /Command failed/, 'Visitors cannot take a seat');
+            asUser(one, 'UPDATE public.open_rooms SET seats_taken = 2;'); // both seats of this two-seat listing are in use
             assert.throws(() => asUser(three, "SELECT public.join_room('OPEN22', NULL);"), /Command failed/, 'A full listed room also refuses joins by code');
             asUser(one, "UPDATE public.open_rooms SET seats = 4, subject = 'science', camera = 'off', timer_mode = 'focus';");
             assert.throws(() => asUser(one, "UPDATE public.open_rooms SET subject = 'gossip';"), /Command failed/, 'Subjects come from the fixed list');
