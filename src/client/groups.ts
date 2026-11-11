@@ -27,7 +27,12 @@ function card(room: OpenRoom) {
         if (joining) return;
         joining = button.disabled = true;
         const result = await takeSeat(room.id).catch((): { reason: string } => ({ reason: 'Could not join this group. Check your connection and try again.' }));
-        if ('code' in result) { window.location.href = '/room.html?room=' + encodeURIComponent(result.code) + '&join=1'; return; }
+        if ('code' in result) {
+            // Handed over in sessionStorage, not the URL: a link must never be able to walk someone into a room with their camera on.
+            sessionStorage.setItem('flow_join', result.code);
+            window.location.href = '/room.html';
+            return;
+        }
         message.textContent = result.reason;
         joining = false;
         load();

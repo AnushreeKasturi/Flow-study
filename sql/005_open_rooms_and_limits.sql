@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS public.open_rooms (
     host_name TEXT NOT NULL CHECK (char_length(host_name) BETWEEN 1 AND 40),
     topic TEXT NOT NULL CHECK (char_length(topic) BETWEEN 3 AND 80),
     seats INT NOT NULL CHECK (seats BETWEEN 2 AND 6),
-    seats_taken INT NOT NULL DEFAULT 1 CHECK (seats_taken BETWEEN 0 AND 50),
+    -- Reported by the host's browser: only live presence knows who is in the room right now.
+    seats_taken INT NOT NULL DEFAULT 1 CHECK (seats_taken BETWEEN 1 AND 50),
     last_seen TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -37,7 +38,24 @@ ALTER TABLE public.open_rooms ENABLE ROW LEVEL SECURITY;
 -- after it, so the board hands out seats through join_open_room() instead.
 REVOKE ALL ON public.open_rooms FROM anon, authenticated;
 GRANT SELECT (id, host_id, host_name, topic, seats, seats_taken, last_seen, created_at) ON public.open_rooms TO authenticated;
-GRANT INSERT, UPDATE, DELETE ON public.open_rooms TO authenticated;
+-- Writable columns only. last_seen is never taken from the client (see the trigger below).
+GRANT INSERT (host_id, room_id, host_name, topic, seats, seats_taken), UPDATE (host_id, room_id, host_name, topic, seats, seats_taken), DELETE ON public.open_rooms TO authenticated;
+
+-- A listing stays visible for two minutes after its host last touched it, by the
+-- server's clock. Without this a host could post-date last_seen and never expire.
+-- Someone taking a seat changes seats_taken but must not keep a hostless listing alive.
+CREATE OR REPLACE FUNCTION public.open_rooms_stamp() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'INSERT' OR auth.uid() = NEW.host_id THEN
+    NEW.last_seen := now();
+  ELSIF auth.uid() IS NOT NULL THEN
+    NEW.last_seen := OLD.last_seen;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS open_rooms_stamp ON public.open_rooms;
+CREATE TRIGGER open_rooms_stamp BEFORE INSERT OR UPDATE ON public.open_rooms FOR EACH ROW EXECUTE FUNCTION public.open_rooms_stamp();
 
 DROP POLICY IF EXISTS open_rooms_select ON public.open_rooms;
 CREATE POLICY open_rooms_select ON public.open_rooms FOR SELECT TO authenticated

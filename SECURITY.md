@@ -12,7 +12,7 @@ Please don't open a public issue. Use GitHub's private reporting: **Security →
 | Tasks, sessions, profiles | PostgreSQL row-level security: tasks are readable and writable only by people who joined that room; sessions and profiles only by their owner |
 | Room PINs | Never readable by clients; checked inside the `join_room` database function |
 | Stored text | Length limits enforced by the database, not only by the browser (`sql/005`) |
-| Study-groups board | A room's internal id is never exposed; seats are handed out by a database function that checks capacity under a row lock |
+| Study-groups board | A room's internal id is never exposed; seats are handed out by a database function that checks capacity under a row lock; listing expiry uses the server's clock; a seat is passed to the room page in session storage, so no link can join a room on someone's behalf |
 | Text from other people | Names, tasks, and chat are always inserted as text, never as HTML. Tests feed markup through every one of these paths and assert it stays inert |
 | Shared audio links | Only real YouTube and Spotify hosts are accepted, converted to the official embed URL, and the Content-Security-Policy allows frames from those two origins only |
 | Assistant and TURN endpoints | Require a signed-in user (the server validates the caller's Supabase token), are rate limited per address, and keep provider keys on the server. TURN credentials are short-lived tokens issued per request |

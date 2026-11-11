@@ -84,6 +84,10 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.throws(() => asUser(three, `SELECT public.join_open_room('${listing}');`), /Command failed/, 'A full group refuses another seat');
             asUser(two, "UPDATE public.open_rooms SET topic = 'Taken over';");
             assert.equal(run(database, 'SELECT topic FROM public.open_rooms;').trim(), 'Organic chemistry revision', 'Only the host may edit a listing');
+            assert.throws(() => asUser(one, "UPDATE public.open_rooms SET last_seen = now() + interval '1 year';"), /Command failed/, 'A host cannot post-date their listing');
+            run(database, "UPDATE public.open_rooms SET last_seen = now() - interval '5 minutes';");
+            asUser(one, 'UPDATE public.open_rooms SET seats_taken = 1;');
+            assert.equal(asUser(two, 'SELECT count(*) FROM public.open_rooms;'), '1', 'The host refreshing brings the listing back');
             run(database, "UPDATE public.open_rooms SET last_seen = now() - interval '5 minutes';");
             assert.equal(asUser(two, 'SELECT count(*) FROM public.open_rooms;'), '0', 'Stale listings disappear from the board');
             assert.equal(asUser(one, 'SELECT count(*) FROM public.open_rooms;'), '1', 'The host still sees their own listing');

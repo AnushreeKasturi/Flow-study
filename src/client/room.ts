@@ -213,7 +213,6 @@ async function enterRoom(roomId: string, roomCode: string) {
     reveal(appContainer, 'room');
     const roomUrl = new URL(window.location.href);
     roomUrl.searchParams.set('room', roomCode);
-    roomUrl.searchParams.delete('join');
     history.replaceState(null, '', roomUrl);
     sessionStorage.setItem('flow_last_room', roomCode);
     UI.updateRoomInfo(roomCode, 1);
@@ -658,8 +657,12 @@ async function start() {
     setRoomBusy(false);
 
     // Arriving from the study-groups board: either to host a new group, or with a seat already taken.
+    // Both are one-time notes left by the board page in this tab. A URL alone never joins a room:
+    // an invite link only fills in the code, and the person still presses Join.
     const hosting = sessionStorage.getItem('flow_host');
+    const seat = sessionStorage.getItem('flow_join');
     sessionStorage.removeItem('flow_host');
+    sessionStorage.removeItem('flow_join');
     if (hosting) {
         const { topic, seats } = JSON.parse(hosting);
         roomCodeInput.value = pinInput.value = '';
@@ -669,7 +672,8 @@ async function start() {
             byId<HTMLSelectElement>('board-seats').value = String(seats);
             await listOnBoard(topic, Math.min(6, Math.max(2, Number(seats) || 4)));
         }
-    } else if (new URLSearchParams(location.search).has('join') && roomCodeInput.value) {
+    } else if (seat && /^[A-Z0-9]{6}$/.test(seat)) {
+        roomCodeInput.value = seat;
         await joinRoom();
     }
 }

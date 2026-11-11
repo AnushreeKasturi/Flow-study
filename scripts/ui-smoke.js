@@ -247,16 +247,16 @@ async (page) => {
     // All appearance themes maintain readable body text.
     for (const theme of ['forest', 'midnight', 'warm', 'aqua', 'amethyst', 'desert', 'aurora', 'storm', 'dawn', 'daylight']) {
         await page.getByLabel('Room atmosphere').selectOption(theme);
-        const contrast = await page.evaluate(() => {
+        // Skies cross-fade, so wait for the ground colour to settle before measuring.
+        await page.waitForFunction(() => {
             const style = getComputedStyle(document.body);
             const luminance = color => {
                 const rgb = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(value => value / 255).map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
                 return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
             };
             const a = luminance(style.color), b = luminance(style.backgroundColor);
-            return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
-        });
-        assert(contrast >= 4.5, theme + ' body text contrast');
+            return (Math.max(a, b) + .05) / (Math.min(a, b) + .05) >= 4.5;
+        }, undefined, { timeout: 3000 }).catch(() => { throw new Error(theme + ' body text contrast'); });
     }
     await page.getByLabel('Room atmosphere').selectOption('forest');
 
@@ -577,6 +577,10 @@ async (page) => {
     await page.getByRole('button', { name: 'Take a seat', exact: true }).click();
     await page.waitForURL(url => url.pathname === '/room.html' && url.searchParams.get('room') === 'FOCUS6');
     await visible('#app');
+    // A link alone must never put someone in a room: it fills in the code and waits for a click.
+    await page.goto(origin + '/room.html?room=FOCUS6&join=1');
+    await visible('#join-modal');
+    assert(await page.locator('#app').isHidden() && await page.locator('#room-code-input').inputValue() === 'FOCUS6', 'A URL must not auto-join a room');
     await page.goto(origin + '/docs.html');
     for (const width of [1440, 390, 320]) { await page.setViewportSize({ width, height: 900 }); await fitsViewport(); }
     await page.setViewportSize({ width: 1440, height: 1000 });
