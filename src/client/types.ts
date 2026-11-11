@@ -43,6 +43,7 @@ export interface SocketHandlers {
     onReaction?: (reaction: { userId: string; emoji: string }) => void;
     onRemoved?: (userId: string) => void;
     onBye?: (userId: string) => void;
+    onNotice?: (kind: string) => void;
 }
 export interface ProfileStats {
     savedTotalSeconds: number; savedTodaySeconds: number; weekSeconds: number[]; persistedIds: string[];

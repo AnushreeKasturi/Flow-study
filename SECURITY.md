@@ -10,7 +10,7 @@ Please don't open a public issue. Use GitHub's private reporting: **Security →
 | --- | --- |
 | Accounts | Supabase email/password authentication. New accounts need a password of at least 8 characters |
 | Rooms | A room, its code, and its internal id are visible only to its creator and the people who have joined it. The database, not the browser, records who created a room, validates the code and PIN, and caps how many rooms one account can create in a day |
-| Joining | A wrong code and a wrong PIN get the same answer, so a guess reveals nothing about which was wrong. Ten misses in ten minutes lock joining for that account until the window passes |
+| Joining | A wrong code and a wrong PIN get the same answer, so a guess reveals nothing about which was wrong. Ten misses in ten minutes lock joining for that account, and thirty wrong PINs on one room (from any accounts) close it to newcomers, until the window passes |
 | Room PINs | Never readable by clients; checked inside the `join_room` database function |
 | Tasks, sessions, profiles | Row-level security: tasks are readable and writable only by people who joined that room; sessions and profiles only by their owner. Length and size limits are enforced by the database |
 | Room channels | Private (Supabase Realtime Authorization): only people who joined a room can subscribe to it, and public channels are switched off for the project |
@@ -34,6 +34,7 @@ These are real gaps. They are listed so nobody assumes more than is true.
 - **Presence is self-reported.** "Who is here", display names, and camera state travel as presence, which the database cannot stamp. A member could show up under another display name. Everything that acts on identity (chat, call setup, removal) uses the verified sender, not presence.
 - **Seat limits rely on the host's browser for the head count.** Only live presence knows who is in a room right now, so the host reports it.
 - **Membership is permanent.** Someone who has joined a room keeps access to its tasks and channel until the host removes them.
+- **The PIN lock can be turned against a room.** Thirty wrong PINs in ten minutes close a PIN room to newcomers for that window, which stops guessing but lets a few accounts keep new people out for a while. People already in the room are unaffected and are told when it happens.
 - **Room PINs are stored as entered.** They are four digits, never sent to browsers, and protected by the attempt limit; hashing four digits would add nothing against someone who can read the database.
 - **Automatic hiding can be abused by a patient group.** Three accounts that are each more than a day old can hide a host's listings for a week. The `reports` table records who reported whom.
 - **Removal takes effect at the database immediately, and in the removed person's browser when it hears about it.** Their realtime access ends when their token next refreshes.

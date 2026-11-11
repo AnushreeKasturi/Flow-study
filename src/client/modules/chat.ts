@@ -31,9 +31,11 @@ export const handleIncomingMessage = (message: unknown, own = false) => {
     const claimed = message.sender.slice(0, 80);
     const text = message.text.slice(0, 4000);
     const assistant = claimed === 'AI Assistant';
-    const verified = from ? nameOf?.(from) : undefined;
+    // A stamped sender we can't put a name to gets a neutral label, never the name the message claims.
+    // (A message with no stamp at all can only arrive on servers that have not applied sql/009.)
+    const verified = from ? nameOf?.(from) ?? 'Someone in the room' : undefined;
     const label = own && !assistant ? 'You'
-        : assistant ? (own || !from ? 'AI Assistant' : `AI Assistant, asked by ${verified ?? 'someone in the room'}`)
+        : assistant ? (own || !from ? 'AI Assistant' : `AI Assistant, asked by ${verified}`)
         : verified ?? claimed;
     const div = document.createElement('div');
     div.className = 'chat-message' + (own && !assistant ? ' own-message' : '') + (assistant ? ' ai-message' : '');

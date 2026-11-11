@@ -371,6 +371,12 @@ async function enterRoom(roomId: string, roomCode: string) {
         onYouTubeSync: url => loadRoomAudio('youtube', url),
         onAudioSync: loadRoomAudio,
         onReaction: data => showReaction(data.userId, data.emoji),
+        onNotice: kind => {
+            if (kind !== 'pin-guessing') return;
+            const text = 'Someone is guessing this room’s PIN. New people can’t join for the next ten minutes; everyone here is unaffected.';
+            pushNote(text);
+            notify(text, 'error');
+        },
         onRemoved: userId => {
             if (userId === getMyUserId()) confirmRemoval();
             else if (partners[userId]) pushNote(`${partners[userId].username || 'Someone'} was removed by the host.`);

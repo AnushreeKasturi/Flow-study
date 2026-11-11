@@ -192,7 +192,8 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.throws(() => asUser(stranger, 'SELECT count(*) FROM public.join_failures;'), /Command failed/, 'The failure log is not readable');
             // A PIN room is also protected across accounts: twenty wrong PINs close it to newcomers for a while.
             run(database, 'DELETE FROM public.join_failures;'); // start the count clean: earlier checks in this test also guessed wrong
-            for (const guesser of [three, four]) for (let attempt = 0; attempt < 10; attempt++) asUser(guesser, "SELECT public.join_room('NEWONE', '0000');");
+            for (const guesser of [two, three, four]) for (let attempt = 0; attempt < 10; attempt++) asUser(guesser, "SELECT public.join_room('NEWONE', '0000');");
+            assert.equal(run(database, "SELECT count(*) FROM realtime.sent WHERE event = 'notice' AND topic = 'room:' || (SELECT id FROM public.rooms WHERE room_code = 'NEWONE');").trim(), '1', 'The room is told when its PIN is being guessed');
             assert.throws(() => asUser(fresh, "SELECT public.join_room('NEWONE', '4321');"), /Command failed/, 'A room under PIN guessing refuses newcomers, even with the right PIN');
             run(database, 'DELETE FROM public.join_failures;');
             assert.equal(asUser(fresh, "SELECT public.join_room('NEWONE', '4321') IS NOT NULL;"), 't', 'and opens again when the window passes');

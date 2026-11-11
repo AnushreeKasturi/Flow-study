@@ -78,13 +78,21 @@ BEGIN
     -- People already in the room are not asked for the PIN again, so the room-wide lock below never shuts them out.
     IF room.is_locked AND NOT v_member THEN
         -- A four-digit PIN falls to many accounts guessing a little each, so wrong PINs are
-        -- also counted per room: twenty in ten minutes closes the room to newcomers for that window.
+        -- also counted per room: thirty in ten minutes closes the room to newcomers for that
+        -- window. This can be used to keep newcomers out for a while, which is the lesser
+        -- harm; people already in the room are never affected, and the room is told.
         PERFORM pg_advisory_xact_lock(hashtext('join_room_pin:' || room.id::text));
-        IF (SELECT count(*) FROM public.join_failures WHERE room_id = room.id) >= 20 THEN
+        IF (SELECT count(*) FROM public.join_failures WHERE room_id = room.id) >= 30 THEN
             RAISE EXCEPTION 'Too many attempts';
         END IF;
         IF room.pin IS DISTINCT FROM NULLIF(trim(p_pin), '') THEN
             INSERT INTO public.join_failures (user_id, room_id) VALUES (auth.uid(), room.id);
+            IF (SELECT count(*) FROM public.join_failures WHERE room_id = room.id) = 30 THEN
+                BEGIN
+                    PERFORM realtime.send(jsonb_build_object('kind', 'pin-guessing'), 'notice', 'room:' || room.id::text, true);
+                EXCEPTION WHEN OTHERS THEN NULL; -- telling the room is a courtesy; the lock holds regardless
+                END;
+            END IF;
             RETURN NULL;
         END IF;
     END IF;

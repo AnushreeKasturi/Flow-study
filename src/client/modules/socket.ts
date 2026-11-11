@@ -155,6 +155,9 @@ const connectChannel = () => {
         if (typeof who === 'string' && who !== myUserId) handlers.onBye?.(who);
     });
 
+    // The database tells the room when something needs its attention (sent from sql/008, never by a browser).
+    listen('notice', payload => { if (typeof payload?.kind === 'string' && !payload.from) handlers.onNotice?.(payload.kind); });
+
     // The host removed someone. The room page confirms with the database before acting on it.
     listen('removed', payload => {
         if (typeof payload?.userId === 'string') handlers.onRemoved?.(payload.userId);
