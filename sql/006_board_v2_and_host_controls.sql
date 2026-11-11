@@ -124,6 +124,10 @@ BEGIN
   END IF;
   IF NEW.host_id IS NULL THEN RAISE EXCEPTION 'Listing not found'; END IF;
   IF NEW.host_id = NEW.reporter_id THEN RAISE EXCEPTION 'You cannot report your own listing'; END IF;
+  -- Ten reports a day is far more than honest use needs, and caps what one account can do.
+  IF (SELECT count(*) FROM public.reports WHERE reporter_id = NEW.reporter_id AND created_at > now() - interval '1 day') >= 10 THEN
+    RAISE EXCEPTION 'Too many reports today';
+  END IF;
   RETURN NEW;
 END $$;
 DROP TRIGGER IF EXISTS reports_count ON public.reports;
@@ -132,8 +136,13 @@ CREATE TRIGGER reports_resolve BEFORE INSERT ON public.reports FOR EACH ROW EXEC
 
 -- Three different people reporting the same host within a week hides everything
 -- that host has on the board, including anything they post afterwards.
+-- Only accounts at least a day old count, so a handful of throwaway sign-ups
+-- cannot take someone off the board on the spot. Every report is still stored
+-- for review, whoever filed it.
 CREATE OR REPLACE FUNCTION public.is_flagged(p_host UUID) RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT count(DISTINCT reporter_id) >= 3 FROM public.reports WHERE host_id = p_host AND created_at > now() - interval '7 days';
+  SELECT count(DISTINCT r.reporter_id) >= 3
+  FROM public.reports r JOIN auth.users u ON u.id = r.reporter_id
+  WHERE r.host_id = p_host AND r.created_at > now() - interval '7 days' AND u.created_at < now() - interval '1 day';
 $$;
 REVOKE ALL ON FUNCTION public.is_flagged(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.is_flagged(UUID) TO anon, authenticated;

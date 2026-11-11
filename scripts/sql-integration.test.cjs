@@ -18,7 +18,7 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
         const database = 'flow_ui_' + variant + '_' + process.pid;
         run('postgres', 'CREATE DATABASE ' + database + ';');
         try {
-            run(database, `CREATE SCHEMA auth; CREATE TABLE auth.users(id UUID PRIMARY KEY);
+            run(database, `CREATE SCHEMA auth; CREATE TABLE auth.users(id UUID PRIMARY KEY, created_at TIMESTAMPTZ NOT NULL DEFAULT now() - interval '30 days');
                 CREATE FUNCTION auth.uid() RETURNS UUID LANGUAGE SQL STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
                 GRANT USAGE ON SCHEMA auth, public TO authenticated, anon;
                 INSERT INTO auth.users VALUES ('${one}'), ('${two}');`);
@@ -140,7 +140,13 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             asUser(two, `DELETE FROM public.planned_groups WHERE id = '${planId}';`);
             assert.equal(run(database, 'SELECT count(*) FROM public.planned_groups;').trim(), '3', 'Only the host can cancel a plan');
 
-            for (const id of [two, three, four]) asUser(id, `INSERT INTO public.reports(kind,target,reason) VALUES('planned','${planId}','Not about studying');`);
+            // Three reporters hide a host, but an account made today does not count toward the three.
+            const fresh = '55555555-5555-4555-8555-555555555555';
+            run(database, `INSERT INTO auth.users(id, created_at) VALUES ('${fresh}', now());`);
+            for (const id of [fresh, two, three]) asUser(id, `INSERT INTO public.reports(kind,target,reason) VALUES('planned','${planId}','Not about studying');`);
+            assert.equal(asUser(two, 'SELECT count(*) FROM public.planned_groups;'), '3', 'Two established reporters plus a brand-new account are not enough');
+            assert.equal(run(database, 'SELECT count(*) FROM public.reports;').trim(), '3', 'Every report is still recorded');
+            asUser(four, `INSERT INTO public.reports(kind,target,reason) VALUES('planned','${planId}','Not about studying');`);
             assert.throws(() => asUser(two, `INSERT INTO public.reports(kind,target) VALUES('planned','${planId}');`), /Command failed/, 'One report per person per listing');
             assert.throws(() => asUser(two, 'SELECT count(*) FROM public.reports;'), /Command failed/, 'Reports are write-only for users');
             assert.throws(() => asUser(one, `INSERT INTO public.reports(kind,target) VALUES('planned','${planId}');`), /Command failed/, 'A host cannot report themselves');
