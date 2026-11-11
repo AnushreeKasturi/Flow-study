@@ -44,9 +44,12 @@ CREATE TRIGGER rooms_guard BEFORE INSERT ON public.rooms FOR EACH ROW EXECUTE FU
 -- and does not say which of the two was wrong.
 CREATE TABLE IF NOT EXISTS public.join_failures (
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    room_id UUID REFERENCES public.rooms(id) ON DELETE CASCADE, -- set when the code was right and the PIN wrong
     at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE public.join_failures ADD COLUMN IF NOT EXISTS room_id UUID REFERENCES public.rooms(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS join_failures_recent ON public.join_failures (user_id, at);
+CREATE INDEX IF NOT EXISTS join_failures_room ON public.join_failures (room_id, at);
 ALTER TABLE public.join_failures ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.join_failures FROM anon, authenticated;
 
@@ -55,23 +58,40 @@ RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   room public.rooms%ROWTYPE;
   listing public.open_rooms%ROWTYPE;
+  v_member BOOLEAN;
 BEGIN
     IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+    -- One attempt at a time per account, so parallel guesses cannot slip past the count.
+    PERFORM pg_advisory_xact_lock(hashtext('join_room:' || auth.uid()::text));
     -- Ten misses in ten minutes locks joining for the rest of that window.
-    DELETE FROM public.join_failures WHERE user_id = auth.uid() AND at < now() - interval '10 minutes';
+    DELETE FROM public.join_failures WHERE at < now() - interval '10 minutes';
     IF (SELECT count(*) FROM public.join_failures WHERE user_id = auth.uid()) >= 10 THEN
         RAISE EXCEPTION 'Too many attempts';
     END IF;
 
     SELECT * INTO room FROM public.rooms WHERE room_code = upper(trim(p_room_code));
-    IF NOT FOUND OR (room.is_locked AND room.pin IS DISTINCT FROM NULLIF(trim(p_pin), '')) THEN
+    IF NOT FOUND THEN
         INSERT INTO public.join_failures (user_id) VALUES (auth.uid());
         RETURN NULL;
+    END IF;
+    v_member := EXISTS (SELECT 1 FROM public.room_participants WHERE room_id = room.id AND user_id = auth.uid());
+    -- People already in the room are not asked for the PIN again, so the room-wide lock below never shuts them out.
+    IF room.is_locked AND NOT v_member THEN
+        -- A four-digit PIN falls to many accounts guessing a little each, so wrong PINs are
+        -- also counted per room: twenty in ten minutes closes the room to newcomers for that window.
+        PERFORM pg_advisory_xact_lock(hashtext('join_room_pin:' || room.id::text));
+        IF (SELECT count(*) FROM public.join_failures WHERE room_id = room.id) >= 20 THEN
+            RAISE EXCEPTION 'Too many attempts';
+        END IF;
+        IF room.pin IS DISTINCT FROM NULLIF(trim(p_pin), '') THEN
+            INSERT INTO public.join_failures (user_id, room_id) VALUES (auth.uid(), room.id);
+            RETURN NULL;
+        END IF;
     END IF;
     IF EXISTS (SELECT 1 FROM public.room_bans WHERE room_id = room.id AND user_id = auth.uid()) THEN
         RAISE EXCEPTION 'Removed from room';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM public.room_participants WHERE room_id = room.id AND user_id = auth.uid()) THEN
+    IF NOT v_member THEN
         SELECT * INTO listing FROM public.open_rooms WHERE room_id = room.id AND last_seen > now() - interval '2 minutes';
         IF FOUND AND (listing.closed OR listing.seats_taken >= listing.seats) THEN
             RAISE EXCEPTION 'Room is full';
@@ -121,6 +141,8 @@ BEGIN
   ELSIF p_kind = 'turn' THEN per_minute := 20; per_day := 300;
   ELSE RAISE EXCEPTION 'Unknown quota';
   END IF;
+  -- One request at a time per account and kind, so parallel calls cannot all pass the check before any is counted.
+  PERFORM pg_advisory_xact_lock(hashtext('api_allow:' || auth.uid()::text || ':' || p_kind));
   DELETE FROM public.api_usage WHERE user_id = auth.uid() AND at < now() - interval '1 day';
   IF (SELECT count(*) FROM public.api_usage WHERE user_id = auth.uid() AND kind = p_kind AND at > now() - interval '1 minute') >= per_minute
      OR (SELECT count(*) FROM public.api_usage WHERE user_id = auth.uid() AND kind = p_kind) >= per_day THEN

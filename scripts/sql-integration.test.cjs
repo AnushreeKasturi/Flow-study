@@ -190,6 +190,12 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.throws(() => asUser(stranger, "SELECT public.join_room('NEWONE', '4321');"), /Command failed/, 'Ten misses lock joining, even with the right PIN');
             assert.equal(asUser(two, "SELECT public.join_room('focus6','1234');"), room, 'Other accounts are unaffected');
             assert.throws(() => asUser(stranger, 'SELECT count(*) FROM public.join_failures;'), /Command failed/, 'The failure log is not readable');
+            // A PIN room is also protected across accounts: twenty wrong PINs close it to newcomers for a while.
+            for (const guesser of [three, four]) for (let attempt = 0; attempt < 10; attempt++) asUser(guesser, "SELECT public.join_room('NEWONE', '0000');");
+            assert.throws(() => asUser(fresh, "SELECT public.join_room('NEWONE', '4321');"), /Command failed/, 'A room under PIN guessing refuses newcomers, even with the right PIN');
+            run(database, 'DELETE FROM public.join_failures;');
+            assert.equal(asUser(fresh, "SELECT public.join_room('NEWONE', '4321') IS NOT NULL;"), 't', 'and opens again when the window passes');
+            assert.equal(asUser(fresh, "SELECT public.join_room('NEWONE', NULL) IS NOT NULL;"), 't', 'Someone already in a PIN room is not asked for it again');
             // Stored data limits.
             assert.throws(() => asUser(two, `INSERT INTO public.sessions(room_id,user_id,mode,duration_seconds) VALUES('${variant === 'legacy' ? room : room}','${two}','focus',999999);`), /Command failed/, 'Absurd focus sessions are refused');
             // The API quota counts per account and says no when it is used up.

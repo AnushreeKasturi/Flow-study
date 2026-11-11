@@ -367,7 +367,7 @@ async function enterRoom(roomId: string, roomCode: string) {
             partners[data.userId].presence = { status: data.status, nowPlaying: data.nowPlaying };
             updatePartnerUI(data.userId);
         },
-        onChatMessage: handleIncomingMessage,
+        onChatMessage: message => handleIncomingMessage(message),
         onYouTubeSync: url => loadRoomAudio('youtube', url),
         onAudioSync: loadRoomAudio,
         onReaction: data => showReaction(data.userId, data.emoji),
@@ -415,7 +415,7 @@ async function enterRoom(roomId: string, roomCode: string) {
         chime('message');
         pushNote(`${sender}: ${text}`, () => byId('chat-tab-button').click());
         systemNotify(`${sender} in Flow`, text);
-    });
+    }, userId => partners[userId]?.username);
 
     // The soundscape chosen during setup starts with the room; the Sound tab turns it off.
     const sound = localStorage.getItem('flow_sound');

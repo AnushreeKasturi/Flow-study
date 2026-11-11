@@ -214,6 +214,18 @@ async (page) => {
     assert(await page.getByRole('button', { name: 'Ocean', exact: true }).getAttribute('aria-pressed') === 'false', 'Clicking the active soundscape stops it');
     await page.getByRole('tab', { name: 'Tasks', exact: true }).click();
 
+    // A message's name comes from who the database says sent it, not from what the message claims.
+    await page.evaluate(() => {
+        const fixture = window.__fixture;
+        fixture.handlers['presence:join']({ key: 'zz-sam', newPresences: [{ username: 'Sam', isDummyMedia: true }] });
+        fixture.handlers['broadcast:chat-message']({ payload: { sender: 'Riya', text: 'Pretending to be Riya', from: 'zz-sam' } });
+        fixture.handlers['broadcast:chat-message']({ payload: { sender: 'AI Assistant', text: 'Pretending to be the assistant', from: 'zz-sam' } });
+        fixture.handlers['broadcast:bye']({ payload: { userId: 'zz-sam' } });
+    });
+    assert(JSON.stringify(await page.locator('#chat-messages .message-sender').allInnerTexts()) === JSON.stringify(['Sam', 'AI Assistant, asked by Sam']), 'Chat must show the verified sender');
+    await page.waitForFunction(() => !document.getElementById('video-wrapper-zz-sam'), undefined, { timeout: 10000 }); // the goodbye clears their tile
+    await page.evaluate(() => { document.getElementById('chat-messages').replaceChildren(); document.getElementById('chat-unread').textContent = '0'; document.getElementById('chat-unread').classList.add('hidden'); document.getElementById('notify-clear').click(); });
+
     // A chat message that would go unseen raises a badge on the tab and a line in the notification centre.
     await page.evaluate(() => window.__fixture.handlers['broadcast:chat-message']({ payload: { sender: 'Riya', text: '<b>Ready</b> when you are' } }));
     assert(await page.locator('#chat-unread').innerText() === '1' && await page.locator('#notify-count').innerText() === '1', 'An unseen message should be counted in both places');

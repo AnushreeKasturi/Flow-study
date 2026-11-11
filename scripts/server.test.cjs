@@ -83,7 +83,7 @@ test('HTTP boundaries and bounded local concurrency', async t => {
             assert.equal(response.headers.get('x-frame-options'), 'DENY', path);
             const html = await response.text();
             assert.doesNotMatch(html, /__fixture/, path);
-            for (const tag of html.match(/<script[^>]*>/g) || []) assert.match(tag, / src="/, path + ': no inline scripts, found ' + tag);
+            for (const tag of html.match(/<script[^>]*>/gi) || []) assert.match(tag, / src="/, path + ': no inline scripts, found ' + tag);
         }
     });
     await t.test('provider endpoints reject callers who are not signed in', async t => {
