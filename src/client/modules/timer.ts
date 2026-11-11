@@ -64,6 +64,9 @@ const broadcastState = () => {
     socketUpdateTimer(roomId, 'sync', state);
 };
 
+// For the study-groups board: which mode the room is in and, if the clock is running, when it ends.
+export const timerSnapshot = () => ({ timer_mode: state.mode as string, timer_ends_at: state.isRunning ? new Date(deadline).toISOString() : null });
+
 export const broadcastCurrentState = () => {
     broadcastState();
 };

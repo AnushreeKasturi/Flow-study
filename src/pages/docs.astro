@@ -41,8 +41,10 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
 
         <section id="groups">
             <h2>Study groups</h2>
-            <p>The <a href="/groups.html">study-groups board</a> lists rooms whose hosts have opened them to anyone signed in. Each shows what the group is studying and how many of its seats are free. Groups hold two to six people.</p>
-            <p>To host, use “Host a group” on the board, or open Invite inside any room without a PIN and list it. Your room stays on the board while you’re in it and comes off when you leave. If your browser closes unexpectedly, the listing disappears within two minutes.</p>
+            <p>The <a href="/groups.html">study-groups board</a> shows two things: rooms that are open right now, and groups planned for later. Anyone can read it; taking a seat or hosting needs an account. Groups hold two to six people.</p>
+            <p>Each open group shows its topic and subject, whether cameras are expected and how much talking there is, how many seats are free, and what the room is doing this minute (“Focusing, 14 min left”). Search by topic, filter by subject, or press “Find me a seat” to be placed in the open group with the most room.</p>
+            <p>To host, use “Host a group” on the board. Choose “Now” and you land in a new room that is already listed. Choose “Later”, pick a time within the next two weeks, and it appears under “Coming up”, where others can say they’re in. From fifteen minutes before the start, your plan shows “Start now”, which opens the room and replaces the plan with a live listing. You can also list any room without a PIN from its Invite dialog.</p>
+            <p>Your room stays on the board while you’re in it and comes off when you leave; if your browser closes unexpectedly, it disappears within two minutes. As host you can stop new people joining from the Invite dialog, and remove someone by hovering their tile and pressing Remove. A removed person cannot rejoin that room. If a listing isn’t about studying, press Report on it: three reports hide a listing.</p>
         </section>
 
         <section id="sound">
@@ -60,7 +62,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
 
         <section id="data">
             <h2>Your data</h2>
-            <p>Flow stores your email, your display name, the tasks you add to rooms, and a record of each focus block you finish (when, and how long). If you list a room on the board, its topic and your display name are visible to other signed-in users until you leave.</p>
+            <p>Flow stores your email, your display name, the tasks you add to rooms, and a record of each focus block you finish (when, and how long). If you list or plan a group on the board, its topic and your display name are public, visible without an account, until the listing ends.</p>
             <p>Video, voice, and chat are not stored, and calls are encrypted between the browsers taking part. A question sent with <kbd>/ai</kbd> goes to the assistant’s provider to be answered and is not kept by Flow. Security details, including what is not protected yet, are in <a href={repo + '/blob/main/SECURITY.md'} target="_blank" rel="noopener noreferrer">SECURITY.md</a>.</p>
         </section>
 

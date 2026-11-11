@@ -51,7 +51,7 @@ It's free, runs in the browser, and every line is on GitHub.
 > - rain, ocean, or a fireplace in the background (made in your browser, no audio files)
 
 4/
-> New: a board of study groups that are open right now. Say what you're studying, pick two to six seats, and people working on the same thing can take one.
+> There's a board of study groups: the ones open right now (with what each is doing this minute) and ones planned for later. Say what you're studying, pick two to six seats, and people working on the same thing can take one. No account needed to look.
 
 5/
 > Setup takes a minute, and you set your focus length by dragging the sun up the sky.
@@ -104,6 +104,19 @@ https://flow-study.me · https://github.com/ManasDasri/Flow-study
 > flow-study.me · github.com/ManasDasri/Flow-study
 
 ## Images
+
+Ready to post, in `marketing/images/` (1600 × 900, the shape X and LinkedIn show without cropping):
+
+| Use with | File |
+| --- | --- |
+| Launch post, thread 1/ | `demo.gif` (a focus block played in ten seconds) or `landing.png` |
+| Thread 2/ and 3/ | `room.png`, `focus-mode.png` |
+| Thread 4/, the study-groups post | `study-groups.png` |
+| Thread 5/, the "drag the sun" post | `setup-drag-the-sun.png` |
+
+Regenerate them with `npm run build && npm run marketing:images` (the GIF needs `ffmpeg`). Set `FLOW_MARKETING_SKY=midnight` or any other sky to change the look.
+
+Other images:
 
 | Use | File |
 | --- | --- |

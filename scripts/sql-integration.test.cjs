@@ -18,7 +18,7 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
         const database = 'flow_ui_' + variant + '_' + process.pid;
         run('postgres', 'CREATE DATABASE ' + database + ';');
         try {
-            run(database, `CREATE SCHEMA auth; CREATE TABLE auth.users(id UUID PRIMARY KEY);
+            run(database, `CREATE SCHEMA auth; CREATE TABLE auth.users(id UUID PRIMARY KEY, created_at TIMESTAMPTZ NOT NULL DEFAULT now() - interval '30 days');
                 CREATE FUNCTION auth.uid() RETURNS UUID LANGUAGE SQL STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
                 GRANT USAGE ON SCHEMA auth, public TO authenticated, anon;
                 INSERT INTO auth.users VALUES ('${one}'), ('${two}');`);
@@ -91,6 +91,74 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             run(database, "UPDATE public.open_rooms SET last_seen = now() - interval '5 minutes';");
             assert.equal(asUser(two, 'SELECT count(*) FROM public.open_rooms;'), '0', 'Stale listings disappear from the board');
             assert.equal(asUser(one, 'SELECT count(*) FROM public.open_rooms;'), '1', 'The host still sees their own listing');
+
+            // 006: board v2, host controls, reports. Run twice to prove it is repeatable.
+            const v2 = readFileSync('sql/006_board_v2_and_host_controls.sql', 'utf8');
+            run(database, v2);
+            run(database, v2);
+            const four = '44444444-4444-4444-8444-444444444444';
+            const asAnon = sql => run(database, 'SET ROLE anon; ' + sql).trim().split('\n').at(-1);
+            run(database, `INSERT INTO auth.users VALUES ('${four}'); UPDATE public.open_rooms SET last_seen = now(); UPDATE public.rooms SET created_by = '${one}' WHERE id = '${openRoom}';`);
+            assert.equal(asAnon('SELECT count(*) FROM public.open_rooms;'), '1', 'Visitors can read the board');
+            assert.throws(() => asAnon('SELECT room_id FROM public.open_rooms;'), /Command failed/, 'Visitors never see room ids');
+            assert.throws(() => asAnon(`SELECT public.join_open_room('${listing}');`), /Command failed/, 'Visitors cannot take a seat');
+            asUser(one, 'UPDATE public.open_rooms SET seats_taken = 2;'); // both seats of this two-seat listing are in use
+            assert.throws(() => asUser(three, "SELECT public.join_room('OPEN22', NULL);"), /Command failed/, 'A full listed room also refuses joins by code');
+            asUser(one, "UPDATE public.open_rooms SET seats = 4, subject = 'science', camera = 'off', timer_mode = 'focus';");
+            assert.throws(() => asUser(one, "UPDATE public.open_rooms SET subject = 'gossip';"), /Command failed/, 'Subjects come from the fixed list');
+            assert.throws(() => asUser(two, `INSERT INTO public.open_rooms(room_id,host_name,topic,seats) VALUES('${openRoom}','Mallory','Second listing',6);`), /Command failed/, 'Only the room\'s creator may list it, and only once');
+            assert.equal(asUser(three, "SELECT public.join_room('OPEN22', NULL);"), openRoom, 'A free seat lets a code join through');
+            asUser(one, 'UPDATE public.open_rooms SET closed = true;');
+            assert.throws(() => asUser(four, `SELECT public.join_open_room('${listing}');`), /Command failed/, 'Closed seats refuse newcomers');
+            assert.throws(() => asUser(four, "SELECT public.join_room('OPEN22', NULL);"), /Command failed/, 'Closed seats also refuse joins by code');
+            assert.equal(asUser(two, `SELECT public.join_open_room('${listing}');`), 'OPEN22', 'People already in the room can come back');
+
+            assert.throws(() => asUser(two, `SELECT public.remove_participant('${openRoom}','${three}');`), /Command failed/, 'Only the host can remove someone');
+            assert.throws(() => asUser(one, `SELECT public.remove_participant('${openRoom}','${one}');`), /Command failed/, 'The host cannot remove themselves');
+            asUser(one, `SELECT public.remove_participant('${openRoom}','${three}');`);
+            assert.equal(run(database, `SELECT count(*) FROM public.room_participants WHERE room_id = '${openRoom}' AND user_id = '${three}';`).trim(), '0');
+            asUser(one, 'UPDATE public.open_rooms SET closed = false;');
+            assert.throws(() => asUser(three, "SELECT public.join_room('OPEN22', NULL);"), /Command failed/, 'Someone removed cannot rejoin by code');
+            assert.throws(() => asUser(three, `SELECT public.join_open_room('${listing}');`), /Command failed/, 'Someone removed cannot rejoin from the board');
+            assert.equal(asUser(two, "SELECT public.join_room('focus6','1234');"), room, 'Existing PIN rooms still work');
+
+            const plan = (id, when) => asUser(id, `INSERT INTO public.planned_groups(host_name,topic,seats,starts_at) VALUES('Alex','Evening calculus',4, now() + interval '${when}');`);
+            plan(one, '3 hours');
+            assert.throws(() => plan(one, '-1 day'), /Command failed/, 'A plan cannot start in the past');
+            assert.throws(() => plan(one, '30 days'), /Command failed/, 'A plan cannot be more than two weeks out');
+            const planId = asAnon('SELECT id FROM public.planned_groups;');
+            assert.match(planId, /^[0-9a-f-]{36}$/, 'Visitors can read planned groups');
+            asUser(two, `INSERT INTO public.planned_group_members(group_id) VALUES('${planId}');`);
+            asUser(one, `INSERT INTO public.planned_group_members(group_id) VALUES('${planId}');`);
+            assert.equal(run(database, 'SELECT going FROM public.planned_groups;').trim(), '2', 'Going counts the host once plus everyone in');
+            assert.throws(() => asUser(two, 'UPDATE public.planned_groups SET going = 99;'), /Command failed/, 'Going is never set by clients');
+            assert.throws(() => asUser(two, `INSERT INTO public.planned_group_members(group_id,user_id) VALUES('${planId}','${three}');`), /Command failed/, 'Nobody can sign someone else up');
+            asUser(two, `DELETE FROM public.planned_group_members WHERE group_id = '${planId}';`);
+            assert.equal(run(database, 'SELECT going FROM public.planned_groups;').trim(), '1');
+            plan(one, '4 hours'); plan(one, '5 hours');
+            assert.throws(() => plan(one, '6 hours'), /Command failed/, 'A host is limited to three plans ahead');
+            asUser(two, `DELETE FROM public.planned_groups WHERE id = '${planId}';`);
+            assert.equal(run(database, 'SELECT count(*) FROM public.planned_groups;').trim(), '3', 'Only the host can cancel a plan');
+
+            // Three reporters hide a host, but an account made today does not count toward the three.
+            const fresh = '55555555-5555-4555-8555-555555555555';
+            run(database, `INSERT INTO auth.users(id, created_at) VALUES ('${fresh}', now());`);
+            for (const id of [fresh, two, three]) asUser(id, `INSERT INTO public.reports(kind,target,reason) VALUES('planned','${planId}','Not about studying');`);
+            assert.equal(asUser(two, 'SELECT count(*) FROM public.planned_groups;'), '3', 'Two established reporters plus a brand-new account are not enough');
+            assert.equal(run(database, 'SELECT count(*) FROM public.reports;').trim(), '3', 'Every report is still recorded');
+            asUser(four, `INSERT INTO public.reports(kind,target,reason) VALUES('planned','${planId}','Not about studying');`);
+            assert.throws(() => asUser(two, `INSERT INTO public.reports(kind,target) VALUES('planned','${planId}');`), /Command failed/, 'One report per person per listing');
+            assert.throws(() => asUser(two, 'SELECT count(*) FROM public.reports;'), /Command failed/, 'Reports are write-only for users');
+            assert.throws(() => asUser(one, `INSERT INTO public.reports(kind,target) VALUES('planned','${planId}');`), /Command failed/, 'A host cannot report themselves');
+            assert.throws(() => asUser(two, "INSERT INTO public.reports(kind,target) VALUES('planned','99999999-9999-4999-8999-999999999999');"), /Command failed/, 'A report must point at a real listing');
+            assert.equal(asUser(two, 'SELECT count(*) FROM public.planned_groups;'), '0', 'Three reporters hide everything that host has planned');
+            assert.equal(asUser(two, 'SELECT count(*) FROM public.open_rooms;'), '0', 'and their open room');
+            assert.equal(asUser(one, 'SELECT count(*) FROM public.planned_groups;'), '3', 'The host still sees their own');
+            asUser(one, `DELETE FROM public.planned_groups WHERE id = '${planId}';`);
+            plan(one, '7 hours');
+            assert.equal(asUser(two, 'SELECT count(*) FROM public.planned_groups;'), '0', 'Deleting and posting again does not clear the reports');
+            assert.throws(() => asUser(four, `SELECT public.join_open_room('${listing}');`), /Command failed/, 'A flagged host\'s room cannot be joined from the board');
+            assert.equal(run(database, "SELECT count(*) FROM pg_publication_tables WHERE pubname='supabase_realtime' AND tablename IN ('open_rooms','planned_groups');").trim(), '2', 'The board tables publish changes');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

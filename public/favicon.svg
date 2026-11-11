@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
   <title>Flow</title>
-  <!-- Instrument Sans SemiBold (600), outlined to match the site wordmark. -->
-  <rect width="64" height="64" rx="14" fill="#101b16"/>
+  <!-- An outlined f beside the sun-coloured dot of the wordmark. -->
+  <rect width="64" height="64" rx="14" fill="#0a1a15"/>
   <path fill="#eff3e9" d="M22.778 54V20.427Q22.778 15.364 25.581 12.682Q28.384 10 33.989 10Q35.255 10 36.099 10.121Q36.942 10.241 37.726 10.482V16.389Q37.304 16.208 36.641 16.118Q35.978 16.027 35.134 16.027Q32.723 16.027 31.548 17.203Q30.373 18.378 30.373 20.608V54ZM17.233 29.227V23.26H37.063V29.227Z"/>
-  <path fill="#b6d3ac" d="M38.027 54V45.321H46.767V54Z"/>
+  <circle cx="42.6" cy="49.4" r="4.9" fill="#f4dc8f"/>
 </svg>

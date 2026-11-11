@@ -1,6 +1,7 @@
 ---
 import GitHubStar from '../GitHubStar.astro';
 import Icon from '../Icon.astro';
+import { SUBJECTS, CAMERAS, VIBES } from '../../client/modules/board-options';
 const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focus mode'], ['M', 'Mute or unmute your microphone'], ['V', 'Turn your camera on or off'], ['?', 'Show these shortcuts'], ['Esc', 'Close a dialog']];
 ---
 <div id="modal-overlay" class="modal-overlay">
@@ -23,7 +24,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
             </form>
             <div id="lobby-step">
                 <h2 id="lobby-greeting">Settle into your session.</h2>
-                <p class="lobby-description">Use your group’s code, or create a new room.</p>
+                <div class="lobby-home"><p id="lobby-recap"></p><p id="lobby-today"></p><p id="lobby-board"></p></div>
                 <label for="room-code-input">Room code</label>
                 <input type="text" id="room-code-input" class="input room-code-field" aria-describedby="lobby-error" placeholder="Enter 6-character code" maxlength="6" autocomplete="off" spellcheck="false">
                 <label for="room-pin-input">Room PIN <span class="muted">(if required)</span></label>
@@ -94,14 +95,29 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
             <p id="board-status" class="panel-description" role="status">Anyone signed in can find it and take a seat. Rooms with a PIN can’t be listed.</p>
             <label for="board-topic">What are you studying?</label>
             <input type="text" id="board-topic" class="input" minlength="3" maxlength="80" required placeholder="Organic chemistry revision">
+            <div class="board-form-grid">
+                <select id="board-subject" class="input" aria-label="Subject">{SUBJECTS.map(([id, name]) => <option value={id} selected={id === 'other'}>{name}</option>)}</select>
+                <select id="board-camera" class="input" aria-label="Cameras">{CAMERAS.map(([id, name]) => <option value={id}>{name}</option>)}</select>
+                <select id="board-vibe" class="input" aria-label="Talking">{VIBES.map(([id, name]) => <option value={id}>{name}</option>)}</select>
+            </div>
             <div class="board-form-row">
                 <label for="board-seats">Seats</label>
                 <select id="board-seats" class="input" aria-label="Seats, including you">{[2, 3, 4, 5, 6].map(n => <option value={n} selected={n === 4}>{n}</option>)}</select>
                 <button id="board-list-btn" class="btn btn-primary">List this room</button>
                 <button type="button" id="board-unlist-btn" class="btn hidden">Remove from the board</button>
             </div>
+            <label id="board-closed-row" class="check hidden"><input type="checkbox" id="board-closed"><span>Stop new people joining<small>The listing stays up and shows as closed. People already here are not affected.</small></span></label>
         </form>
         <div class="dialog-actions"><button id="close-invite-btn" class="btn">Done</button></div>
+    </div>
+
+    <div id="remove-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="remove-title">
+        <h2 id="remove-title">Remove this person?</h2>
+        <p id="remove-text" class="dialog-description">They will leave the room now and won’t be able to come back to it.</p>
+        <div class="dialog-actions">
+            <button id="cancel-remove-btn" class="btn">Keep them</button>
+            <button id="confirm-remove-btn" class="btn btn-danger">Remove from room</button>
+        </div>
     </div>
 
     <div id="shortcuts-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
