@@ -6,7 +6,7 @@
 @property --sun { syntax: '<color>'; inherits: true; initial-value: #f4dc8f; }
 @property --bg { syntax: '<color>'; inherits: true; initial-value: #0a1a15; }
 
-/* Six skies. Each names its sky, its ground (--bg), its sun, and the ink that sits on them. */
+/* Ten skies. Each names its sky, its ground (--bg), its sun, and the ink that sits on them. */
 :root,
 [data-theme="forest"] {
     color-scheme: dark;
@@ -39,6 +39,32 @@
     --bg: #130b2b; --surface: #1c1238; --card: #221641; --field: #180f31; --hover: #33215c; --line: #40296e;
     --primary: #e3c8ff; --on-primary: #1c1238; --accent: #ffcfe6;
     --text: #f6effd; --text-2: #cfc0e4; --text-3: #a593c2;
+}
+[data-theme="desert"] {
+    --sky-top: #2b2a4a; --sky-bottom: #d9925f; --sun: #ffe2a8;
+    --bg: #1e1712; --surface: #29201a; --card: #30261f; --field: #241b15; --hover: #45362b; --line: #574436;
+    --primary: #ffe2a8; --on-primary: #29201a; --accent: #e8a27a;
+    --text: #fbf1e4; --text-2: #dccab4; --text-3: #b29d86;
+}
+[data-theme="aurora"] {
+    --sky-top: #04121f; --sky-bottom: #1f8f7a; --sun: #d8fff0;
+    --bg: #04101a; --surface: #0a1b28; --card: #0d2231; --field: #071622; --hover: #153549; --line: #1d4257;
+    --primary: #8ef0c8; --on-primary: #04101a; --accent: #b9a5ff;
+    --text: #e9f7f6; --text-2: #b5cfd2; --text-3: #86a6ac;
+}
+[data-theme="storm"] {
+    --sky-top: #1c2530; --sky-bottom: #6d7f8f; --sun: #dfe7ee;
+    --bg: #141a21; --surface: #1b232c; --card: #202a35; --field: #171e26; --hover: #2c3947; --line: #364556;
+    --primary: #dfe7ee; --on-primary: #141a21; --accent: #9fc3dc;
+    --text: #eef2f5; --text-2: #c0cad3; --text-3: #93a1ae;
+}
+[data-theme="dawn"] {
+    color-scheme: light;
+    --sky-top: #8fa3d9; --sky-bottom: #ffc9a8; --sun: #fff0c2;
+    --bg: #fbeee6; --surface: #fff7f1; --card: #ffffff; --field: #f3e2d8; --hover: #ebd5c8; --line: #dcc3b4;
+    --primary: #7a3b52; --on-primary: #ffffff; --accent: #a8482a;
+    --ok: #2c7548; --danger: #a33636;
+    --text: #2a1b24; --text-2: #523c48; --text-3: #6f5763;
 }
 [data-theme="daylight"] {
     color-scheme: light;
@@ -89,12 +115,26 @@ h3 { font-stretch: 90%; font-variation-settings: 'wdth' 90; letter-spacing: -.01
     content: ''; position: absolute; inset: 0; opacity: .22; mix-blend-mode: soft-light;
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
 }
+/* Light pooling along the horizon under the sun; it strengthens as the sun gets low. */
+.sky::before {
+    content: ''; position: absolute; inset: 0; opacity: calc(.3 + var(--sun-y) * .6);
+    background: radial-gradient(55% 62% at var(--sun-x) 100%, color-mix(in srgb, var(--sun) 60%, transparent), transparent 72%);
+    transition: opacity 1s linear;
+}
+/* The disc: a hot core that cools slightly toward the limb, inside a corona that fades with distance. */
 .sun {
     position: absolute; left: var(--sun-x); top: calc(10% + var(--sun-y) * 90%); width: var(--sun-size); aspect-ratio: 1; translate: -50% 0;
-    border-radius: 50%; background: var(--sun);
-    box-shadow: 0 0 0 calc(var(--sun-size) * .09) color-mix(in srgb, var(--sun) 16%, transparent), 0 0 calc(var(--sun-size) * .9) color-mix(in srgb, var(--sun) 45%, transparent);
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 46%, color-mix(in oklab, var(--sun) 45%, white) 0%, var(--sun) 58%, color-mix(in oklab, var(--sun) 82%, var(--sky-bottom)) 100%);
+    box-shadow:
+        0 0 calc(var(--sun-size) * .06) color-mix(in srgb, var(--sun) 95%, transparent),
+        0 0 calc(var(--sun-size) * .28) color-mix(in srgb, var(--sun) 55%, transparent),
+        0 0 calc(var(--sun-size) * .8) color-mix(in srgb, var(--sun) 32%, transparent),
+        0 0 calc(var(--sun-size) * 2) color-mix(in srgb, var(--sun) 16%, transparent);
     transition: top 1s linear, left .9s var(--ease), width .9s var(--ease);
 }
+/* While something drives the sun frame by frame, easing on top of it would stutter. */
+.sun-driven .sun, .sun-driven .sky::before { transition: none; }
 
 .brand { display: inline-flex; align-items: baseline; text-decoration: none; font-size: 2rem; font-weight: 800; font-stretch: 80%; font-variation-settings: 'wdth' 80; letter-spacing: -.045em; line-height: 1; color: var(--text); }
 .brand i { width: .2em; height: .2em; margin-left: .05em; border-radius: 50%; background: var(--sun); }
@@ -132,7 +172,12 @@ h3 { font-stretch: 90%; font-variation-settings: 'wdth' 90; letter-spacing: -.01
 }
 .input::placeholder { color: var(--text-3); opacity: 1; }
 .input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
-select.input { padding: 8px 12px; border-radius: 999px; cursor: pointer; }
+/* Native select, own chevron: two small gradients drawn in the text colour, so it follows every sky. */
+select.input {
+    appearance: none; padding: 8px 34px 8px 14px; border-radius: 999px; cursor: pointer;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: calc(100% - 18px) 54%, calc(100% - 13px) 54%; background-size: 5px 5px; background-repeat: no-repeat;
+}
 
 .segmented { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--field); }
 .segmented button {
@@ -151,12 +196,12 @@ select.input { padding: 8px 12px; border-radius: 999px; cursor: pointer; }
 .github-star [data-stars]:not(:empty) { padding: 1px 8px; border-radius: 99px; background: color-mix(in srgb, var(--text) 14%, transparent); font-variant-numeric: tabular-nums; font-size: .74rem; }
 
 /* Sky swatches, shared by the landing page and setup. */
-.swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.swatches { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .swatches button { display: flex; flex-direction: column; gap: 10px; padding: 8px 8px 10px; border: 1.5px solid transparent; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text-2); font-size: .86rem; font-weight: 600; text-align: left; cursor: pointer; transition: transform .2s var(--ease), border-color .15s; }
 .swatches button:hover { transform: translateY(-3px); }
 .swatches button[aria-pressed="true"] { border-color: var(--text); color: var(--text); }
-.swatch { position: relative; display: block; height: 64px; overflow: hidden; border-radius: 8px; background: linear-gradient(var(--sky-top), var(--sky-bottom)); }
-.swatch::after { content: ''; position: absolute; left: 62%; bottom: -12px; width: 34px; height: 34px; border-radius: 50%; background: var(--sun); }
+.swatch { position: relative; display: block; height: 52px; overflow: hidden; border-radius: 8px; background: linear-gradient(var(--sky-top), var(--sky-bottom)); }
+.swatch::after { content: ''; position: absolute; left: 62%; bottom: -10px; width: 24px; height: 24px; border-radius: 50%; background: var(--sun); }
 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {

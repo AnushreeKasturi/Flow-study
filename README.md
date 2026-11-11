@@ -16,10 +16,12 @@ A shared study room for focused work. Bring your group, set a timer, and work th
 - **Study partners:** camera and microphone controls, presence, reactions, raised hands, and peer-to-peer WebRTC calls.
 - **Shared tasks:** add, assign, complete, and remove room goals with persistent storage.
 - **Room chat:** send messages and ask the study assistant with `/ai`.
-- **Soundscape:** brown, pink, and white noise generated in the browser. Only you hear it; no audio files are downloaded.
+- **Soundscapes:** rain, ocean, fireplace, wind, night, and a deep hum, each synthesized in the browser from filtered noise. Only you hear them; no audio files are downloaded.
+- **Study groups (`/groups.html`):** open your room to a public board with a topic and two to six seats, or take a seat in someone else's. Listings disappear when the host leaves.
+- **Arrivals and departures:** a soft chime, and a tile that says who left before it clears.
 - **Room audio:** share YouTube or Spotify links through the official embedded players. Everyone controls their own playback, and no player loads until someone asks for one.
 - **Your focus:** today's total, a streak, and a seven-day chart. Pauses do not count. Completed focus sessions are saved; progress from an unfinished session is lost on refresh.
-- **Six skies:** Forest, Midnight, Warm, Aqua, Amethyst, and Daylight. Sky, ground, and sun all take their colours from the one you choose.
+- **Ten skies:** Forest, Midnight, Warm, Aqua, Amethyst, Desert, Aurora, Storm, Dawn, and Daylight. Sky, ground, and sun all take their colours from the one you choose.
 - **Keyboard shortcuts:** `S` timer, `F` focus mode, `M` microphone, `V` camera, `?` for the list.
 - **Optional notifications:** a system notification when a session ends while Flow is in a background tab.
 - **Interactive setup (`/start.html`):** name, sky, focus length (drag the sun), and a soundscape preview, then the account. The choices carry into the first room, which shows a short first-session checklist. An invite link survives sign-in.
@@ -75,6 +77,7 @@ For a **new, empty database**, run these files in order in the Supabase SQL edit
 2. [`sql/002_profiles.sql`](sql/002_profiles.sql)
 3. [`sql/003_task_assignment.sql`](sql/003_task_assignment.sql)
 4. [`sql/004_room_access_compatibility.sql`](sql/004_room_access_compatibility.sql)
+5. [`sql/005_open_rooms_and_limits.sql`](sql/005_open_rooms_and_limits.sql) (study-groups board and text size limits; the board page reports that it is not set up until this has run)
 
 **`schema.sql` drops existing tables. Do not run it as an upgrade on a database with data.** For an existing installation, use the additive migration sequence and compatibility notes in [TESTING.md](TESTING.md#supabase-compatibility).
 
@@ -97,11 +100,11 @@ Generation loads Instrument Sans from Google Fonts; the deployed PNG has no font
 
 ## Architecture
 
-Astro generates four static pages: the landing page (`/`), setup (`/start.html`), sign-in (`/login.html`), and the room (`/room.html`). Strict TypeScript powers the room, Vite bundles and fingerprints everything into `dist/_astro`, and fonts are self-hosted, so the only third-party requests are to Supabase, plus YouTube or Spotify when a player is requested and GitHub for the landing page's star count. No client framework runtime is needed.
+Astro generates six static pages: the landing page (`/`), setup (`/start.html`), sign-in (`/login.html`), the room (`/room.html`), the study-groups board (`/groups.html`), and docs (`/docs.html`). Strict TypeScript powers the room, Vite bundles and fingerprints everything into `dist/_astro`, and fonts are self-hosted, so the only third-party requests are to Supabase, plus YouTube or Spotify when a player is requested and GitHub for the landing page's star count. No client framework runtime is needed.
 
 | Location | Responsibility |
 | --- | --- |
-| `src/pages` | Landing, setup, login, and room templates |
+| `src/pages` | Landing, setup, login, room, study groups, and docs templates |
 | `src/layouts`, `src/components` | Shared metadata, page layout, icons, room sections, and dialogs |
 | `src/client` | `landing.ts`, `start.ts`, `login.ts`, `room.ts`, and the room's modules (timer, tasks, realtime, WebRTC, soundscape, shortcuts) |
 | `src/styles` | Design tokens and shared controls (`global.css`), then one stylesheet per page |
@@ -114,6 +117,12 @@ Supabase handles authentication, PostgreSQL persistence, task changes, presence,
 `/api/ai` and `/api/turn-credentials` spend provider credit, so they require a signed-in user: the browser sends its Supabase access token and the server asks Supabase to validate it before calling Groq or Twilio. Both stay rate limited per address. Every page is served with a Content-Security-Policy and related headers, defined once in `vercel.json`.
 
 Old invite links (`/?room=CODE`) redirect to the room. The landing page's opening (the wordmark in the dark, then a sunrise) is CSS only, plays once per browser session, and is skipped under reduced motion. Type is Bricolage Grotesque, self-hosted.
+
+## Contributing, security, and launch material
+
+- [CONTRIBUTING.md](CONTRIBUTING.md): how to run, test, and send a change.
+- [SECURITY.md](SECURITY.md): what is protected today, what is not yet, and how to report a problem.
+- [marketing/launch-kit.md](marketing/launch-kit.md): descriptions, posts, and the image list for sharing Flow.
 
 ## Checks and CI
 

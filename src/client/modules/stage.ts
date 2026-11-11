@@ -55,6 +55,23 @@ export function attachStream(userId: string, stream: MediaStream, partner?: Part
     });
 }
 
+// Shown the moment someone's presence drops. If they are back within the grace
+// period the note is removed and the tile carries on as if nothing happened.
+export function markLeft(userId: string, left: boolean, name = 'Your partner') {
+    const wrapper = document.getElementById(`video-wrapper-${userId}`);
+    if (!wrapper) return;
+    wrapper.classList.toggle('left', left);
+    wrapper.querySelector('.left-note')?.remove();
+    if (!left) return;
+    const note = Object.assign(document.createElement('div'), { className: 'left-note' });
+    note.append(
+        Object.assign(document.createElement('span'), { textContent: '👋' }),
+        Object.assign(document.createElement('strong'), { textContent: `${name} left the room` }),
+        Object.assign(document.createElement('small'), { textContent: 'Their tile will clear in a moment.' })
+    );
+    wrapper.appendChild(note);
+}
+
 export const removeTile = (userId: string) => document.getElementById(`video-wrapper-${userId}`)?.remove();
 export const setCameraOff = (userId: string, off: boolean) => document.getElementById(`dummy-${userId}`)?.classList.toggle('hidden', !off);
 

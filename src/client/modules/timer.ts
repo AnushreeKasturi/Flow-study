@@ -6,6 +6,7 @@ import { finishFocus, confirmFocus } from './focus-progress';
 import { fetchDailyFocusTime } from './presence';
 import { openModal, closeModal, notify } from './feedback';
 import { ROUNDS } from './ui';
+import { chime } from './chime';
 
 let state: TimerState = {
     mode: 'focus',
@@ -138,42 +139,6 @@ const stopLocalTick = () => {
     }
 };
 
-let sharedAudioCtx: AudioContext | null = null;
-
-const playChime = () => {
-    try {
-        if (!sharedAudioCtx) {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContext) return;
-            sharedAudioCtx = new AudioContext();
-        }
-
-        // Resume if suspended (browser autoplay policy)
-        if (sharedAudioCtx.state === 'suspended') {
-            sharedAudioCtx.resume();
-        }
-
-        // Main tone
-        const osc = sharedAudioCtx.createOscillator();
-        const gainNode = sharedAudioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, sharedAudioCtx.currentTime); // A5
-        osc.frequency.exponentialRampToValueAtTime(440, sharedAudioCtx.currentTime + 0.5); // Slide down to A4
-
-        gainNode.gain.setValueAtTime(0, sharedAudioCtx.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.3, sharedAudioCtx.currentTime + 0.05);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, sharedAudioCtx.currentTime + 1.5);
-
-        osc.connect(gainNode);
-        gainNode.connect(sharedAudioCtx.destination);
-
-        osc.start();
-        osc.stop(sharedAudioCtx.currentTime + 1.5);
-    } catch (e) {
-        console.warn('Audio Context not supported or failed', e);
-    }
-};
-
 // A system notification, only when the user opted in and Flow is in a background tab.
 const announce = (title: string, body: string) => {
     try {
@@ -217,7 +182,7 @@ const handleComplete = () => {
         setMode('focus');
     }
 
-    playChime();
+    chime('done');
     announce(title, msg);
     byId<HTMLElement>('timer-alert-title').textContent = title;
     byId<HTMLElement>('timer-alert-msg').textContent = msg;

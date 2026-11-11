@@ -9,6 +9,7 @@ const supabaseDefaults = require('./supabase.config.json');
 const { headers: hostingHeaders } = require('./vercel.json');
 
 const app = express();
+app.disable('x-powered-by');
 // Vercel replaces X-Forwarded-For with the client address at its edge.
 if (process.env.VERCEL) app.set('trust proxy', 1);
 

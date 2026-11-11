@@ -2,14 +2,10 @@
 import Page from '../layouts/Page.astro';
 import Sky from '../components/Sky.astro';
 import '../styles/start.css';
+import { SKIES as skies } from '../client/theme';
+import { SOUNDS } from '../client/modules/soundscape';
 
-const skies = [['forest', 'Forest'], ['midnight', 'Midnight'], ['warm', 'Warm'], ['aqua', 'Aqua'], ['amethyst', 'Amethyst'], ['daylight', 'Daylight']];
-const sounds = [
-    ['', 'Silence', 'Just the room.'],
-    ['brown', 'Brown noise', 'Low and deep, like a far-off waterfall.'],
-    ['pink', 'Pink noise', 'Soft and even, like steady rain.'],
-    ['white', 'White noise', 'Bright and full, like a fan.']
-];
+const sounds = [['', 'Silence', 'Just the room.'], ...SOUNDS];
 ---
 <Page title="Set up your space | Flow" bodyClass="start">
     <Sky />

@@ -1,23 +1,25 @@
-.login-page { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); min-height: 100svh; }
+.login-page { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); height: 100svh; min-height: 560px; }
 .login-photo { position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: 28px clamp(24px, 4vw, 56px); overflow: hidden; background: linear-gradient(var(--sky-top), var(--sky-bottom)); }
-.login-photo::after { content: ''; position: absolute; left: 50%; bottom: -12vh; width: 44vh; height: 44vh; translate: -50%; border-radius: 50%; background: var(--sun); box-shadow: 0 0 0 4vh color-mix(in srgb, var(--sun) 16%, transparent), 0 0 30vh color-mix(in srgb, var(--sun) 50%, transparent); }
+.login-photo::after { content: ''; position: absolute; left: 50%; bottom: -12vh; width: 44vh; height: 44vh; translate: -50%; border-radius: 50%; background: radial-gradient(circle at 50% 46%, color-mix(in oklab, var(--sun) 45%, white) 0%, var(--sun) 58%, color-mix(in oklab, var(--sun) 82%, var(--sky-bottom)) 100%); box-shadow: 0 0 3vh color-mix(in srgb, var(--sun) 90%, transparent), 0 0 14vh color-mix(in srgb, var(--sun) 45%, transparent), 0 0 40vh color-mix(in srgb, var(--sun) 22%, transparent); }
 .login-photo > * { position: relative; z-index: 1; }
 .login-photo .brand, .login-photo .github-star { align-self: flex-start; }
-.login-photo > div { margin-bottom: auto; padding-top: 6vh; }
+.login-photo > div { margin-bottom: auto; padding-top: 4vh; }
 .login-photo .github-star { padding: 2px 14px; border-radius: 999px; background: var(--bg); color: var(--text); }
 .login-quote { max-width: 11ch; font-size: clamp(2.8rem, 5.4vw, 5rem); font-weight: 800; font-stretch: 78%; font-variation-settings: 'wdth' 78; line-height: .88; letter-spacing: -.03em; }
 .invite-note { max-width: 36ch; margin-top: 24px; padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg); color: var(--text-2); font-size: .92rem; line-height: 1.55; }
 .invite-note strong { color: var(--text); letter-spacing: .08em; }
 
-.login-main { display: flex; flex-direction: column; padding: 24px clamp(24px, 5vw, 72px) 48px; }
+.login-main { display: flex; flex-direction: column; min-height: 0; padding: 18px clamp(24px, 5vw, 72px) 20px; overflow-y: auto; }
 .theme-control { display: flex; align-items: center; gap: 12px; align-self: flex-end; }
 .theme-control label { font-size: .78rem; white-space: nowrap; color: var(--text-3); }
 .theme-control select { width: 132px; }
-.login-card { width: 100%; max-width: 400px; margin: auto; padding-block: 32px; }
-.login-card h1 { font-size: 3rem; font-weight: 800; }
-.login-description { margin: 12px 0 32px; color: var(--text-2); font-size: .94rem; line-height: 1.65; }
-#auth-form label { margin-bottom: 8px; }
-#auth-form .input { padding: 14px; margin-bottom: 20px; }
+.login-card { width: 100%; max-width: 400px; margin: auto; padding-block: 8px; }
+.login-card h1 { font-size: clamp(2rem, 5.4svh, 3rem); font-weight: 800; }
+.login-description { margin: 8px 0 clamp(14px, 3svh, 28px); color: var(--text-2); font-size: .94rem; line-height: 1.65; }
+#auth-form label { margin-bottom: 6px; }
+#auth-form .input { padding: 12px 14px; margin-bottom: clamp(10px, 2svh, 18px); }
+#auth-form .btn-lg { min-height: 46px; }
+#auth-form .divider { margin: clamp(8px, 1.8svh, 18px) 0; }
 .password-field { position: relative; }
 .password-field .input { padding-right: 70px !important; }
 #toggle-password { position: absolute; right: 8px; top: 8px; padding: 6px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--text-2); font-size: .8rem; cursor: pointer; }
@@ -25,10 +27,10 @@
 .auth-message { display: none; padding: 12px; margin-bottom: 20px; border: 1px solid currentColor; border-radius: 8px; font-size: .88rem; overflow-wrap: anywhere; }
 .error-msg { color: var(--danger); }
 .success-msg { color: var(--ok); }
-.login-note { margin-top: 28px; color: var(--text-3); font-size: .78rem; line-height: 1.6; text-align: center; }
+.login-note { margin-top: clamp(10px, 2svh, 22px); color: var(--text-3); font-size: .78rem; line-height: 1.6; text-align: center; }
 
 @media (max-width: 760px) {
-    .login-page { display: block; }
+    .login-page { display: block; height: auto; }
     .login-photo { flex-direction: row; align-items: center; padding: 20px 24px; }
     .login-photo::after { display: none; }
     .login-photo > div { margin: 0; padding: 0; }

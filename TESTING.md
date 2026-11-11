@@ -1,6 +1,6 @@
 # Validation and coverage
 
-The UI refinement has repeatable checks across every shipped JavaScript module, the HTTP server, all four HTML pages, all six themes, and the supplied database schemas. This is a coverage inventory, not a claim that every possible state or production environment has been tested.
+The UI refinement has repeatable checks across every shipped JavaScript module, the HTTP server, all six HTML pages, all ten skies, and the supplied database schemas. This is a coverage inventory, not a claim that every possible state or production environment has been tested.
 
 ## Run the checks
 
@@ -38,6 +38,7 @@ The test server clears AI and Twilio provider credentials before loading Express
 | `login.ts`, `login.astro` | Native form validation, Enter submission, service rejection recovery, signup, theme persistence, malformed stored login, logout, password visibility, interactive timer preview |
 | `landing.ts`, `index.astro` | Responsive fit, hero timer start/pause/modes, atmosphere swatches, legacy invite-link redirect, opening animation skipped under reduced motion |
 | `start.ts`, `start.astro` | Name validation and live greeting, sky choice, focus length by preset, slider and dragging the sun, soundscape choice, account validation, choices carried into the first room, first-session checklist |
+| `groups.ts`, `board.ts`, `groups.astro` | Empty state, topic validation, one-click hosting with a listed room, unlisting on leave, full groups, taking a seat into the room, inert topic text |
 | `room.ts`, `room.astro` | Room code/PIN validation, wrong PIN, rejected join, bounded code collisions, host/join exclusion, invite clipboard fallback, media links, leave cancellation and confirmation |
 | `feedback.ts` | Inline feedback, toasts, dialog focus containment, Escape, focus restoration, inert background |
 | `ui.ts` | Task reconciliation, assignment, completion, pending controls, empty states, text escaping, presence cards, progress |

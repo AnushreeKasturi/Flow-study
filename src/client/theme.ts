@@ -1,6 +1,10 @@
 // The saved atmosphere is applied before first paint by the inline script in Head.astro.
-export const THEMES = ['forest', 'midnight', 'warm', 'aqua', 'amethyst', 'daylight'] as const;
-export type Theme = typeof THEMES[number];
+export const SKIES = [
+    ['forest', 'Forest'], ['midnight', 'Midnight'], ['warm', 'Warm'], ['aqua', 'Aqua'], ['amethyst', 'Amethyst'],
+    ['desert', 'Desert'], ['aurora', 'Aurora'], ['storm', 'Storm'], ['dawn', 'Dawn'], ['daylight', 'Daylight']
+] as const;
+export type Theme = typeof SKIES[number][0];
+const THEMES: readonly string[] = SKIES.map(([id]) => id);
 
 export function currentTheme(): Theme {
     const saved = document.documentElement.dataset.theme as Theme;

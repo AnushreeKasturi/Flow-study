@@ -2,6 +2,7 @@
 import Page from '../layouts/Page.astro';
 import GitHubStar from '../components/GitHubStar.astro';
 import '../styles/login.css';
+import { SKIES } from '../client/theme';
 ---
 <Page title="Log in | Flow" bodyClass="login-page">
     <Fragment slot="head">
@@ -18,14 +19,7 @@ import '../styles/login.css';
     <main class="login-main">
         <div class="theme-control">
             <label for="theme-picker">Your atmosphere</label>
-            <select id="theme-picker" class="input">
-                <option value="forest">Forest</option>
-                <option value="midnight">Midnight</option>
-                <option value="warm">Warm</option>
-                <option value="aqua">Aqua</option>
-                <option value="amethyst">Amethyst</option>
-                <option value="daylight">Daylight</option>
-            </select>
+            <select id="theme-picker" class="input">{SKIES.map(([id, name]) => <option value={id}>{name}</option>)}</select>
         </div>
         <section class="login-card" aria-labelledby="login-title">
             <h1 id="login-title">Welcome to your space.</h1>
