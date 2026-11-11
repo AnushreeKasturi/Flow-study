@@ -175,7 +175,7 @@ const connectChannel = () => {
         () => fetchTasks(roomId, handlers.onRoomTasksUpdate, handlers.onTasksError)
     );
 
-    activeChannel.subscribe(async function onStatus(status: string, err?: Error) {
+    const onStatus = async (status: string, err?: Error): Promise<void> => {
         // Ignore callbacks from a channel instance that's already been
         // superseded by a newer connectChannel() call.
         if (myGeneration !== connectionGeneration) return;
@@ -215,7 +215,12 @@ const connectChannel = () => {
                 if (myGeneration === connectionGeneration && currentRoomId === roomId) connectChannel();
             }, delay);
         }
-    });
+    };
+    // A private channel is joined with the user's token. Right after page load the
+    // realtime socket may not have it yet, and joining without it is refused, which
+    // cost a failed attempt and a retry on every entry. Hand it over first.
+    const ready = PRIVATE_CHANNELS ? getSupabase().realtime.setAuth().catch(() => {}) : Promise.resolve();
+    ready.then(() => { if (myGeneration === connectionGeneration) activeChannel.subscribe(onStatus); });
 };
 
 const fetchTasks = async (roomId: string, callback: SocketHandlers['onRoomTasksUpdate'], onError?: () => void) => {

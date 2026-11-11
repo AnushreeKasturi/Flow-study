@@ -71,6 +71,7 @@ window.supabase = { createClient() {
         };
         return {
             from, channel: () => { fixture.channelCount++; return channel; }, async removeChannel() { fixture.removed = true; },
+            realtime: { setAuth: async () => {} },
             rpc: async name => {
                 fixture.calls.push({ action: 'rpc', name });
                 await new Promise(resolve => setTimeout(resolve, fixture.delay));
