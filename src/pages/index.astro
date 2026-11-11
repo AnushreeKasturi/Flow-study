@@ -8,7 +8,7 @@ import { SKIES as atmospheres } from '../client/theme';
 const repo = 'https://github.com/ManasDasri/Flow-study';
 const features = [
     ['One sun for everyone', 'Start a focus block and the sun starts sinking for the whole room. When it sets, the room moves to a break, with a longer one after every fourth block.'],
-    ['Your group on camera', 'Video and voice run directly between browsers over WebRTC. Mute or turn the camera off whenever you like.'],
+    ['Your group on camera, encrypted', 'Video and voice are encrypted and go directly between browsers over WebRTC. Flow’s servers never see or store them. Mute or turn the camera off whenever you like.'],
     ['A task list you finish together', 'Add goals for the session, assign them to people, and watch the room’s progress fill in.'],
     ['Chat, with a study assistant', 'Message the room, or start a message with /ai to ask a question without leaving.'],
     ['Sound for concentration', 'Rain, ocean, a fireplace, wind, a quiet night. Share a YouTube or Spotify link when the room wants music.'],
@@ -105,7 +105,8 @@ const steps = [
                 <ul>
                     <li>Astro pages with strict TypeScript, and no client framework</li>
                     <li>Supabase for sign-in, saved tasks, and realtime rooms</li>
-                    <li>Peer-to-peer video and voice over WebRTC</li>
+                    <li>Encrypted, peer-to-peer video and voice over WebRTC</li>
+                    <li>MIT licensed: use it, change it, host it yourself</li>
                     <li>Checked in CI on Node 22, 24, and 26, PostgreSQL 17, and Chromium</li>
                 </ul>
                 <div class="hero-actions">
@@ -131,7 +132,7 @@ const steps = [
 
     <footer class="site-footer">
         <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
-        <span>Study better, together.</span>
+        <span>Study better, together. Open source under the MIT license.</span>
         <nav aria-label="Footer">
             <a href="/groups.html">Study groups</a>
             <a href="/docs.html">Docs</a>
