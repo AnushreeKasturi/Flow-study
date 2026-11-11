@@ -4,6 +4,7 @@
 [![Astro](https://img.shields.io/badge/Astro-7-bc52ee)](https://astro.build/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-22%20%7C%2024%20%7C%2026-5f8056)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-f4dc8f)](LICENSE)
 [![Open Flow](https://img.shields.io/badge/demo-flow--study.me-b6d3ac)](https://flow-study.me)
 
 A shared study room for focused work. Bring your group, set a timer, and work through your goals together. Free to use and open source.
@@ -13,7 +14,7 @@ A shared study room for focused work. Bring your group, set a timer, and work th
 ## Inside a room
 
 - **The sun is the timer:** every page is a sky over a horizon. Starting a focus block starts the sun sinking for the whole room; it rises again through the break. Focus, short break, and long break lengths are adjustable, four focus blocks make a set, and the fourth earns the long break. Focus mode strips the room down to sky, sun, clock, and people.
-- **Study partners:** camera and microphone controls, presence, reactions, raised hands, and peer-to-peer WebRTC calls.
+- **Study partners:** camera and microphone controls, presence, reactions, raised hands, and encrypted peer-to-peer WebRTC calls. Video and voice never pass through Flow's servers.
 - **Shared tasks:** add, assign, complete, and remove room goals with persistent storage.
 - **Room chat:** send messages and ask the study assistant with `/ai`.
 - **Soundscapes:** rain, ocean, fireplace, wind, night, and a deep hum, each synthesized in the browser from filtered noise. Only you hear them; no audio files are downloaded.
@@ -117,6 +118,10 @@ Supabase handles authentication, PostgreSQL persistence, task changes, presence,
 `/api/ai` and `/api/turn-credentials` spend provider credit, so they require a signed-in user: the browser sends its Supabase access token and the server asks Supabase to validate it before calling Groq or Twilio. Both stay rate limited per address. Every page is served with a Content-Security-Policy and related headers, defined once in `vercel.json`.
 
 Old invite links (`/?room=CODE`) redirect to the room. The landing page's opening (the wordmark in the dark, then a sunrise) is CSS only, plays once per browser session, and is skipped under reduced motion. Type is Bricolage Grotesque, self-hosted.
+
+## License
+
+Flow is released under the [MIT License](LICENSE).
 
 ## Contributing, security, and launch material
 

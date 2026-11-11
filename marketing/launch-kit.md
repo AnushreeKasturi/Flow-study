@@ -16,7 +16,7 @@ Flow is a study room you share with friends. Start a focus block and a sun start
 
 Studying alone is easy to abandon. Flow puts you in a room with other people and one shared timer, drawn as a sun: it sinks while you focus and has set when the block ends, then rises again through the break. Everyone sees the same sky, so nobody has to ask "are we on a break?"
 
-A room has video and voice between browsers, a task list the group finishes together, chat with a study assistant, and soundscapes made in your browser (rain, ocean, a fireplace). The study-groups board lists rooms that are open right now, two to six seats each, so you can sit down with people working on the same thing.
+A room has encrypted video and voice between browsers, a task list the group finishes together, chat with a study assistant, and soundscapes made in your browser (rain, ocean, a fireplace). The study-groups board lists rooms that are open right now, two to six seats each, so you can sit down with people working on the same thing.
 
 It's free, runs in the browser, and every line is on GitHub.
 
@@ -45,7 +45,7 @@ It's free, runs in the browser, and every line is on GitHub.
 
 3/
 > A room also has:
-> - video and voice, browser to browser
+> - encrypted video and voice, browser to browser
 > - a task list the group finishes together
 > - chat, with /ai for quick questions
 > - rain, ocean, or a fireplace in the background (made in your browser, no audio files)
@@ -80,7 +80,7 @@ I wanted a way to study alongside friends without a meeting app and a separate P
 
 The idea is one shared timer, drawn as a sun. It sinks during a focus block and sets when the block ends; everyone in the room sees the same thing. There's also video, a shared task list, chat, background soundscapes generated in the browser, and a board where you can open your room to two to six people studying the same subject.
 
-It's free, there are no ads, and the code is on GitHub (Astro, TypeScript, Supabase, WebRTC). You can run the whole thing offline with `npm run dev:demo`.
+It's free, there are no ads, calls are encrypted between browsers, and the code is on GitHub under the MIT license (Astro, TypeScript, Supabase, WebRTC). You can run the whole thing offline with `npm run dev:demo`.
 
 I'd like to hear what's confusing or missing.
 

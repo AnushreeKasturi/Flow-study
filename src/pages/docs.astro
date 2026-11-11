@@ -36,7 +36,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
         <section id="rooms">
             <h2>Rooms and invites</h2>
             <p>A room has a six-character code. Press Invite to copy a link that carries the code; anyone who opens it signs in and arrives in your room. Type a four-digit PIN before creating a room if you want it locked.</p>
-            <p>Video and voice go directly between browsers. You can turn your camera or microphone off at any time, and Flow works fine with both off. Tasks are shared with the room and stay there after you leave. Chat is not stored: it exists only while the room is open. Start a message with <kbd>/ai</kbd> to ask the study assistant a question.</p>
+            <p>Calls are encrypted. Video and voice are encrypted in each browser with keys that only the two browsers on a call hold (WebRTC’s DTLS-SRTP), and travel directly between them. When a direct path isn’t possible they pass through a relay, which forwards the encrypted stream and cannot read it. Flow’s own servers never receive your video or voice. You can turn your camera or microphone off at any time, and Flow works fine with both off. Tasks are shared with the room and stay there after you leave. Chat is not stored: it exists only while the room is open. Start a message with <kbd>/ai</kbd> to ask the study assistant a question.</p>
         </section>
 
         <section id="groups">
@@ -61,12 +61,12 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
         <section id="data">
             <h2>Your data</h2>
             <p>Flow stores your email, your display name, the tasks you add to rooms, and a record of each focus block you finish (when, and how long). If you list a room on the board, its topic and your display name are visible to other signed-in users until you leave.</p>
-            <p>Video, voice, and chat are not stored. A question sent with <kbd>/ai</kbd> goes to the assistant’s provider to be answered and is not kept by Flow. Security details, including what is not protected yet, are in <a href={repo + '/blob/main/SECURITY.md'} target="_blank" rel="noopener noreferrer">SECURITY.md</a>.</p>
+            <p>Video, voice, and chat are not stored, and calls are encrypted between the browsers taking part. A question sent with <kbd>/ai</kbd> goes to the assistant’s provider to be answered and is not kept by Flow. Security details, including what is not protected yet, are in <a href={repo + '/blob/main/SECURITY.md'} target="_blank" rel="noopener noreferrer">SECURITY.md</a>.</p>
         </section>
 
         <section id="self-host">
             <h2>Run your own copy</h2>
-            <p>Flow is open source. Clone the <a href={repo} target="_blank" rel="noopener noreferrer">repository</a> and run <code>npm ci</code> then <code>npm run dev:demo</code> to explore it offline with no accounts or keys. The README covers connecting your own Supabase project and deploying, and CONTRIBUTING.md covers sending changes.</p>
+            <p>Flow is open source under the <a href={repo + '/blob/main/LICENSE'} target="_blank" rel="noopener noreferrer">MIT license</a>. Clone the <a href={repo} target="_blank" rel="noopener noreferrer">repository</a> and run <code>npm ci</code> then <code>npm run dev:demo</code> to explore it offline with no accounts or keys. The README covers connecting your own Supabase project and deploying, and CONTRIBUTING.md covers sending changes.</p>
         </section>
     </main>
 </Page>
