@@ -31,12 +31,14 @@ window.supabase = { createClient() {
                 maybeSingle() { single = true; return this; },
                 insert(value) { action = 'insert'; payload = value; return this; },
                 update(value) { action = 'update'; payload = value; return this; },
-                upsert(value) { action = 'insert'; payload = value; if (table === 'open_rooms') tables[table] = tables[table].filter(row => row.host_id !== value.host_id); return this; },
+                upsert(value) { action = table === 'open_rooms' ? 'denied' : 'insert'; payload = value; return this; },
                 delete() { action = 'delete'; return this; },
                 then(resolve, reject) {
                     return (async () => {
                     fixture.calls.push({ table, action });
                     await new Promise(resolve => setTimeout(resolve, fixture.delay));
+                    // The real open_rooms table hides room_id, and an upsert must read what it overwrites.
+                    if (action === 'denied') return { data: null, error: { code: '42501', message: 'permission denied for table open_rooms' } };
                     const failure = fixture.fail;
                     if (failure && failure.table === table && failure.action === action) {
                         fixture.fail = null;
@@ -69,6 +71,7 @@ window.supabase = { createClient() {
         };
         return {
             from, channel: () => { fixture.channelCount++; return channel; }, async removeChannel() { fixture.removed = true; },
+            realtime: { setAuth: async () => {} },
             rpc: async name => {
                 fixture.calls.push({ action: 'rpc', name });
                 await new Promise(resolve => setTimeout(resolve, fixture.delay));

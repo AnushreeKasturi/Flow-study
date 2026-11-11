@@ -3,8 +3,9 @@ import { reveal } from './motion';
 import type { Participants, ProfileStats, TimerMode } from './types';
 import { byId } from './dom';
 import { bindThemePicker } from './theme';
-import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, updateMyUsername, sendReaction, sendHandRaise, sendRemoved } from './modules/socket';
-import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, cleanupMedia, isVideoActive, hasAudioTrack } from './modules/rtc';
+import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, updateMyUsername, sendReaction, sendHandRaise, sendRemoved, sendBye } from './modules/socket';
+import { initNotifications, pushNote, systemNotify } from './modules/notifications';
+import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack } from './modules/rtc';
 import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState } from './modules/timer';
 import { initTasks, addTask, toggleTask, deleteTask, assignTask, rerenderTasks, setSharedTasks } from './modules/tasks';
 import { initPresence, updatePresence, startFocusTracking, stopFocusTracking, formatFocusTime } from './modules/presence';
@@ -18,7 +19,7 @@ import { getStoredUser } from './modules/utils';
 import { ensureTile, attachStream, removeTile, markLeft, setCameraOff, showReaction, setHandRaised } from './modules/stage';
 import { playSound, stopSound, setSoundVolume, isSound, type Sound } from './modules/soundscape';
 import { chime } from './modules/chime';
-import { listRoom, refreshListing, unlistRoom, setClosed, cancelPlan, fetchOpenRooms } from './modules/board';
+import { listRoom, refreshListing, unlistRoom, setClosed, cancelPlan, fetchOpenRooms, takeSeat, statusOf } from './modules/board';
 import { timerSnapshot } from './modules/timer';
 import { getStats as getTaskStats } from './modules/tasks';
 import type { GroupDetails } from './types';
@@ -52,6 +53,11 @@ const on = <T extends HTMLElement = HTMLElement>(id: string, handler: (event: Mo
 // of rebuilding the peer connection and video tile for someone who never left.
 const pendingLeaves: Record<string, ReturnType<typeof setTimeout>> = {};
 const LEAVE_GRACE_MS = 18000;
+// Someone who said goodbye, or has gone silent with a dead connection, is not coming back from a blip.
+const CERTAIN_LEAVE_MS = 4000;
+// Background tabs may only get to send a heartbeat about once a minute, so allow for that.
+const SILENCE_MS = 95000;
+const lastHeard: Record<string, number> = {};
 const cancelLeave = (userId: string) => {
     if (!(userId in pendingLeaves)) return;
     clearTimeout(pendingLeaves[userId]);
@@ -73,7 +79,7 @@ function setRoomBusy(busy: boolean, action = 'join') {
     roomActionBusy = busy;
     joinBtn.disabled = hostBtn.disabled = busy;
     joinBtn.textContent = busy && action === 'join' ? 'Joining…' : 'Join room';
-    hostBtn.textContent = busy && action === 'host' ? 'Creating…' : 'Create a room';
+    hostBtn.textContent = busy && action === 'host' ? 'Creating…' : document.querySelector<HTMLInputElement>('input[name="audience"]:checked')?.value === 'open' ? 'Open a study group' : 'Create a room';
 }
 function showLobbyError(message: string) {
     lobbyError.textContent = message;
@@ -141,10 +147,12 @@ async function firstRunName(userId: string) {
     });
 }
 
-async function createRoom() {
+// Creates a room and walks into it. With `open`, the new room is also listed on
+// the study-groups board; such a room never has a PIN.
+async function createRoom(open?: Omit<GroupDetails, 'host_name'> & { planId?: string }) {
     if (roomActionBusy) return;
-    const pin = pinInput.value.trim();
-    if (pin && !/^\d{4}$/.test(pin)) { showLobbyError('Use a 4-digit PIN, or leave it empty.'); return; }
+    const pin = open ? '' : byId<HTMLInputElement>('create-pin-input').value.trim();
+    if (pin && !/^\d{4}$/.test(pin)) { showLobbyError('A PIN is 4 digits. Fix it, or leave it empty for no PIN.'); return; }
     setRoomBusy(true, 'host');
     lobbyError.classList.add('hidden');
     let createdCode;
@@ -167,7 +175,18 @@ async function createRoom() {
     }
     if (!createdCode) return;
     roomCodeInput.value = createdCode;
+    pinInput.value = pin;
     await joinRoom();
+    if (open && currentRoomCode === createdCode) {
+        // Fill the listing form, so what the board shows is exactly what "Update listing" would send.
+        byId<HTMLInputElement>('board-topic').value = open.topic;
+        for (const [id, value] of [['board-seats', String(open.seats)], ['board-subject', open.subject], ['board-camera', open.camera], ['board-vibe', open.vibe]]) {
+            const select = byId<HTMLSelectElement>(id);
+            if ([...select.options].some(option => option.value === String(value))) select.value = String(value);
+        }
+        // A planned group that has now started is replaced by its live listing.
+        if (await listOnBoard(boardForm()) && open.planId) cancelPlan(open.planId).then(undefined, () => {});
+    }
     // A new room starts with the focus length its creator chose during setup.
     const minutes = Number(localStorage.getItem('flow_focus_minutes'));
     if (currentRoomCode === createdCode && minutes >= 10 && minutes <= 90 && minutes !== 25) {
@@ -251,9 +270,50 @@ async function enterRoom(roomId: string, roomCode: string) {
 
     // People inside their leave grace period are already gone as far as the room is concerned.
     const countPeople = () => UI.updateRoomInfo(roomCode, Object.keys(partners).filter(id => !(id in pendingLeaves)).length + 1);
+    // One path for every kind of departure: say so at once (chime, a note on the
+    // tile, one fewer in the count), then clear the tile after `grace`.
+    // `unverified` is for a goodbye message, which anyone in the room could send
+    // in someone else's name. It marks the tile at once (harmless, and undone by
+    // that person's next heartbeat) but nothing is torn down while their call is
+    // still connected: a real leaver's call drops within seconds, a faked one doesn't.
+    const partnerLeft = (userId: string, grace: number, unverified = false) => {
+        if (!partners[userId]) return;
+        if (!(userId in pendingLeaves)) {
+            chime('leave');
+            markLeft(userId, true, partners[userId].username);
+            pushNote(`${partners[userId].username || 'Someone'} left the room.`);
+        }
+        clearTimeout(pendingLeaves[userId]);
+        const finish = () => {
+            if (unverified && isPeerConnected(userId)) { pendingLeaves[userId] = setTimeout(finish, 3000); return; }
+            delete pendingLeaves[userId];
+            delete partners[userId];
+            delete lastHeard[userId];
+            removePeer(userId);
+            removeTile(userId);
+            countPeople();
+            rerenderTasks();
+        };
+        pendingLeaves[userId] = setTimeout(finish, grace);
+        countPeople();
+    };
+    // Last line of defence, for when neither presence nor a goodbye arrives (a
+    // crashed browser, a laptop lid). Silence alone is not enough: a background
+    // tab can go quiet while its call is still up. Silence with no live call is.
+    // ("Not connected" rather than "failed": the reconnect loop below keeps
+    // replacing a failed connection with a fresh one that hasn't failed yet.)
+    setInterval(() => {
+        const now = Date.now();
+        Object.keys(partners).forEach(userId => {
+            if (userId in pendingLeaves || now - (lastHeard[userId] ?? now) < SILENCE_MS) return;
+            if (!isPeerConnected(userId)) partnerLeft(userId, CERTAIN_LEAVE_MS);
+        });
+    }, 5000);
+
     const welcome = (userId: string, data: Participants[string]) => {
+        lastHeard[userId] = Date.now();
         // A new face gets a chime; someone returning from a blip does not.
-        if (!partners[userId]) chime('join');
+        if (!partners[userId]) { chime('join'); pushNote(`${data.username || 'Someone'} joined the room.`); }
         cancelLeave(userId);
         partners[userId] = data;
         countPeople();
@@ -266,7 +326,7 @@ async function enterRoom(roomId: string, roomCode: string) {
         onConnectionStatus: connectionStatus,
         onRoomState: state => {
             const users = state.participants || {};
-            Object.keys(users).forEach(cancelLeave);
+            Object.keys(users).forEach(userId => { lastHeard[userId] = Date.now(); cancelLeave(userId); });
             // Add and update only. Presence "sync" fires on every track() call,
             // and a momentarily incomplete snapshot must not read as a
             // departure; removal belongs to the "leave" event below.
@@ -278,25 +338,17 @@ async function enterRoom(roomId: string, roomCode: string) {
             countPeople();
         },
         onUserJoined: data => welcome(data.userId, data),
-        onUserLeft: userId => {
-            if (!partners[userId]) return;
-            // Say so at once: chime, a note on their tile, and one fewer in the count.
-            // The connection itself is only torn down after the grace period.
-            if (!(userId in pendingLeaves)) { chime('leave'); markLeft(userId, true, partners[userId].username); }
-            clearTimeout(pendingLeaves[userId]);
-            pendingLeaves[userId] = setTimeout(() => {
-                delete pendingLeaves[userId];
-                delete partners[userId];
-                removePeer(userId);
-                removeTile(userId);
-                countPeople();
-                rerenderTasks();
-            }, LEAVE_GRACE_MS);
+        // Presence says they left. It also says so during a reconnect blip, hence the long grace.
+        onUserLeft: userId => partnerLeft(userId, LEAVE_GRACE_MS),
+        // A goodbye message: fast, but only a hint until their call is seen to drop.
+        onBye: userId => partnerLeft(userId, CERTAIN_LEAVE_MS, true),
+        // Proof of life. Heals a presence "join" that never arrived, and cancels a departure that turned out to be a blip.
+        onPresenceHeartbeat: data => {
+            lastHeard[data.userId] = Date.now();
+            if (!partners[data.userId]) welcome(data.userId, data); else cancelLeave(data.userId);
             countPeople();
         },
-        // Heals a presence "join" that never arrived; a no-op for people we already know.
-        onPresenceHeartbeat: data => { if (!partners[data.userId]) welcome(data.userId, data); },
-        onSignal: data => handleSignal(data, onRemoteStream),
+        onSignal: data => { lastHeard[data.from] = Date.now(); handleSignal(data, onRemoteStream); },
         onTimerUpdated: syncState,
         onTasksError: () => {
             byId<HTMLElement>('task-sync-status').textContent = 'Tasks could not be loaded.';
@@ -319,7 +371,7 @@ async function enterRoom(roomId: string, roomCode: string) {
         onReaction: data => showReaction(data.userId, data.emoji),
         onRemoved: userId => {
             if (userId === getMyUserId()) confirmRemoval();
-            else if (partners[userId]) notify(`${partners[userId].username || 'Someone'} was removed by the host.`);
+            else if (partners[userId]) pushNote(`${partners[userId].username || 'Someone'} was removed by the host.`);
         }
     });
 
@@ -351,7 +403,17 @@ async function enterRoom(roomId: string, roomCode: string) {
     });
     taskInput.disabled = addTaskBtn.disabled = false;
     initPresence(roomId, presenceState => UI.updateMyPresenceUI(presenceState, currentUsername));
-    initChat(roomId, currentUsername);
+    initChat(roomId, currentUsername, (sender, text) => {
+        // Only interrupt when the message would otherwise go unseen.
+        const chatOpen = byId('chat-tab').classList.contains('active') && !document.body.classList.contains('focus-active') && !document.hidden;
+        if (chatOpen) return;
+        const badge = byId<HTMLElement>('chat-unread');
+        badge.textContent = String(Math.min(99, Number(badge.textContent) + 1));
+        badge.classList.remove('hidden');
+        chime('message');
+        pushNote(`${sender}: ${text}`, () => byId('chat-tab-button').click());
+        systemNotify(`${sender} in Flow`, text);
+    });
 
     // The soundscape chosen during setup starts with the room; the Sound tab turns it off.
     const sound = localStorage.getItem('flow_sound');
@@ -386,11 +448,15 @@ const peopleHere = () => Object.keys(partners).filter(id => !(id in pendingLeave
 
 async function listOnBoard(details: Omit<GroupDetails, 'host_name'>) {
     const status = byId<HTMLElement>('board-status');
-    listed = await listRoom({
+    const result = await listRoom({
         ...details, host_id: getMyUserId(), room_id: currentRoomId, host_name: currentUsername.slice(0, 40),
         seats_taken: peopleHere(), closed: byId<HTMLInputElement>('board-closed').checked, ...timerSnapshot()
     });
-    status.textContent = listed ? `Listed as “${details.topic}” with ${details.seats} seats. It comes off the board when you leave.` : 'This room could not be listed. Rooms with a PIN can’t go on the board.';
+    listed = result === 'listed';
+    status.textContent = listed ? `Listed as “${details.topic}” with ${details.seats} seats. It comes off the board when you leave.`
+        : result === 'locked' ? 'This room can’t go on the board. Only the person who created it can list it, and not if it has a PIN.'
+        : 'The room could not be listed just now. Check your connection and try again.';
+    if (!listed) notify(status.textContent, 'error');
     byId<HTMLElement>('board-unlist-btn').classList.toggle('hidden', !listed);
     byId<HTMLElement>('board-closed-row').classList.toggle('hidden', !listed);
     byId<HTMLButtonElement>('board-list-btn').textContent = listed ? 'Update listing' : 'List this room';
@@ -445,31 +511,8 @@ async function confirmRemoval() {
 
 // ── Lobby home ─────────────────────────────────────────────────────────────
 
-// What the last session added up to, how today is going, and whether anyone is studying right now.
-async function showLobbyHome(userId: string) {
-    const recap = sessionStorage.getItem('flow_recap');
-    sessionStorage.removeItem('flow_recap');
-    if (recap) byId<HTMLElement>('lobby-recap').textContent = recap;
-    const notice = sessionStorage.getItem('flow_notice');
-    sessionStorage.removeItem('flow_notice');
-    if (notice) showLobbyError(notice);
-    getProfileStats(userId).then(stats => {
-        const today = byId<HTMLElement>('lobby-today');
-        today.replaceChildren('Today: ', Object.assign(document.createElement('strong'), { textContent: formatFocusTime(stats.todayMinutes) }), ' focused',
-            stats.streak > 1 ? `, on a ${stats.streak}-day streak.` : '.');
-    }).catch(() => {});
-    fetchOpenRooms().then(rooms => {
-        const open = rooms.filter(room => !room.closed && room.seats_taken < room.seats).length;
-        const line = byId<HTMLElement>('lobby-board');
-        const link = Object.assign(document.createElement('a'), { href: '/groups.html', textContent: open ? `${open} study group${open === 1 ? ' has' : 's have'} a free seat right now` : 'Browse study groups, or plan one for later' });
-        line.replaceChildren(link, '.');
-    }).catch(() => {});
-}
-
-// ── Profile ────────────────────────────────────────────────────────────────
-
-function renderProfileStats(stats: ProfileStats) {
-    // Seven days of focus, oldest first; today includes time still in progress.
+// Seven days of focus as small bars, oldest first; today includes time still in progress.
+function weekChart(stats: ProfileStats) {
     const minutes = stats.weekSeconds.map((seconds, index) => index === 6 ? stats.todayMinutes : Math.floor(seconds / 60));
     const peak = Math.max(...minutes, 1);
     const days = minutes.map((value, index) => {
@@ -478,8 +521,86 @@ function renderProfileStats(stats: ProfileStats) {
         const day = date.toLocaleDateString(undefined, { weekday: 'short' });
         return { day, value, tip: `${index === 6 ? 'Today' : day}: ${formatFocusTime(value)}` };
     });
-    const week = `<div class="week" role="img" aria-label="Focus over the last seven days. ${days.map(d => d.tip).join(', ')}.">` +
+    return `<div class="week" role="img" aria-label="Focus over the last seven days. ${days.map(d => d.tip).join(', ')}.">` +
         days.map((d, index) => `<div class="week-day${index === 6 ? ' today' : ''}" data-tip="${d.tip}"><i style="height:${Math.round(d.value / peak * 58)}px"></i>${d.day.charAt(0)}</div>`).join('') + '</div>';
+}
+
+// Home: who you are and how your week went on the left; groups open right now on the right.
+async function showHome(user: { id: string; email: string }) {
+    const recap = sessionStorage.getItem('flow_recap');
+    sessionStorage.removeItem('flow_recap');
+    if (recap) byId<HTMLElement>('lobby-recap').textContent = recap;
+    const notice = sessionStorage.getItem('flow_notice');
+    sessionStorage.removeItem('flow_notice');
+    if (notice) showLobbyError(notice);
+
+    const setName = (name: string) => {
+        byId<HTMLElement>('join-title').textContent = `Hi, ${name}.`;
+        byId<HTMLElement>('home-avatar').textContent = UI.initial(name);
+        byId<HTMLInputElement>('home-name-input').value = name;
+    };
+    setName(user.email.split('@')[0]);
+    getMyProfile(user.id).then(profile => { if (profile?.display_name) setName(profile.display_name); });
+    const nameForm = byId<HTMLFormElement>('home-name-form');
+    on('home-edit-name', () => { nameForm.classList.toggle('hidden'); byId<HTMLInputElement>('home-name-input').select(); });
+    nameForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const name = byId<HTMLInputElement>('home-name-input').value.trim();
+        if (!name) return;
+        if (!await saveDisplayName(user.id, name)) { showLobbyError('Your name could not be saved. Check your connection and try again.'); return; }
+        setName(name);
+        nameForm.classList.add('hidden');
+    });
+
+    getProfileStats(user.id).then(stats => {
+        // Numbers and locale weekday names only; nothing here comes from another user.
+        byId<HTMLElement>('home-stats').innerHTML =
+            `<div class="home-today"><div><span>Focused today</span><strong>${formatFocusTime(stats.todayMinutes)}</strong></div>${weekChart(stats)}</div>` +
+            `<dl class="home-figures"><div><dt>Streak</dt><dd>${stats.streak} day${stats.streak === 1 ? '' : 's'}</dd></div><div><dt>All time</dt><dd>${formatFocusTime(stats.totalMinutes)}</dd></div><div><dt>Sessions</dt><dd>${stats.sessionsCompleted}</dd></div></dl>`;
+    }).catch(() => {});
+
+    fetchOpenRooms().then(rooms => {
+        const free = rooms.filter(room => !room.closed && room.seats_taken < room.seats && room.host_id !== user.id);
+        byId<HTMLElement>('lobby-board').replaceChildren(Object.assign(document.createElement('a'), {
+            href: '/groups.html', textContent: free.length ? `${free.length} group${free.length === 1 ? ' has' : 's have'} a free seat right now` : 'No group is open this minute. See what’s planned'
+        }), '.');
+        byId<HTMLElement>('home-groups').replaceChildren(...free.slice(0, 3).map(room => {
+            const item = document.createElement('li');
+            const text = document.createElement('div');
+            text.append(Object.assign(document.createElement('strong'), { textContent: room.topic }), Object.assign(document.createElement('span'), { textContent: `${room.host_name}, ${statusOf(room).toLowerCase()}` }));
+            const sit = Object.assign(document.createElement('button'), { className: 'btn btn-primary', type: 'button', textContent: 'Join' });
+            sit.setAttribute('aria-label', `Take a seat in ${room.topic}`);
+            sit.addEventListener('click', async () => {
+                if (roomActionBusy) return;
+                sit.disabled = true;
+                const seat = await takeSeat(room.id);
+                if ('code' in seat) { roomCodeInput.value = seat.code; pinInput.value = ''; await joinRoom(); }
+                else { showLobbyError(seat.reason); sit.disabled = false; }
+            });
+            item.append(text, sit);
+            return item;
+        }));
+    }).catch(() => {});
+
+    // "Start a room": the audience choice swaps between a PIN and a board topic.
+    const audience = () => (document.querySelector<HTMLInputElement>('input[name="audience"]:checked')!).value;
+    document.querySelectorAll('input[name="audience"]').forEach(radio => radio.addEventListener('change', () => {
+        byId('create-private').classList.toggle('hidden', audience() === 'open');
+        byId('create-open').classList.toggle('hidden', audience() !== 'open');
+        hostBtn.textContent = audience() === 'open' ? 'Open a study group' : 'Create a room';
+    }));
+    on('host-btn', () => {
+        if (audience() !== 'open') return createRoom();
+        const topic = byId<HTMLInputElement>('create-topic').value.trim();
+        if (topic.length < 3) { showLobbyError('Say what you’re studying, so people know what the group is for.'); byId('create-topic').focus(); return; }
+        createRoom({ topic, subject: byId<HTMLSelectElement>('create-subject').value, seats: Number(byId<HTMLSelectElement>('create-seats').value), camera: 'optional', vibe: 'quiet' });
+    });
+}
+
+// ── Profile ────────────────────────────────────────────────────────────────
+
+function renderProfileStats(stats: ProfileStats) {
+    const week = weekChart(stats);
     const note = stats.liveMinutes ? `Includes ${stats.liveMinutes} live minute${stats.liveMinutes === 1 ? '' : 's'} from this visit.` : 'Your focus time, one session at a time.';
     const rows = [
         ['All-time focus', formatFocusTime(stats.totalMinutes)],
@@ -697,6 +818,7 @@ function bindRoomControls() {
                 byId(other.dataset.tab!).classList.toggle('active', selected);
             });
             reveal(byId(tab.dataset.tab!));
+            if (tab.id === 'chat-tab-button') { byId('chat-unread').textContent = '0'; byId('chat-unread').classList.add('hidden'); }
         });
     });
 
@@ -708,6 +830,7 @@ function bindRoomControls() {
         if (leaving) return;
         leaving = true;
         event.currentTarget.disabled = true;
+        sendBye(); // tell the room now; presence may take a while, or never say
         cleanupMedia();
         stopSound();
         // A one-line summary, shown in the lobby we are about to return to.
@@ -737,13 +860,13 @@ async function start() {
     supabase.auth.onAuthStateChange(event => { if (event === 'SIGNED_OUT') signOutLocally(); });
 
     initDialogs();
+    initNotifications();
     initAudio();
     bindThemePicker(byId<HTMLSelectElement>('theme-picker'));
     bindRoomControls();
 
     roomCodeInput.value = new URLSearchParams(location.search).get('room') || sessionStorage.getItem('flow_last_room') || '';
     on('join-btn', joinRoom);
-    on('host-btn', createRoom);
     [roomCodeInput, pinInput].forEach(input => input.addEventListener('keydown', event => {
         if (event.key === 'Enter') { event.preventDefault(); joinRoom(); }
     }));
@@ -757,11 +880,11 @@ async function start() {
     window.addEventListener('online', () => connectionStatus('CONNECTING'));
     connectionStatus('CONNECTING');
     // Drop from presence at once when the tab closes or reloads.
-    window.addEventListener('beforeunload', () => { cleanupMedia(); disconnectSocket(); });
+    window.addEventListener('pagehide', () => { sendBye(); cleanupMedia(); disconnectSocket(); });
 
     await firstRunName(user.id);
     setRoomBusy(false);
-    showLobbyHome(user.id);
+    showHome(user);
 
     // Arriving from the study-groups board: either to host a new group, or with a seat already taken.
     // Both are one-time notes left by the board page in this tab. A URL alone never joins a room:
@@ -772,18 +895,7 @@ async function start() {
     sessionStorage.removeItem('flow_join');
     if (hosting) {
         const plan = JSON.parse(hosting);
-        roomCodeInput.value = pinInput.value = '';
-        await createRoom();
-        if (currentRoomId && typeof plan.topic === 'string') {
-            // Fill the listing form, so what the board shows is exactly what "Update listing" would send.
-            byId<HTMLInputElement>('board-topic').value = plan.topic;
-            for (const [id, value] of [['board-seats', plan.seats], ['board-subject', plan.subject], ['board-camera', plan.camera], ['board-vibe', plan.vibe]]) {
-                const select = byId<HTMLSelectElement>(id);
-                if ([...select.options].some(option => option.value === String(value))) select.value = String(value);
-            }
-            // A planned group that has now started is replaced by its live listing.
-            if (await listOnBoard(boardForm()) && typeof plan.planId === 'string') cancelPlan(plan.planId).then(undefined, () => {});
-        }
+        if (typeof plan.topic === 'string') await createRoom({ topic: plan.topic, subject: plan.subject, camera: plan.camera, vibe: plan.vibe, seats: Math.min(6, Math.max(2, Number(plan.seats) || 4)), planId: typeof plan.planId === 'string' ? plan.planId : undefined });
     } else if (seat && /^[A-Z0-9]{6}$/.test(seat)) {
         roomCodeInput.value = seat;
         await joinRoom();

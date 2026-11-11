@@ -18,6 +18,14 @@ import { SKIES } from '../../client/theme';
                 <span class="status-indicator"><span class="dot green"></span><span id="my-status-text">Online</span><span id="my-focus-time">Today: 0m focused</span></span>
             </div>
         </div>
+        <details id="notify" class="notify">
+            <summary id="notify-summary" class="icon-btn" aria-label="Notifications"><Icon name="bell" /><span id="notify-count" class="notify-count hidden" aria-hidden="true">0</span></summary>
+            <div class="notify-panel">
+                <div class="notify-head"><h2>Notifications</h2><button id="notify-clear" type="button" class="link-btn">Clear</button></div>
+                <p id="notify-empty" class="panel-description">Nothing yet. Messages, arrivals, and finished sessions show up here.</p>
+                <ul id="notify-list"></ul>
+            </div>
+        </details>
         <button id="open-shortcuts-btn" class="icon-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)"><Icon name="keyboard" /></button>
         <select id="theme-picker" class="input" aria-label="Room atmosphere">{SKIES.map(([id, name]) => <option value={id}>{name}</option>)}</select>
         <button id="share-link-btn" class="btn">Invite</button>

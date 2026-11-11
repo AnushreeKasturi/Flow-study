@@ -23,7 +23,11 @@ export function openModal(id: string) {
     reveal(byId(id), 'dialog');
     byId<HTMLElement>('app').inert = true;
     // Land on the first field when there is one, otherwise the first control.
-    requestAnimationFrame(() => (byId(id).querySelector<HTMLElement>('input:not([readonly])') ?? byId(id).querySelector<HTMLElement>('input, button, a'))?.focus());
+    requestAnimationFrame(() => {
+        const modal = byId(id);
+        const shown = (selector: string) => [...modal.querySelectorAll<HTMLElement>(selector)].find(el => el.getClientRects().length);
+        (shown('[data-autofocus]') ?? shown('input:not([readonly])') ?? shown('input, button, a'))?.focus();
+    });
 }
 
 export function closeModal() {

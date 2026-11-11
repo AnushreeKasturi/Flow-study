@@ -75,6 +75,11 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.throws(() => list(one, openRoom, `,'${two}'`), /Command failed/, 'A listing cannot be created in someone else\'s name');
             list(one, openRoom);
             assert.throws(() => asUser(two, 'SELECT room_id FROM public.open_rooms;'), /Command failed/, 'The room id stays hidden from the board');
+            // The app must list with delete-then-insert. An upsert reads the hidden room_id and is refused,
+            // which is exactly how listing was broken in production.
+            assert.throws(() => asUser(one, `INSERT INTO public.open_rooms(host_id,room_id,host_name,topic,seats) VALUES('${one}','${openRoom}','Alex','Upserted',2) ON CONFLICT (host_id) DO UPDATE SET room_id = EXCLUDED.room_id, topic = EXCLUDED.topic;`), /Command failed/, 'Upserts are refused because room_id is unreadable');
+            asUser(one, `DELETE FROM public.open_rooms WHERE host_id = '${one}'; INSERT INTO public.open_rooms(host_id,room_id,host_name,topic,seats,seats_taken) VALUES('${one}','${openRoom}','Alex','Organic chemistry revision',2,1);`);
+            assert.equal(run(database, 'SELECT count(*) FROM public.open_rooms;').trim(), '1', 'Delete-then-insert replaces the listing');
             const listing = asUser(two, 'SELECT id FROM public.open_rooms;');
             assert.match(listing, /^[0-9a-f-]{36}$/, 'Signed-in users see fresh listings');
             assert.throws(() => run(database, `SET ROLE anon; SELECT public.join_open_room('${listing}');`), /Command failed/, 'Signed-out callers cannot take a seat');

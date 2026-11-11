@@ -23,6 +23,7 @@ Please don't open a public issue. Use GitHub's private reporting: **Security →
 | Abusive listings | Any signed-in user can report a listing. Reports are recorded against the host by the database, and three different reporters within a week hide everything that host has on the board, including anything posted afterwards. Only accounts at least a day old count toward the three, and one account can file ten reports a day. Reports are write-only and are read in the Supabase table editor |
 | Listings | One per room, and only by the room's creator, so a second listing cannot be used to close a room or get around its seat limit |
 | Seat limits | A listed room's seat count, and "closed to new people", are enforced in the database for joins by code as well as from the board |
+| Departure messages | A "goodbye" only marks a tile; the connection is torn down once that person's call has actually dropped, and their next heartbeat undoes a false one, so it cannot be used to cut someone else off |
 | Abuse inside a room | Timer messages are throttled when sent and flood-limited when received; ICE candidates are capped per peer |
 
 ## Known limits

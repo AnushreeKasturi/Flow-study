@@ -214,6 +214,18 @@ async (page) => {
     assert(await page.getByRole('button', { name: 'Ocean', exact: true }).getAttribute('aria-pressed') === 'false', 'Clicking the active soundscape stops it');
     await page.getByRole('tab', { name: 'Tasks', exact: true }).click();
 
+    // A chat message that would go unseen raises a badge on the tab and a line in the notification centre.
+    await page.evaluate(() => window.__fixture.handlers['broadcast:chat-message']({ payload: { sender: 'Riya', text: '<b>Ready</b> when you are' } }));
+    assert(await page.locator('#chat-unread').innerText() === '1' && await page.locator('#notify-count').innerText() === '1', 'An unseen message should be counted in both places');
+    await page.locator('#notify-summary').click();
+    assert((await page.locator('#notify-list').innerText()).includes('Riya: <b>Ready</b> when you are') && await page.locator('#notify-list b').count() === 0, 'Notifications must show message text as text');
+    await page.locator('#notify-count').waitFor({ state: 'hidden' }); // opening the list marks it read
+    await page.locator('#notify-list button').first().click();
+    assert(await page.getByRole('tab', { name: 'Chat', exact: true }).getAttribute('aria-selected') === 'true' && await page.locator('#chat-unread').isHidden(), 'A message notification should open the chat and clear its badge');
+    await page.evaluate(() => window.__fixture.handlers['broadcast:chat-message']({ payload: { sender: 'Riya', text: 'Seen straight away' } }));
+    assert(await page.locator('#chat-unread').isHidden(), 'A message read as it arrives needs no badge');
+    await page.getByRole('tab', { name: 'Tasks', exact: true }).click();
+
     await page.getByRole('tab', { name: 'Tasks', exact: true }).focus();
     await page.keyboard.press('ArrowRight');
     assert(await page.getByRole('tab', { name: 'Chat', exact: true }).getAttribute('aria-selected') === 'true', 'Arrow key should activate Chat');
@@ -468,6 +480,18 @@ async (page) => {
     assert(await page.locator('#video-wrapper-zz-test-0.left').count() === 0, 'A returning partner must not be shown as gone');
     await page.clock.fastForward(18001);
     assert(await page.locator('.video-wrapper').count() === 2, 'Only genuinely departed participants should be removed');
+    // An explicit goodbye needs no presence event at all: the tile says so and clears within seconds.
+    await page.evaluate(() => window.__fixture.handlers['broadcast:bye']({ payload: { userId: 'zz-test-0' } }));
+    assert(await page.locator('#video-wrapper-zz-test-0.left .left-note').count() === 1 && await page.locator('#count').innerText() === '1', 'A goodbye should show on the tile and drop the count at once');
+    await page.clock.fastForward(4100);
+    assert(await page.locator('.video-wrapper').count() === 1, 'A tile should clear a few seconds after a goodbye');
+    // Neither presence nor a goodbye (a crashed browser): silence plus a dead call still clears the tile.
+    await page.evaluate(() => window.__fixture.handlers['presence:join']({ key: 'zz-crashed', newPresences: [{ username: 'Crashed', isDummyMedia: true }] }));
+    await page.clock.fastForward(60000);
+    assert(await page.locator('#video-wrapper-zz-crashed').count() === 1, 'A quiet minute alone must not remove anyone');
+    await page.clock.fastForward(50000);
+    // The room's five-second check started before this fake clock was installed, so it runs in real time.
+    await page.waitForFunction(() => !document.getElementById('video-wrapper-zz-crashed'), undefined, { timeout: 20000 }).catch(() => { throw new Error('A partner who vanished without a word should be cleared'); });
 
     await page.getByRole('button', { name: 'Start timer', exact: true }).click();
     await page.clock.fastForward(61000);
@@ -586,6 +610,34 @@ async (page) => {
     assert(await page.evaluate(() => window.__fixture.tables.open_rooms.length) === 0, 'Leaving takes the room off the board');
     assert((await page.locator('#lobby-recap').innerText()).startsWith('Last session:'), 'The lobby should recap the session just left');
     await page.locator('#lobby-board a').waitFor();
+
+    // Home: who you are, and one place to start a private room, open a listed one, join by code, or sit in a group.
+    assert(await page.locator('#join-title').innerText() === 'Hi, Alex.', 'Home should greet the signed-in person by name');
+    await page.getByRole('button', { name: 'Change name', exact: true }).click();
+    await page.getByLabel('Your display name').fill('Alex R');
+    await page.getByLabel('Your display name').press('Enter');
+    await page.waitForFunction(() => document.getElementById('join-title').textContent === 'Hi, Alex R.');
+    await page.locator('input[name="audience"][value="open"]').check();
+    await page.getByRole('button', { name: 'Open a study group', exact: true }).click();
+    await visible('#lobby-error');
+    assert(await page.evaluate(() => window.__fixture.tables.rooms.length) === 0, 'An open group needs a topic before any room is made');
+    await page.getByLabel('Topic for the board').fill('Past papers, timed');
+    await page.getByLabel('Subject', { exact: true }).first().selectOption('exams');
+    await page.getByRole('button', { name: 'Open a study group', exact: true }).click();
+    await page.waitForFunction(() => window.__fixture.tables.open_rooms.length === 1 && !document.getElementById('new-task-input').disabled);
+    assert(await page.evaluate(() => { const row = window.__fixture.tables.open_rooms[0]; return row.topic === 'Past papers, timed' && row.subject === 'exams' && window.__fixture.tables.rooms.at(-1).is_locked === false; }), 'Opening a study group from home should create an unlocked room and list it');
+    await page.getByRole('button', { name: 'Leave', exact: true }).click();
+    await page.getByRole('button', { name: 'Leave room', exact: true }).click();
+    await visible('#join-modal');
+    for (const width of [1440, 768, 390, 320]) { await page.setViewportSize({ width, height: 900 }); await fitsViewport(); }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto(origin + '/room.html?board');
+    await page.getByRole('button', { name: /^Take a seat in Organic chemistry/ }).click();
+    await visible('#app');
+    assert(await page.locator('#header-room-code').innerText() === 'FOCUS6', 'A seat taken from home should lead straight into that room');
+    await page.getByRole('button', { name: 'Leave', exact: true }).click();
+    await page.getByRole('button', { name: 'Leave room', exact: true }).click();
+    await visible('#join-modal');
 
     // Browsing: search, subjects, plans, reports, and a seat that leads straight into the room.
     await page.goto(origin + '/groups.html?board');

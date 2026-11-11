@@ -7,6 +7,7 @@ import { fetchDailyFocusTime } from './presence';
 import { openModal, closeModal, notify } from './feedback';
 import { ROUNDS } from './ui';
 import { chime } from './chime';
+import { pushNote, systemNotify } from './notifications';
 
 let state: TimerState = {
     mode: 'focus',
@@ -142,15 +143,6 @@ const stopLocalTick = () => {
     }
 };
 
-// A system notification, only when the user opted in and Flow is in a background tab.
-const announce = (title: string, body: string) => {
-    try {
-        if (document.hidden && localStorage.getItem('flow_notify') === '1' && 'Notification' in window && Notification.permission === 'granted') {
-            new Notification(title, { body, icon: '/favicon.svg', tag: 'flow-timer' });
-        }
-    } catch { /* Notifications are a courtesy; the chime and dialog still fire. */ }
-};
-
 const handleComplete = () => {
     stopLocalTick();
     let title, msg;
@@ -186,7 +178,8 @@ const handleComplete = () => {
     }
 
     chime('done');
-    announce(title, msg);
+    systemNotify(title, msg);
+    pushNote(`${title}. ${msg}`);
     byId<HTMLElement>('timer-alert-title').textContent = title;
     byId<HTMLElement>('timer-alert-msg').textContent = msg;
     openModal('timer-alert-modal');
