@@ -1,6 +1,7 @@
 const { chromium } = require('playwright');
 const { resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { copyFileSync } = require('node:fs');
 
 (async () => {
     const browser = await chromium.launch({ headless: true });
@@ -13,8 +14,10 @@ const { pathToFileURL } = require('node:url');
         // Old social cards may still reference the PNG; keep both URLs current.
         await page.screenshot({ path: resolve(__dirname, '../public/social-preview.png') });
         // JPEG: the image is photographic, so it is a fraction of the size of a PNG.
-        await page.screenshot({ path: resolve(__dirname, '../public/social-preview.jpg'), type: 'jpeg', quality: 92 });
-        console.log('Generated public/social-preview.png and public/social-preview.jpg (1200 × 630)');
+        const jpegPath = resolve(__dirname, '../public/social-preview-lake.jpg');
+        await page.screenshot({ path: jpegPath, type: 'jpeg', quality: 92 });
+        copyFileSync(jpegPath, resolve(__dirname, '../public/social-preview.jpg'));
+        console.log('Generated public/social-preview-lake.jpg and both legacy formats (1200 × 630)');
     } finally {
         await browser.close();
     }
