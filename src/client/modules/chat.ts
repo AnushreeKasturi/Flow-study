@@ -2,6 +2,7 @@ import { byId } from '../dom';
 import { sendToRoom } from './socket';
 import { notify } from './feedback';
 import { api } from './api';
+import { renderMarkdown } from './markdown';
 import { parseRemind, describeWhen } from './reminder-parse';
 import { addReminder } from './reminders';
 
@@ -44,8 +45,8 @@ export const handleIncomingMessage = (message: unknown, own = false) => {
     const name = document.createElement('div');
     name.className = 'message-sender';
     name.textContent = label;
-    const body = document.createElement('div');
-    body.textContent = text;
+    const body = Object.assign(document.createElement('div'), { className: 'message-body' });
+    body.append(renderMarkdown(text));
     div.append(name, body);
     chatMessages.append(div);
     // Keep this ephemeral conversation bounded during long study sessions.
