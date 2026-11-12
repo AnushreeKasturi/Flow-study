@@ -164,6 +164,56 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.equal(asUser(two, 'SELECT count(*) FROM public.planned_groups;'), '0', 'Deleting and posting again does not clear the reports');
             assert.throws(() => asUser(four, `SELECT public.join_open_room('${listing}');`), /Command failed/, 'A flagged host\'s room cannot be joined from the board');
             assert.equal(run(database, "SELECT count(*) FROM pg_publication_tables WHERE pubname='supabase_realtime' AND tablename IN ('open_rooms','planned_groups');").trim(), '2', 'The board tables publish changes');
+
+            // 008: security hardening. A stand-in for Supabase's realtime.send records what would be broadcast.
+            run(database, `CREATE SCHEMA IF NOT EXISTS realtime; CREATE TABLE IF NOT EXISTS realtime.sent(payload JSONB, event TEXT, topic TEXT, private BOOLEAN);
+                CREATE OR REPLACE FUNCTION realtime.send(payload JSONB, event TEXT, topic TEXT, private BOOLEAN DEFAULT true) RETURNS VOID LANGUAGE SQL AS $$ INSERT INTO realtime.sent VALUES (payload, event, topic, private) $$;`);
+            const hardening = readFileSync('sql/008_security_hardening.sql', 'utf8');
+            run(database, hardening);
+            run(database, hardening);
+            const stranger = '66666666-6666-4666-8666-666666666666';
+            run(database, `INSERT INTO auth.users VALUES ('${stranger}');`);
+            // Rooms are no longer listable by anyone signed in.
+            assert.equal(asUser(stranger, 'SELECT count(*) FROM public.rooms;'), '0', 'A stranger sees no rooms');
+            assert.equal(asUser(two, `SELECT count(*) FROM public.rooms WHERE id = '${openRoom}';`), '1', 'A member sees their room');
+            assert.throws(() => asAnon('SELECT count(*) FROM public.rooms;'), /Command failed/, 'Visitors cannot read rooms at all');
+            // Creating rooms: the database decides the creator and the lock, and rejects bad codes.
+            asUser(stranger, `INSERT INTO public.rooms(room_code, is_locked, pin, created_by) VALUES('NEWONE', false, '4321', '${one}');`);
+            assert.equal(run(database, "SELECT created_by::text || ' ' || is_locked FROM public.rooms WHERE room_code = 'NEWONE';").trim(), stranger + ' true', 'Creator and lock are set by the database');
+            assert.throws(() => asUser(stranger, "INSERT INTO public.rooms(room_code) VALUES('bad code');"), /Command failed/, 'Room codes must be six capitals or digits');
+            assert.throws(() => asUser(stranger, "INSERT INTO public.rooms(room_code, pin) VALUES('PINBAD', 'abcd');"), /Command failed/, 'PINs must be four digits');
+            // Joining: misses return nothing, are counted, and lock the account out after ten.
+            assert.equal(asUser(stranger, "SELECT public.join_room('NOPE00', NULL) IS NULL;"), 't', 'A wrong code returns nothing');
+            assert.equal(asUser(stranger, "SELECT public.join_room('NEWONE', '0000') IS NULL;"), 't', 'A wrong PIN returns nothing, the same as a wrong code');
+            assert.equal(asUser(stranger, "SELECT public.join_room('NEWONE', '4321') IS NOT NULL;"), 't', 'The right PIN still works');
+            for (let attempt = 0; attempt < 8; attempt++) asUser(stranger, "SELECT public.join_room('NOPE00', NULL);");
+            assert.throws(() => asUser(stranger, "SELECT public.join_room('NEWONE', '4321');"), /Command failed/, 'Ten misses lock joining, even with the right PIN');
+            assert.equal(asUser(two, "SELECT public.join_room('focus6','1234');"), room, 'Other accounts are unaffected');
+            assert.throws(() => asUser(stranger, 'SELECT count(*) FROM public.join_failures;'), /Command failed/, 'The failure log is not readable');
+            // A PIN room is also protected across accounts: twenty wrong PINs close it to newcomers for a while.
+            run(database, 'DELETE FROM public.join_failures;'); // start the count clean: earlier checks in this test also guessed wrong
+            for (const guesser of [two, three, four]) for (let attempt = 0; attempt < 10; attempt++) asUser(guesser, "SELECT public.join_room('NEWONE', '0000');");
+            assert.equal(run(database, "SELECT count(*) FROM realtime.sent WHERE event = 'notice' AND topic = 'room:' || (SELECT id FROM public.rooms WHERE room_code = 'NEWONE');").trim(), '1', 'The room is told when its PIN is being guessed');
+            assert.throws(() => asUser(fresh, "SELECT public.join_room('NEWONE', '4321');"), /Command failed/, 'A room under PIN guessing refuses newcomers, even with the right PIN');
+            run(database, 'DELETE FROM public.join_failures;');
+            assert.equal(asUser(fresh, "SELECT public.join_room('NEWONE', '4321') IS NOT NULL;"), 't', 'and opens again when the window passes');
+            assert.equal(asUser(fresh, "SELECT public.join_room('NEWONE', NULL) IS NOT NULL;"), 't', 'Someone already in a PIN room is not asked for it again');
+            // Stored data limits.
+            assert.throws(() => asUser(two, `INSERT INTO public.sessions(room_id,user_id,mode,duration_seconds) VALUES('${variant === 'legacy' ? room : room}','${two}','focus',999999);`), /Command failed/, 'Absurd focus sessions are refused');
+            // The API quota counts per account and says no when it is used up.
+            for (let call = 0; call < 10; call++) assert.equal(asUser(two, "SELECT public.api_allow('ai');"), 't');
+            assert.equal(asUser(two, "SELECT public.api_allow('ai');"), 'f', 'The eleventh assistant call in a minute is refused');
+            assert.equal(asUser(three, "SELECT public.api_allow('ai');"), 't', 'Quotas are per account');
+            assert.throws(() => asAnon("SELECT public.api_allow('ai');"), /Command failed/, 'Signed-out callers have no quota');
+            assert.throws(() => asUser(two, "SELECT public.api_allow('free-for-all');"), /Command failed/);
+            // Room messages: members only, known kinds only, and the sender is stamped by the database.
+            asUser(two, `SELECT public.room_send('${openRoom}', 'chat-message', '{"sender":"Sam","text":"hi","from":"${one}"}');`);
+            assert.equal(run(database, "SELECT (payload->>'from') || ' ' || topic || ' ' || private FROM realtime.sent;").trim(), two + ' room:' + openRoom + ' true', 'A forged sender is overwritten with the real one');
+            assert.throws(() => asUser(stranger, `SELECT public.room_send('${openRoom}', 'chat-message', '{"text":"let me in"}');`), /Command failed/, 'Non-members cannot send');
+            assert.throws(() => asUser(two, `SELECT public.room_send('${openRoom}', 'made-up', '{}');`), /Command failed/, 'Unknown kinds of message are refused');
+            assert.throws(() => asUser(two, `SELECT public.room_send('${openRoom}', 'removed', '{"userId":"${one}"}');`), /Command failed/, 'Only the host can announce a removal');
+            asUser(one, `SELECT public.room_send('${openRoom}', 'removed', '{"userId":"${three}"}');`);
+            assert.throws(() => asUser(two, `SELECT public.room_send('${openRoom}', 'chat-message', '"not an object"');`), /Command failed/);
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

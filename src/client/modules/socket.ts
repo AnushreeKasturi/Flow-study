@@ -89,6 +89,15 @@ const connectChannel = () => {
         }
     });
 
+    // Every room message arrives through here. Messages sent through the
+    // database come back to their sender too, so anything carrying this tab's
+    // id is dropped. `from` is stamped by the database (see room_send in
+    // sql/008) and, once sql/009 is applied, cannot be forged.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const listen = (event: string, handle: (payload: any) => void) =>
+        activeChannel.on('broadcast', { event }, ({ payload }) => { if (payload?.sid !== SID) handle(payload); });
+    const senderOf = (payload: { from?: unknown; userId?: unknown }) => typeof payload?.from === 'string' ? payload.from : payload?.userId;
+
     const emitRoomState = () => {
         const state = activeChannel.presenceState<Participant>();
         const participants: Participants = {};
@@ -112,46 +121,51 @@ const connectChannel = () => {
         }
     });
 
-    activeChannel.on('broadcast', { event: 'signal' }, ({ payload }) => {
+    listen('signal', payload => {
         if (payload?.to === myUserId) {
             handlers.onSignal({ from: payload.from, signal: payload.signal });
         }
     });
 
-    activeChannel.on('broadcast', { event: 'youtube-sync' }, ({ payload }) => {
+    listen('youtube-sync', payload => {
         if (typeof payload?.url === 'string') handlers.onYouTubeSync?.(payload.url);
     });
-    activeChannel.on('broadcast', { event: 'audio-sync' }, ({ payload }) => {
+    listen('audio-sync', payload => {
         if (payload?.provider === 'spotify' && typeof payload.url === 'string') handlers.onAudioSync?.(payload.provider, payload.url);
     });
 
     // Flood guard: a client stuck in a loop (or a hostile one) cannot lock up
     // everyone's clock. Past 20 timer messages in five seconds, the rest of that window is dropped.
     let timerWindow = 0, timerCount = 0;
-    activeChannel.on('broadcast', { event: 'timer-updated' }, ({ payload }) => {
+    listen('timer-updated', payload => {
         const now = Date.now();
         if (now - timerWindow > 5000) { timerWindow = now; timerCount = 0; }
         if (++timerCount > 20) return;
         handlers.onTimerUpdated(payload);
     });
 
-    activeChannel.on('broadcast', { event: 'chat-message' }, ({ payload }) => {
+    listen('chat-message', payload => {
         handlers.onChatMessage?.(payload);
     });
 
     // Someone said they are leaving. Presence should report this too, but its
     // "leave" does not always arrive, so the leaver says it themselves as well.
-    activeChannel.on('broadcast', { event: 'bye' }, ({ payload }) => {
-        if (typeof payload?.userId === 'string' && payload.userId !== myUserId) handlers.onBye?.(payload.userId);
+    listen('bye', payload => {
+        const who = senderOf(payload);
+        if (typeof who === 'string' && who !== myUserId) handlers.onBye?.(who);
     });
 
+    // The database tells the room when something needs its attention (sent from sql/008, never by a browser).
+    listen('notice', payload => { if (typeof payload?.kind === 'string' && !payload.from) handlers.onNotice?.(payload.kind); });
+
     // The host removed someone. The room page confirms with the database before acting on it.
-    activeChannel.on('broadcast', { event: 'removed' }, ({ payload }) => {
+    listen('removed', payload => {
         if (typeof payload?.userId === 'string') handlers.onRemoved?.(payload.userId);
     });
 
-    activeChannel.on('broadcast', { event: 'reaction' }, ({ payload }) => {
-        handlers.onReaction?.(payload);
+    listen('reaction', payload => {
+        const who = senderOf(payload);
+        if (typeof who === 'string' && typeof payload?.emoji === 'string') handlers.onReaction?.({ userId: who, emoji: payload.emoji.slice(0, 8) });
     });
 
     // Cheap fallback for the rare case where a presence 'join' diff is
@@ -163,10 +177,9 @@ const connectChannel = () => {
     // heals from the payload. Pure broadcast — never touches the presence
     // channel's join/leave lifecycle, so unlike rebuilding the whole
     // channel, it's invisible to everyone else (no phantom leave+rejoin).
-    activeChannel.on('broadcast', { event: 'presence-heartbeat' }, ({ payload }) => {
-        if (payload?.userId && payload.userId !== myUserId) {
-            handlers.onPresenceHeartbeat?.(payload);
-        }
+    listen('presence-heartbeat', payload => {
+        const who = senderOf(payload);
+        if (typeof who === 'string' && who !== myUserId) handlers.onPresenceHeartbeat?.({ ...payload, userId: who });
     });
 
     activeChannel.on(
@@ -198,11 +211,7 @@ const connectChannel = () => {
 
                 const sendHeartbeat = () => {
                     if (myGeneration !== connectionGeneration) return;
-                    activeChannel.send({
-                        type: 'broadcast',
-                        event: 'presence-heartbeat',
-                        payload: { userId: myUserId, username: myUsername, isDummyMedia: currentIsDummyMedia }
-                    });
+                    sendToRoom('presence-heartbeat', { userId: myUserId, username: myUsername, isDummyMedia: currentIsDummyMedia });
                 };
                 sendHeartbeat();
                 heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
@@ -236,24 +245,41 @@ export const reloadTasks = () => {
     if (currentRoomId && currentHandlers) return fetchTasks(currentRoomId, currentHandlers.onRoomTasksUpdate, currentHandlers.onTasksError);
 };
 
-export const getSocket = () => channel;
 export const getMyUserId = () => myUserId;
 
 // Changes the name broadcast in this client's own presence going forward.
-// Doesn't re-track by itself — callers should follow up with a presence
-// update (e.g. presence.js's updatePresence) to actually push it out.
+// Doesn't re-track by itself; callers follow up with a presence update.
 export const updateMyUsername = (username: string) => {
     myUsername = username;
 };
 
-export const sendSignal = (to: string, signal: Signal) => {
-    if (!channel) return;
-    channel.send({
-        type: 'broadcast',
-        event: 'signal',
-        payload: { to, from: myUserId, signal }
-    });
-};
+// ── Sending ──
+// Messages go through the database (room_send, sql/008), which checks the
+// sender is a member and stamps who they are. One at a time, in order: call
+// setup breaks if an answer overtakes its offer.
+const SID = crypto.randomUUID();
+let viaDatabase = true;
+let outbox: Promise<unknown> = Promise.resolve();
+export function sendToRoom(event: string, payload: Record<string, unknown>): Promise<string> {
+    const deliver = async () => {
+        const room = currentRoomId, direct = channel;
+        if (!room || !direct) return 'closed';
+        const message = { ...payload, sid: SID };
+        if (viaDatabase) {
+            const { error } = await getSupabase().rpc('room_send', { p_room: room, p_event: event, p_payload: message });
+            if (!error) return 'ok';
+            // PGRST202: this server has not run sql/008 yet. Use the direct path for the rest of this visit.
+            if (error.code === 'PGRST202') viaDatabase = false;
+        }
+        // Direct broadcast: the path before sql/008, and the fallback if the database call fails.
+        return String(await direct.send({ type: 'broadcast', event, payload: message }));
+    };
+    const result = outbox.then(deliver, deliver);
+    outbox = result.catch(() => {});
+    return result;
+}
+
+export const sendSignal = (to: string, signal: Signal) => { sendToRoom('signal', { to, from: myUserId, signal }); };
 
 // Timer changes go out at most every 250 ms. A burst of clicks collapses into
 // its first and last state, so the room always ends up where the sender did.
@@ -262,7 +288,7 @@ let trailingTimerSend: ReturnType<typeof setTimeout> | undefined;
 export const updateTimer = (_roomId: string | null, action: string, payload: Partial<TimerState>) => {
     const send = () => {
         lastTimerSend = Date.now();
-        channel?.send({ type: 'broadcast', event: 'timer-updated', payload: { action, ...payload } });
+        sendToRoom('timer-updated', { action, ...payload });
     };
     const wait = 250 - (Date.now() - lastTimerSend);
     // The periodic time-only sync never displaces a real state change that is waiting to go out.
@@ -296,17 +322,9 @@ export const updateCameraState = async (isVideoActive: boolean) => {
     });
 };
 
-export const sendBye = () => channel?.send({ type: 'broadcast', event: 'bye', payload: { userId: myUserId } });
-export const sendRemoved = (userId: string) => channel?.send({ type: 'broadcast', event: 'removed', payload: { userId } });
-
-export const sendReaction = (emoji: string) => {
-    if (!channel) return;
-    channel.send({
-        type: 'broadcast',
-        event: 'reaction',
-        payload: { userId: myUserId, emoji }
-    });
-};
+export const sendBye = () => sendToRoom('bye', { userId: myUserId });
+export const sendRemoved = (userId: string) => sendToRoom('removed', { userId });
+export const sendReaction = (emoji: string) => { sendToRoom('reaction', { userId: myUserId, emoji }); };
 
 // Tracked via presence rather than a one-shot broadcast — a raised hand is
 // meant to be a sticky "I want attention" signal, and unlike a reaction it
@@ -324,19 +342,8 @@ export const sendHandRaise = async (raised: boolean) => {
     });
 };
 
-export const broadcastYouTube = (url: string) => {
-    if (!channel) return;
-    return channel.send({
-        type: 'broadcast',
-        event: 'youtube-sync',
-        payload: { url }
-    });
-};
-
-export const broadcastAudio = (provider: AudioProvider, url: string) => {
-    if (provider === 'youtube') return broadcastYouTube(url);
-    if (channel && provider === 'spotify') return channel.send({ type: 'broadcast', event: 'audio-sync', payload: { provider, url } });
-};
+export const broadcastAudio = (provider: AudioProvider, url: string) =>
+    provider === 'youtube' ? sendToRoom('youtube-sync', { url }) : sendToRoom('audio-sync', { provider, url });
 
 async function trackPresence(payload: Participant) {
     const current = channel;

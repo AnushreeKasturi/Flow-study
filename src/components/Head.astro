@@ -1,8 +1,8 @@
 ---
 import '@fontsource-variable/bricolage-grotesque/wdth.css';
 import '../styles/global.css';
-interface Props { title?: string; }
-const { title = 'Flow | Study better, together' } = Astro.props;
+interface Props { title?: string; page?: string; }
+const { title = 'Flow | Study better, together', page = '' } = Astro.props;
 const description = 'A shared space for focused study. Set a timer, work on your goals, and study better together with Flow.';
 const image = 'https://flow-study.me/social-preview.png';
 const imageAlt = 'Flow. Study until the sun sets. A sun low over the horizon beside a 25-minute focus timer.';
@@ -30,5 +30,5 @@ const imageAlt = 'Flow. Study until the sun sets. A sun low over the horizon bes
 <meta name="twitter:image:alt" content={imageAlt}>
 <meta name="theme-color" content="#101b16">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<!-- Apply the saved atmosphere before first paint. -->
-<script is:inline>try { var t = localStorage.getItem('flow_theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<!-- Before first paint: saved sky, sign-in redirects, and the once-per-session opening. -->
+<script is:inline src="/js/boot.js" data-page={page}></script>

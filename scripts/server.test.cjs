@@ -7,8 +7,17 @@ const http = require('node:http');
 const { once } = require('node:events');
 test('HTTP boundaries and bounded local concurrency', async t => {
     // Stand-in for Supabase's token check: only the bearer token "valid" belongs to a user.
+    // Stand-in for Supabase. Only the bearer token "valid" belongs to a user; the quota
+    // function allows every call except for the token "spent".
+    let quotaInstalled = true;
     const auth = http.createServer((req, res) => {
-        res.writeHead(req.url === '/auth/v1/user' && req.headers.authorization === 'Bearer valid' && req.headers.apikey ? 200 : 401).end('{}');
+        const token = (req.headers.authorization || '').replace('Bearer ', '');
+        const known = ['valid', 'spent'].includes(token) && req.headers.apikey;
+        if (req.url === '/rest/v1/rpc/api_allow') {
+            if (!quotaInstalled) return res.writeHead(404).end('{}');
+            return res.writeHead(known ? 200 : 401, { 'Content-Type': 'application/json' }).end(known ? String(token === 'valid') : '{}');
+        }
+        res.writeHead(req.url === '/auth/v1/user' && known ? 200 : 401).end('{}');
     }).listen(0, '127.0.0.1');
     await once(auth, 'listening');
     process.env.PUBLIC_SUPABASE_URL = 'http://127.0.0.1:' + auth.address().port;
@@ -69,7 +78,12 @@ test('HTTP boundaries and bounded local concurrency', async t => {
             assert.match(response.headers.get('content-security-policy'), /frame-ancestors 'none'/, path);
             assert.equal(response.headers.get('x-content-type-options'), 'nosniff', path);
             assert.equal(response.headers.get('x-powered-by'), null, path);
-            assert.doesNotMatch(await response.text(), /__fixture/, path);
+            const policy = response.headers.get('content-security-policy');
+            assert.match(policy, /script-src 'self';/, path + ': scripts from this site only');
+            assert.equal(response.headers.get('x-frame-options'), 'DENY', path);
+            const html = await response.text();
+            assert.doesNotMatch(html, /__fixture/, path);
+            for (const tag of html.match(/<script[^>]*>/gi) || []) assert.match(tag, / src="/, path + ': no inline scripts, found ' + tag);
         }
     });
     await t.test('provider endpoints reject callers who are not signed in', async t => {
@@ -86,6 +100,19 @@ test('HTTP boundaries and bounded local concurrency', async t => {
                 assert.equal(response.headers.get('cache-control'), 'private, no-store');
             }
         }
+    });
+    await t.test('an account over its quota is refused, and a server without the quota function still checks sign-in', async t => {
+        delete require.cache[require.resolve('../server')];
+        const fresh = require('../server').listen(0, '127.0.0.1');
+        await once(fresh, 'listening');
+        t.after(() => new Promise(resolve => fresh.close(resolve)));
+        const call = token => fetch('http://127.0.0.1:' + fresh.address().port + '/api/turn-credentials', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+        assert.equal((await call('spent')).status, 429, 'Over quota');
+        assert.equal((await call('valid')).status, 500, 'Within quota reaches the handler (TURN is not configured in tests)');
+        quotaInstalled = false;
+        assert.equal((await call('forged')).status, 401, 'Fallback still rejects unknown tokens');
+        assert.equal((await call('valid')).status, 500, 'Fallback still accepts known ones');
+        quotaInstalled = true;
     });
     await t.test('invalid payloads return JSON errors', async () => {
         for (const message of [null, 12, {}, [], '', '   ', 'a'.repeat(501)]) {

@@ -1,8 +1,8 @@
 ---
 import { readFileSync } from 'node:fs';
 import Head from '../components/Head.astro';
-interface Props { title?: string; bodyClass?: string; }
-const { title, bodyClass } = Astro.props;
+interface Props { title?: string; bodyClass?: string; page?: string; }
+const { title, bodyClass, page } = Astro.props;
 // `npm run dev:demo` swaps Supabase for the test fixture so the app runs offline.
 // import.meta.env.DEV is false in every build, so this never ships.
 const demo = import.meta.env.DEV && process.env.FLOW_DEMO ? readFileSync('scripts/supabase-fixture.js', 'utf8') : null;
@@ -10,7 +10,7 @@ const demo = import.meta.env.DEV && process.env.FLOW_DEMO ? readFileSync('script
 <!doctype html>
 <html lang="en">
     <head>
-        <Head title={title} />
+        <Head title={title} page={page} />
         {demo && <script is:inline set:html={demo + "\nif (new URLSearchParams(location.search).has('nocam') && navigator.mediaDevices) navigator.mediaDevices.getUserMedia = async () => { throw new Error('Camera skipped in demo'); };"}></script>}
         <slot name="head" />
     </head>

@@ -8,11 +8,7 @@ import VideoStage from '../components/room/VideoStage.astro';
 import SessionTools from '../components/room/SessionTools.astro';
 import '../styles/room.css';
 ---
-<Page title="Study room | Flow" bodyClass="room-page">
-    <Fragment slot="head">
-        <!-- Signed-out visitors go to login before the room bundle runs; an invite code rides along. -->
-        <script is:inline>try { if (!localStorage.getItem('flow_user')) location.replace('/login.html' + location.search); } catch (e) {}</script>
-    </Fragment>
+<Page page="room" title="Study room | Flow" bodyClass="room-page">
     <Sky />
     <div id="toast" class="toast hidden" role="status" aria-live="polite" aria-atomic="true"></div>
     <Dialogs />

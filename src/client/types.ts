@@ -43,6 +43,7 @@ export interface SocketHandlers {
     onReaction?: (reaction: { userId: string; emoji: string }) => void;
     onRemoved?: (userId: string) => void;
     onBye?: (userId: string) => void;
+    onNotice?: (kind: string) => void;
 }
 export interface ProfileStats {
     savedTotalSeconds: number; savedTodaySeconds: number; weekSeconds: number[]; persistedIds: string[];
@@ -73,6 +74,7 @@ export interface Database {
             join_room: { Args: { p_room_code: string; p_pin: string }; Returns: string };
             join_open_room: { Args: { p_listing: string }; Returns: string };
             remove_participant: { Args: { p_room: string; p_user: string }; Returns: undefined };
+            room_send: { Args: { p_room: string; p_event: string; p_payload: Record<string, unknown> }; Returns: undefined };
         };
         Enums: Record<string, never>;
         CompositeTypes: Record<string, never>;

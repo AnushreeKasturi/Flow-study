@@ -208,7 +208,9 @@ async function joinRoom() {
     try {
         const { data: roomUuid, error } = await supabase.rpc('join_room', { p_room_code: roomCode, p_pin: pin });
         if (error || !roomUuid) {
-            showLobbyError(error?.message?.includes('Incorrect PIN') ? 'This room needs a different PIN. Enter it above and try again.'
+            showLobbyError(!error ? 'No room matches that code and PIN. Check both and try again.'
+                : error.message?.includes('Too many attempts') ? 'Too many wrong codes. Wait ten minutes, then try again.'
+                : error.message?.includes('Incorrect PIN') ? 'This room needs a different PIN. Enter it above and try again.'
                 : error?.message?.includes('Room not found') ? 'Room not found. Check the code and try again.'
                 : error?.message?.includes('Authentication required') ? 'Your sign-in has expired. Log out and log in again.'
                 : error?.message?.includes('Room is full') ? 'This group is full or not taking new people right now.'
@@ -365,10 +367,16 @@ async function enterRoom(roomId: string, roomCode: string) {
             partners[data.userId].presence = { status: data.status, nowPlaying: data.nowPlaying };
             updatePartnerUI(data.userId);
         },
-        onChatMessage: handleIncomingMessage,
+        onChatMessage: message => handleIncomingMessage(message),
         onYouTubeSync: url => loadRoomAudio('youtube', url),
         onAudioSync: loadRoomAudio,
         onReaction: data => showReaction(data.userId, data.emoji),
+        onNotice: kind => {
+            if (kind !== 'pin-guessing') return;
+            const text = 'Someone is guessing this room’s PIN. New people can’t join for the next ten minutes; everyone here is unaffected.';
+            pushNote(text);
+            notify(text, 'error');
+        },
         onRemoved: userId => {
             if (userId === getMyUserId()) confirmRemoval();
             else if (partners[userId]) pushNote(`${partners[userId].username || 'Someone'} was removed by the host.`);
@@ -413,7 +421,7 @@ async function enterRoom(roomId: string, roomCode: string) {
         chime('message');
         pushNote(`${sender}: ${text}`, () => byId('chat-tab-button').click());
         systemNotify(`${sender} in Flow`, text);
-    });
+    }, userId => partners[userId]?.username);
 
     // The soundscape chosen during setup starts with the room; the Sound tab turns it off.
     const sound = localStorage.getItem('flow_sound');
