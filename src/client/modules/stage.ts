@@ -2,6 +2,7 @@
 import type { Participant } from '../types';
 import { byId } from '../dom';
 import { getMyUserId } from './socket';
+import { currentUser } from './session';
 import { initial } from './ui';
 
 const videoGrid = byId<HTMLElement>('video-grid');
@@ -37,6 +38,7 @@ export function ensureTile(userId: string, partner?: Participant) {
     wrapper.append(video, tag, placeholder, remove);
     videoGrid.appendChild(wrapper);
     if (partner) labelTile(userId, partner);
+    markHost(wrapper);
     return video;
 }
 
@@ -47,6 +49,21 @@ function labelTile(userId: string, partner: Participant) {
     tag.querySelector('b')!.textContent = partner.username || 'Partner';
     tag.querySelector('small')!.textContent = status === 'Online' ? '' : status;
     tag.querySelector('i')!.className = `dot ${status.includes('Break') ? 'yellow' : 'green'}`;
+}
+
+// Shows "Host" on the host's tile, and nowhere else. Called whenever the host changes.
+let hostId = '';
+export function setHost(newHostId: string) {
+    hostId = newHostId;
+    document.querySelectorAll<HTMLElement>('.video-wrapper').forEach(markHost);
+}
+function markHost(wrapper: HTMLElement) {
+    const userId = wrapper.id === 'video-wrapper-local' ? currentUser()?.id : wrapper.id.replace('video-wrapper-', '');
+    const tag = wrapper.querySelector('.name-tag');
+    if (!tag) return;
+    const badge = tag.querySelector('.host-badge');
+    if (userId === hostId && !badge) tag.append(Object.assign(document.createElement('span'), { className: 'host-badge', textContent: 'Host' }));
+    else if (userId !== hostId) badge?.remove();
 }
 
 export function attachStream(userId: string, stream: MediaStream, partner?: Participant) {

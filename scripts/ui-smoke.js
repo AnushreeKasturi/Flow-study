@@ -690,12 +690,57 @@ async (page) => {
     await page.evaluate(() => window.__fixture.handlers['broadcast:removed']({ payload: { userId: 'test-user' } }));
     await page.waitForFunction(() => window.__fixture.calls.filter(call => call.name === 'join_room').length >= 2);
     assert(await page.locator('#app').isVisible(), 'A forged removal message must not eject anyone');
+    // As host, with someone else here, leaving asks what happens to the room; "Just leave" takes the listing down.
     await page.getByRole('button', { name: 'Leave', exact: true }).click();
+    await visible('#leave-host');
+    assert(await page.getByRole('button', { name: 'Hand over and leave', exact: true }).isVisible(), 'Handing over is offered first when others are here');
+    await page.getByText('Just leave', { exact: true }).click();
     await page.getByRole('button', { name: 'Leave room', exact: true }).click();
     await visible('#join-modal');
     assert(await page.evaluate(() => window.__fixture.tables.open_rooms.length) === 0, 'Leaving takes the room off the board');
     assert((await page.locator('#lobby-recap').innerText()).startsWith('Last session:'), 'The lobby should recap the session just left');
     await page.locator('#lobby-board a').waitFor();
+
+    // Handing a room over: the new host is chosen in the leave dialog, and the database does the rest.
+    const enterNewRoom = async () => {
+        await page.locator('input[name="audience"][value="private"]').check();
+        await page.getByRole('button', { name: 'Create a room', exact: true }).click();
+        await page.waitForFunction(() => !document.getElementById('new-task-input').disabled && document.body.classList.contains('is-host'));
+        await page.evaluate(() => window.__fixture.handlers['presence:join']({ key: 'zz-next', newPresences: [{ username: 'Riya', isDummyMedia: true }] }));
+    };
+    await enterNewRoom();
+    assert(await page.locator('#video-wrapper-local .host-badge').isVisible(), 'The host is marked on their tile');
+    await page.getByRole('button', { name: 'Leave', exact: true }).click();
+    assert(await page.locator('#leave-new-host').inputValue() === 'zz-next', 'The person here is offered as the new host');
+    await page.getByText('End it for everyone', { exact: true }).click();
+    assert(await page.getByRole('button', { name: 'End room', exact: true }).isVisible(), 'The button says what will happen');
+    await page.getByText('Hand it to', { exact: false }).click();
+    // Leaving loads a new page, so keep this page's record of calls across it.
+    await page.evaluate(() => addEventListener('pagehide', () => sessionStorage.setItem('test-rpcs', JSON.stringify(window.__fixture.calls.filter(call => call.action === 'rpc').map(call => call.name)))));
+    await page.getByRole('button', { name: 'Hand over and leave', exact: true }).click();
+    await visible('#join-modal');
+    assert(await page.evaluate(() => JSON.parse(sessionStorage.getItem('test-rpcs') || '[]').includes('transfer_host')), 'Leaving as host hands the room over');
+
+    // The database says someone else is host now: confirmed first, then shown to everyone.
+    await enterNewRoom();
+    await page.evaluate(() => window.__fixture.handlers['broadcast:host-changed']({ payload: { host: 'zz-next', name: 'Riya' } }));
+    await page.waitForTimeout(300);
+    assert(await page.evaluate(() => document.body.classList.contains('is-host')), 'A host change the database does not confirm is ignored');
+    await page.evaluate(() => {
+        window.__fixture.tables.rooms.at(-1).created_by = 'zz-next';
+        window.__fixture.handlers['broadcast:host-changed']({ payload: { host: 'zz-next', name: 'Riya' } });
+    });
+    await page.waitForFunction(() => !document.body.classList.contains('is-host'));
+    assert(await page.locator('#video-wrapper-zz-next .host-badge').isVisible() && await page.locator('#video-wrapper-local .host-badge').count() === 0, 'The new host is marked, and the old one is not');
+    await page.evaluate(() => window.__fixture.handlers['broadcast:host-changed']({ payload: { host: 'zz-next', name: 'Riya', from: 'zz-next' } }));
+    assert(await page.locator('#leave-host').isHidden(), 'Someone who is not host just leaves');
+
+    // The host ends the room: everyone goes back Home quietly, with a calm note.
+    await page.evaluate(() => { window.__fixture.rpcError = 'Room ended'; window.__fixture.handlers['broadcast:room-ended']({ payload: {} }); });
+    await page.waitForURL(url => url.pathname === '/room.html' && !url.searchParams.get('room'));
+    await visible('#join-modal');
+    assert((await page.locator('#lobby-recap').innerText()).includes('The host ended the room') && await page.locator('#lobby-error').isHidden(), 'An ended room is a note, not an error');
+    await page.evaluate(() => { window.__fixture.rpcError = null; });
 
     // Home: who you are, and one place to start a private room, open a listed one, join by code, or sit in a group.
     assert(await page.locator('#join-title').innerText() === 'Hi, Alex.', 'Home should greet the signed-in person by name');

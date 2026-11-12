@@ -214,6 +214,29 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.throws(() => asUser(two, `SELECT public.room_send('${openRoom}', 'removed', '{"userId":"${one}"}');`), /Command failed/, 'Only the host can announce a removal');
             asUser(one, `SELECT public.room_send('${openRoom}', 'removed', '{"userId":"${three}"}');`);
             assert.throws(() => asUser(two, `SELECT public.room_send('${openRoom}', 'chat-message', '"not an object"');`), /Command failed/);
+
+            // 010: host handover, ending a room, and the board's live ping.
+            const handover = readFileSync('sql/010_host_handover_and_live_board.sql', 'utf8');
+            run(database, handover);
+            run(database, handover);
+            run(database, `UPDATE public.open_rooms SET last_seen = now(), closed = false, seats = 6; INSERT INTO public.profiles(id, display_name) VALUES ('${two}', 'Sam') ON CONFLICT (id) DO UPDATE SET display_name = 'Sam'; DELETE FROM realtime.sent;`);
+            assert.throws(() => asUser(two, `SELECT public.transfer_host('${openRoom}', '${two}');`), /Command failed/, 'Only the host can hand over');
+            assert.throws(() => asUser(one, `SELECT public.transfer_host('${openRoom}', '${stranger}');`), /Command failed/, 'The new host must be in the room');
+            assert.throws(() => asUser(one, `SELECT public.transfer_host('${openRoom}', '${three}');`), /Command failed/, 'Someone removed cannot become host');
+            assert.equal(asUser(one, `SELECT public.transfer_host('${openRoom}', '${two}');`), 'Sam', 'Handing over returns the new host\'s name');
+            assert.equal(run(database, `SELECT created_by::text FROM public.rooms WHERE id = '${openRoom}';`).trim(), two, 'The room has a new host');
+            assert.equal(run(database, `SELECT host_id::text || ' ' || host_name FROM public.open_rooms WHERE room_id = '${openRoom}';`).trim(), two + ' Sam', 'The listing follows the new host, under their name');
+            assert.equal(run(database, "SELECT count(*) FROM realtime.sent WHERE event = 'host-changed' AND payload->>'name' = 'Sam';").trim(), '1', 'The room is told who the host is now');
+            assert.notEqual(run(database, "SELECT count(*) FROM realtime.sent WHERE topic = 'board' AND event = 'changed';").trim(), '0', 'The board is pinged when a listing changes');
+            assert.throws(() => asUser(one, `SELECT public.end_room('${openRoom}');`), /Command failed/, 'The old host can no longer end the room');
+            run(database, `INSERT INTO public.sessions(room_id,user_id,mode,duration_seconds) VALUES('${openRoom}','${one}','focus',600);`);
+            asUser(two, `SELECT public.end_room('${openRoom}');`);
+            assert.equal(run(database, `SELECT count(*) FROM public.open_rooms WHERE room_id = '${openRoom}';`).trim(), '0', 'Ending a room takes it off the board');
+            assert.equal(run(database, "SELECT count(*) FROM realtime.sent WHERE event = 'room-ended';").trim(), '1', 'Everyone in the room is told');
+            assert.throws(() => asUser(one, "SELECT public.join_room('OPEN22', NULL);"), /Command failed/, 'An ended room cannot be joined, even by its members');
+            assert.throws(() => asUser(one, `SELECT public.room_send('${openRoom}', 'chat-message', '{"text":"hello?"}');`), /Command failed/, 'Nothing more can be sent into an ended room');
+            assert.throws(() => asUser(two, `SELECT public.transfer_host('${openRoom}', '${one}');`), /Command failed/, 'An ended room cannot change hands');
+            assert.equal(asUser(one, `SELECT count(*) FROM public.sessions WHERE room_id = '${openRoom}';`), '1', 'Focus history from an ended room is kept');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

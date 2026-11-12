@@ -121,7 +121,14 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
 
     <div id="leave-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="leave-title">
         <h2 id="leave-title">Leave this session?</h2>
-        <p class="dialog-description">Your camera and microphone will disconnect. You can rejoin with the room code; saved shared tasks stay in the room.</p>
+        <p id="leave-text" class="dialog-description">Your camera and microphone will disconnect. You can rejoin with the room code; saved shared tasks stay in the room.</p>
+        <!-- Shown to the host only: what happens to the room when they go. -->
+        <fieldset id="leave-host" class="leave-host hidden">
+            <legend>You’re the host. What should happen to the room?</legend>
+            <label id="leave-handover-row"><input type="radio" name="leave-choice" value="handover"><span><strong>Hand it to <select id="leave-new-host" class="input" aria-label="New host"></select></strong><small>The room, and its board listing if it has one, carry on with them as host.</small></span></label>
+            <label><input type="radio" name="leave-choice" value="end"><span><strong id="leave-end-label">End it for everyone</strong><small id="leave-end-text">Everyone goes back Home and the code stops working. Tasks and focus time are kept.</small></span></label>
+            <label><input type="radio" name="leave-choice" value="leave"><span><strong id="leave-keep-label">Just leave</strong><small id="leave-keep-text">The room stays open for the others, with no host.</small></span></label>
+        </fieldset>
         <div class="dialog-actions">
             <button id="cancel-leave-btn" class="btn">Stay in room</button>
             <button id="confirm-leave-btn" class="btn btn-danger">Leave room</button>
@@ -150,7 +157,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
                 <label for="board-seats">Seats</label>
                 <select id="board-seats" class="input" aria-label="Seats, including you">{[2, 3, 4, 5, 6].map(n => <option value={n} selected={n === 4}>{n}</option>)}</select>
                 <button id="board-list-btn" class="btn btn-primary">List this room</button>
-                <button type="button" id="board-unlist-btn" class="btn hidden">Remove from the board</button>
+                <button type="button" id="board-unlist-btn" class="btn hidden">Take off the board</button>
             </div>
             <label id="board-closed-row" class="check hidden"><input type="checkbox" id="board-closed"><span>Stop new people joining<small>The listing stays up and shows as closed. People already here are not affected.</small></span></label>
         </form>

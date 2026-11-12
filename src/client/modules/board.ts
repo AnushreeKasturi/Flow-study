@@ -62,7 +62,7 @@ export async function listRoom(listing: GroupDetails & { host_id: string; room_i
 // Called on a timer while the host is in the room: who is here, and what the
 // clock is doing. The database stamps last_seen itself, and a listing nobody
 // refreshes drops off the board after two minutes.
-export const refreshListing = (hostId: string, live: { seats_taken: number; timer_mode: string | null; timer_ends_at: string | null }) =>
+export const refreshListing = (hostId: string, live: { seats_taken: number; timer_mode: string | null; timer_ends_at: string | null; host_name?: string }) =>
     getSupabase().from('open_rooms').update(live).eq('host_id', hostId);
 export const setClosed = (hostId: string, closed: boolean) => getSupabase().from('open_rooms').update({ closed }).eq('host_id', hostId);
 export function unlistRoom(hostId: string) { return getSupabase().from('open_rooms').delete().eq('host_id', hostId); }
@@ -85,9 +85,12 @@ export function statusOf(room: Pick<OpenRoom, 'timer_mode' | 'timer_ends_at'>, n
 }
 
 // Calls back whenever a listing or plan changes, so open boards stay current without polling.
+// The database pings the private "board" channel whenever a listing or plan
+// changes (sql/010), and the page fetches the board again. Pings arrive in
+// bursts (a host's check-in, then a seat), so they are gathered for a moment.
 export function watchBoard(onChange: () => void) {
-    return getSupabase().channel('board')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'open_rooms' }, onChange)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'planned_groups' }, onChange)
+    let soon: ReturnType<typeof setTimeout> | undefined;
+    return getSupabase().channel('board', { config: { private: true } })
+        .on('broadcast', { event: 'changed' }, () => { clearTimeout(soon); soon = setTimeout(onChange, 400); })
         .subscribe(() => {});
 }

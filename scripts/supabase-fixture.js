@@ -64,6 +64,11 @@ window.supabase = { createClient() {
             };
             return query;
         }
+        fixture.board = {};
+        const boardChannel = {
+            on(type, config, callback) { fixture.board[type + ':' + config.event] = callback; return this; },
+            subscribe(callback) { setTimeout(() => callback?.('SUBSCRIBED'), 0); return this; }
+        };
         const channel = {
             on(type, config, callback) { fixture.handlers[type + ':' + config.event] = callback; return this; },
             subscribe(callback) { fixture.status = callback; setTimeout(() => callback('SUBSCRIBED'), 0); return this; },
@@ -72,7 +77,8 @@ window.supabase = { createClient() {
             presenceState() { return { [user.id]: [this.presence || { username: 'Alex' }] }; }
         };
         return {
-            from, channel: () => { fixture.channelCount++; return channel; }, async removeChannel() { fixture.removed = true; },
+            // The board has its own channel; every other topic is the room's.
+            from, channel: topic => topic === 'board' ? boardChannel : (fixture.channelCount++, channel), async removeChannel() { fixture.removed = true; },
             realtime: { setAuth: async () => {} },
             rpc: async (name, args) => {
                 // Room messages go through the database; record them the way a broadcast would be.
@@ -83,6 +89,9 @@ window.supabase = { createClient() {
                 fixture.calls.push({ action: 'rpc', name });
                 await new Promise(resolve => setTimeout(resolve, fixture.delay));
                 if (fixture.rpcError === 'throw') throw new Error('Network unavailable');
+                // Host actions: the database would also tell the room; tests send those messages themselves.
+                if (name === 'transfer_host') return fixture.rpcError ? { data: null, error: { message: fixture.rpcError } } : { data: 'New host', error: null };
+                if (name === 'end_room') return fixture.rpcError ? { data: null, error: { message: fixture.rpcError } } : { data: null, error: null };
                 // join_room answers with a room id; join_open_room with the room's code.
                 return { data: fixture.rpcError ? null : name === 'join_open_room' ? 'FOCUS6' : 'test-room', error: fixture.rpcError ? { message: fixture.rpcError } : null };
             },

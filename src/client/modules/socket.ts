@@ -158,6 +158,13 @@ const connectChannel = () => {
     // The database tells the room when something needs its attention (sent from sql/008, never by a browser).
     listen('notice', payload => { if (typeof payload?.kind === 'string' && !payload.from) handlers.onNotice?.(payload.kind); });
 
+    // Sent by the database itself (sql/010), never by a browser: room_send always adds `from`,
+    // so anything carrying one is ignored. The room page still confirms with the database.
+    listen('host-changed', payload => {
+        if (!payload?.from && typeof payload?.host === 'string') handlers.onHostChanged?.(payload.host, typeof payload.name === 'string' ? payload.name.slice(0, 40) : '');
+    });
+    listen('room-ended', payload => { if (!payload?.from) handlers.onRoomEnded?.(); });
+
     // The host removed someone. The room page confirms with the database before acting on it.
     listen('removed', payload => {
         if (typeof payload?.userId === 'string') handlers.onRemoved?.(payload.userId);
