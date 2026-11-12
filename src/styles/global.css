@@ -203,7 +203,44 @@ select.input {
 .swatch { position: relative; display: block; height: 52px; overflow: hidden; border-radius: 8px; background: linear-gradient(var(--sky-top), var(--sky-bottom)); }
 .swatch::after { content: ''; position: absolute; left: 62%; bottom: -10px; width: 24px; height: 24px; border-radius: 50%; background: var(--sun); }
 
+/* ── Transition loader: a small sun with a sleepy face, peeking over a horizon. ── */
+.loader {
+    position: fixed; inset: 0; z-index: 5000; display: grid; place-content: center; justify-items: center; gap: 18px;
+    background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(6px);
+    opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .3s ease, visibility 0s linear .3s;
+}
+.is-loading .loader { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .3s ease; }
+/* While a page is starting up, fade in only if it is taking a while. */
+.is-booting:not(.is-loading) .loader { opacity: 1; visibility: visible; pointer-events: auto; animation: loader-wait .3s ease .65s backwards; }
+@keyframes loader-wait { from { opacity: 0; } }
+.loader-scene { display: flex; flex-direction: column; align-items: center; }
+/* Clipped only below the horizon, so the sun's glow spreads freely above and to the sides. */
+.loader-sky { width: 84px; height: 46px; clip-path: inset(-60px -60px 0 -60px); display: flex; justify-content: center; align-items: flex-end; }
+.loader-sun {
+    position: relative; width: 40px; height: 40px; border-radius: 50%; translate: 0 26px;
+    background: radial-gradient(circle at 50% 42%, color-mix(in oklab, var(--sun) 45%, white), var(--sun) 62%);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--sun) 70%, transparent), 0 0 34px color-mix(in srgb, var(--sun) 35%, transparent);
+    animation: loader-peek 1.9s cubic-bezier(.45, 0, .3, 1) infinite;
+}
+/* Two closed eyes and a small smile, drawn in the ground colour. */
+.loader-sun::before, .loader-sun::after { content: ''; position: absolute; top: 15px; width: 7px; height: 4px; border: 2px solid var(--bg); border-color: transparent transparent var(--bg); border-radius: 0 0 8px 8px; animation: loader-blink 1.9s infinite; }
+.loader-sun::before { left: 9px; }
+.loader-sun::after { right: 9px; }
+.loader-sun b { position: absolute; left: 50%; top: 23px; width: 9px; height: 5px; translate: -50% 0; border: 2px solid var(--bg); border-top: 0; border-radius: 0 0 9px 9px; }
+.loader-horizon { width: 84px; height: 3px; border-radius: 3px; background: color-mix(in srgb, var(--text) 35%, transparent); }
+.loader p { color: var(--text-2); font-size: .92rem; font-weight: 500; }
+/* Rises, has a little bob at the top, then sinks back behind the horizon. */
+@keyframes loader-peek {
+    0% { translate: 0 30px; }
+    35% { translate: 0 4px; scale: 1.04 .96; }
+    45%, 62% { translate: 0 6px; scale: 1; }
+    100% { translate: 0 30px; }
+}
+@keyframes loader-blink { 0%, 44%, 52%, 100% { scale: 1 1; } 48% { scale: 1 .2; } }
+
 @media (prefers-reduced-motion: reduce) {
+    .loader-sun { animation: none; translate: 0 6px; }
+    .loader-sun::before, .loader-sun::after { animation: none; }
     *, *::before, *::after {
         animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important;
         transition-duration: .01ms !important; scroll-behavior: auto !important;

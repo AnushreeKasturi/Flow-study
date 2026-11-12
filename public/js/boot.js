@@ -11,6 +11,13 @@
         var signedIn = !!(localStorage.getItem('flow_signed_in') || localStorage.getItem('flow_user'));
         // The room needs an account; an invite code rides along to login and back.
         if (page === 'room' && !signedIn) location.replace('/login.html' + location.search);
+
+        // The transition loader (src/client/loader.ts). A page change that left a note
+        // shows it at once, so it carries straight over; the room page also holds it,
+        // faded in only if start-up is slow, until its home screen or room is ready.
+        if (sessionStorage.getItem('flow_loader')) document.documentElement.classList.add('is-loading');
+        sessionStorage.removeItem('flow_loader');
+        if (page === 'room') { document.documentElement.classList.add('is-booting'); document.documentElement.dataset.hold = '1'; }
         if (page === 'login' && signedIn) location.replace('/room.html' + location.search);
         if (page === 'home') {
             // Invite links used to be /?room=CODE; keep them working.
