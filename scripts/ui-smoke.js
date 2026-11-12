@@ -435,6 +435,21 @@ async (page) => {
     await page.waitForFunction(() => document.getElementById('chat-input').value === 'Retry this message');
     await page.evaluate(() => { window.__fixture.sendStatus = 'ok'; });
 
+    // Chat formatting: a safe subset of Markdown, built as elements and never parsed as HTML.
+    const formatted = await page.evaluate(() => {
+        window.__fixture.handlers['broadcast:chat-message']({ payload: { sender: 'AI Assistant', from: 'zz-format', text: 'To get started:\n\n1. **Visit** the site at https://leetcode.com.\n2. Click *Sign Up* and run `npm ci`.\n\nSee [the guide](https://example.com/guide) or [this](javascript:alert(1)). <img src=x onerror=alert(1)>\n- one\n- two' } });
+        const body = document.querySelector('#chat-messages .chat-message:last-child .message-body');
+        return {
+            steps: [...body.querySelectorAll('ol > li')].length, bullets: [...body.querySelectorAll('ul > li')].length,
+            bold: body.querySelector('strong')?.textContent, italic: body.querySelector('em')?.textContent, code: body.querySelector('code')?.textContent,
+            links: [...body.querySelectorAll('a')].map(a => [a.textContent, a.getAttribute('href'), a.rel]),
+            stars: body.textContent.includes('**'), images: body.querySelectorAll('img, script, iframe').length, text: body.textContent
+        };
+    });
+    assert(formatted.steps === 2 && formatted.bullets === 2 && formatted.bold === 'Visit' && formatted.italic === 'Sign Up' && formatted.code === 'npm ci' && !formatted.stars, 'Chat should render lists, bold, italics and code: ' + JSON.stringify(formatted));
+    assert(JSON.stringify(formatted.links.map(link => link.slice(0, 2))) === JSON.stringify([['https://leetcode.com', 'https://leetcode.com/'], ['the guide', 'https://example.com/guide']]) && formatted.links.every(link => link[2].includes('noopener')), 'Only real web addresses become links: ' + JSON.stringify(formatted.links));
+    assert(formatted.images === 0 && formatted.text.includes('<img src=x onerror=alert(1)>') && formatted.text.includes('this'), 'Markup in a message stays text');
+
     // 1,000 incoming messages stay bounded and hostile markup stays inert.
     await page.evaluate(async () => {
         const chat = { handleIncomingMessage: payload => window.__fixture.handlers['broadcast:chat-message']({ payload }) };

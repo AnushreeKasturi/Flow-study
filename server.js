@@ -123,7 +123,7 @@ app.post('/api/ai', limiter(10), requireUser('ai'), async (req, res) => {
         const localNow = new Date(Date.now() - tz * 60000).toISOString().slice(0, 16).replace('T', ' ');
         const completion = await groq.chat.completions.create({
             messages: [
-                { role: 'system', content: `You are a helpful study assistant in a virtual study room. Answer concisely. The person's local time is ${localNow}. If they ask to be reminded of something, call set_reminder instead of replying.` },
+                { role: 'system', content: `You are a study buddy in the chat of a shared study room. Reply like a friendly person in a chat, not an article: a few short sentences, usually under 80 words. Use a short numbered list only when there are real steps, bold only the one or two words that matter most, and no headings or tables. Use plain, encouraging language. The person's local time is ${localNow}. If they ask to be reminded of something, call set_reminder instead of replying.` },
                 { role: 'user', content: message }
             ],
             // Groq retired llama-3.1-8b-instant on 2026-08-16; this is its designated replacement.

@@ -189,6 +189,16 @@ body[data-timer="break"] .breath { display: block; }
 .chat-message.own-message { align-self: flex-end; border-radius: 16px 4px 16px 16px; background: var(--hover); }
 .ai-message { max-width: 100%; border: 1.5px solid color-mix(in srgb, var(--sun) 50%, transparent); background: transparent; }
 .message-sender { margin-bottom: 2px; font-size: .72rem; font-weight: 600; color: var(--text-3); }
+/* Chat formatting: a light touch, sized for a narrow panel. */
+.message-body > * + * { margin-top: .55em; }
+.message-body ol, .message-body ul { padding-left: 1.3em; white-space: normal; }
+.message-body li + li { margin-top: .3em; }
+.message-body li::marker { color: var(--text-3); font-weight: 600; }
+.message-body strong { font-weight: 700; color: var(--text); }
+.message-body code { padding: 1px 6px; border-radius: 6px; background: var(--hover); font: .84em ui-monospace, 'SF Mono', Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+.message-body pre { padding: 10px 12px; overflow-x: auto; border-radius: 10px; background: var(--hover); white-space: pre; }
+.message-body pre code { padding: 0; background: none; }
+.message-body a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
 #ai-pending { margin-bottom: 12px; }
 .chat-compose { flex-shrink: 0; padding: 12px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--field); }
 .chat-compose:focus-within { border-color: var(--primary); }
