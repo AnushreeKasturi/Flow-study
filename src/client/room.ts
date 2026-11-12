@@ -15,7 +15,7 @@ import * as UI from './modules/ui';
 import supabase from './modules/supabase';
 import { initAudio, loadRoomAudio } from './modules/audio';
 import { notify, openModal, closeModal, initDialogs } from './modules/feedback';
-import { getStoredUser } from './modules/utils';
+import { loadUser, currentUser, markSignedOut } from './modules/session';
 import { ensureTile, attachStream, removeTile, markLeft, setCameraOff, showReaction, setHandRaised } from './modules/stage';
 import { playSound, stopSound, setSoundVolume, isSound, type Sound } from './modules/soundscape';
 import { chime } from './modules/chime';
@@ -70,7 +70,7 @@ const ROOM_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const generateRoomCode = () => Array.from({ length: 6 }, () => ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)]).join('');
 
 function signOutLocally() {
-    localStorage.removeItem('flow_user');
+    markSignedOut();
     localStorage.removeItem('flow_named');
     sessionStorage.removeItem('flow_last_room');
     window.location.replace('/login.html');
@@ -201,7 +201,7 @@ async function joinRoom() {
     const pin = pinInput.value.trim();
     if (!/^[A-Z0-9]{6}$/.test(roomCode)) { showLobbyError('Enter the 6-character code shared by your study group.'); roomCodeInput.focus(); return; }
     if (pin && !/^\d{4}$/.test(pin)) { showLobbyError('Use a 4-digit PIN, or leave it empty.'); return; }
-    const user = getStoredUser();
+    const user = currentUser();
     if (!user) return signOutLocally();
     setRoomBusy(true);
     lobbyError.classList.add('hidden');
@@ -870,7 +870,7 @@ function bindRoomControls() {
 }
 
 async function start() {
-    const user = getStoredUser();
+    const user = await loadUser();
     if (!user) return signOutLocally();
     // Supabase reports SIGNED_OUT when a refresh token can no longer be renewed.
     supabase.auth.onAuthStateChange(event => { if (event === 'SIGNED_OUT') signOutLocally(); });

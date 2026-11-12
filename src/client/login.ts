@@ -1,5 +1,6 @@
 import { byId } from './dom';
 import { bindThemePicker } from './theme';
+import { markSignedIn } from './modules/session';
 import supabase from './modules/supabase';
 
 // DOM Elements
@@ -39,12 +40,10 @@ const clearMessages = () => {
     successMsg.style.display = 'none';
 };
 
-const persistAndRedirect = (user: { id: string; email?: string }, action: string) => {
+const persistAndRedirect = (_user: { id: string; email?: string }, action: string) => {
     redirectPending = true;
-    localStorage.setItem('flow_user', JSON.stringify({
-        id: user.id,
-        email: user.email
-    }));
+    // Supabase keeps the session; Flow only notes that someone is signed in.
+    markSignedIn();
     showSuccess(action === 'login' ? 'Logged in. Opening your room…' : 'Account created. Opening your room…');
     setTimeout(() => { window.location.href = '/room.html' + location.search; }, 500);
 };

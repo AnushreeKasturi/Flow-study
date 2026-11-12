@@ -700,18 +700,18 @@ async (page) => {
     await visible('#join-modal');
     assert(await page.locator('#app').isHidden() && await page.locator('#room-code-input').inputValue() === 'FOCUS6', 'A URL must not auto-join a room');
     // Signed out, the board is readable but nothing on it can be used.
-    await page.evaluate(() => localStorage.removeItem('flow_user'));
+    await page.evaluate(() => { localStorage.removeItem('flow_signed_in'); localStorage.removeItem('fixture-session'); });
     await page.goto(origin + '/groups.html?board');
     await page.locator('.group').first().waitFor();
     assert(await page.getByRole('link', { name: 'Log in to join', exact: true }).count() === 5 && await page.locator('#host-form').isHidden() && await page.getByRole('button', { name: 'Report', exact: true }).count() === 0, 'Visitors can read the board but not act on it');
     await page.goto(origin + '/');
     await page.locator('#live-groups.live').waitFor({ timeout: 1 }).catch(() => {});
-    await page.evaluate(() => localStorage.setItem('flow_user', JSON.stringify({ id: 'test-user', email: 'alex@example.com' })));
+    await page.evaluate(() => { localStorage.setItem('flow_signed_in', '1'); localStorage.setItem('fixture-session', '1'); });
     await page.goto(origin + '/docs.html');
     for (const width of [1440, 390, 320]) { await page.setViewportSize({ width, height: 900 }); await fitsViewport(); }
     await page.setViewportSize({ width: 1440, height: 1000 });
 
-    await page.evaluate(() => localStorage.removeItem('flow_user'));
+    await page.evaluate(() => { localStorage.removeItem('flow_signed_in'); localStorage.removeItem('fixture-session'); });
     await page.goto(origin + '/login.html');
     await page.screenshot({ path: 'output/playwright/after-login-mobile.png', fullPage: true });
 
@@ -720,12 +720,16 @@ async (page) => {
     await page.getByRole('button', { name: 'Create an account', exact: true }).click();
     await page.waitForURL(origin + '/room.html');
     await visible('#join-modal');
+    // Flow keeps no copy of the account: nothing it stores holds the email or id.
+    assert(await page.evaluate(() => Object.keys(localStorage).filter(key => key !== 'fixture-session').every(key => !/alex@example\.com|test-user/.test(localStorage.getItem(key)))), 'The account must not be copied into browser storage');
     await page.getByRole('link', { name: 'Log out', exact: true }).click();
     await page.waitForURL(origin + '/login.html');
-    assert(await page.evaluate(() => localStorage.getItem('flow_user')) === null, 'Logout must clear login');
-    await page.evaluate(() => localStorage.setItem('flow_user', '{malformed'));
+    assert(await page.evaluate(() => localStorage.getItem('flow_signed_in')) === null, 'Logout must clear the signed-in flag');
+    // A flag without a session (or an old stored copy of the account) is not a sign-in.
+    await page.evaluate(() => { localStorage.setItem('flow_signed_in', '1'); localStorage.setItem('flow_user', '{"id":"test-user","email":"alex@example.com"}'); });
     await page.goto(origin + '/room.html');
     await page.waitForURL(origin + '/login.html');
+    assert(await page.evaluate(() => localStorage.getItem('flow_user') === null && localStorage.getItem('flow_signed_in') === null), 'A stale flag and an old copy of the account are cleared');
     assert(failures.length === 0, 'Uncaught browser errors: ' + failures.join('; '));
     return { passed: true, taskRows: 500, reconciliations: 5, taskRenderMs: taskTiming, incomingMessages: 1000, retainedMessages: 300, simulatedParticipants: 16, localWebRTC: rtcResult, cleanup, browserErrors: failures };
 

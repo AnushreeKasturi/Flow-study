@@ -1,5 +1,6 @@
 import type { Task, TaskStats } from '../types';
 import { getSupabase } from './supabase';
+import { currentUser } from './session';
 import { updatePresence } from './presence';
 import { notify } from './feedback';
 
@@ -28,14 +29,14 @@ export const addTask = async (title: string) => {
     title = title.trim();
     if (!roomId || adding || !title || title.length > 100) return false;
     adding = true;
-    const user = JSON.parse(localStorage.getItem('flow_user') || 'null');
-    const task = { id: 'temp-' + crypto.randomUUID(), room_id: roomId, title, created_by: user?.id, completed: false, pending: true };
+    const createdBy = currentUser()?.id ?? null;
+    const task = { id: 'temp-' + crypto.randomUUID(), room_id: roomId, title, created_by: createdBy, completed: false, pending: true };
     pending.add(task.id);
     roomTasks.push(task);
     renderTasks();
     try {
         const { data, error } = await getSupabase().from('tasks').insert({
-            room_id: roomId, title, created_by: user?.id, completed: false
+            room_id: roomId, title, created_by: createdBy, completed: false
         }).select();
         if (error || !data?.[0]) throw new Error('Task was not saved');
         roomTasks = roomTasks.filter(row => row.id !== task.id && row.id !== data[0].id);

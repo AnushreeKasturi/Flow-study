@@ -1,6 +1,6 @@
 import type { AudioProvider } from '../types';
 import { byId } from '../dom';
-import { youtubeEmbedUrl, spotifyEmbedUrl } from './utils';
+import { youtubeEmbedUrl, spotifyEmbedUrl, isEmbedUrl } from './utils';
 import { broadcastAudio } from './socket';
 import { notify } from './feedback';
 
@@ -26,7 +26,12 @@ function selectProvider(next: AudioProvider) {
     input.value = links[next];
     input.placeholder = next === 'youtube' ? 'YouTube link' : 'Spotify link';
     input.setAttribute('aria-label', next === 'youtube' ? 'YouTube video or playlist link' : 'Spotify track, album, or playlist link');
-    if (sources[next] && frame(next).getAttribute('src') !== sources[next]) frame(next).src = sources[next]!;
+    if (sources[next] && frame(next).getAttribute('src') !== sources[next]) point(frame(next), sources[next]!);
+}
+
+// The one place a player's address is set, and it only accepts an official embed URL.
+function point(player: HTMLIFrameElement, embed: string) {
+    if (isEmbedUrl(embed)) player.src = new URL(embed).href;
 }
 
 export function loadRoomAudio(next: AudioProvider, url: string) {
@@ -35,7 +40,7 @@ export function loadRoomAudio(next: AudioProvider, url: string) {
     links[next] = url;
     sources[next] = embed;
     selectProvider(next);
-    frame(next).src = embed;
+    point(frame(next), embed);
     return true;
 }
 

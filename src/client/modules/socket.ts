@@ -1,6 +1,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { SocketHandlers, Participants, Participant, Signal, TimerState, AudioProvider } from '../types';
 import { getSupabase } from './supabase';
+import { currentUser } from './session';
 import settings from '../../../supabase.config.json';
 
 // Off until sql/007 is applied; see SECURITY.md, "Turning on private room channels".
@@ -32,8 +33,7 @@ export const initSocket = (roomId: string, username: string, isDummyMedia: boole
     currentIsDummyMedia = isDummyMedia;
     currentHandRaised = false;
     reconnectAttempts = 0;
-    const user = JSON.parse(localStorage.getItem('flow_user') || 'null');
-    myUserId = user?.id || crypto.randomUUID();
+    myUserId = currentUser()?.id || crypto.randomUUID();
 
     connectChannel();
 };

@@ -23,7 +23,8 @@ const SKY = process.env.FLOW_MARKETING_SKY || 'warm';
         await context.addInitScript({ path: resolve(__dirname, 'supabase-fixture.js') });
         await context.addInitScript(sky => {
             localStorage.setItem('flow_theme', sky);
-            localStorage.setItem('flow_user', JSON.stringify({ id: 'test-user', email: 'alex@example.com' }));
+            localStorage.setItem('flow_signed_in', '1');
+            localStorage.setItem('fixture-session', '1');
             localStorage.setItem('flow_first_session', 'done');
             sessionStorage.setItem('flow_intro', '1');
             if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = async () => { throw new Error('No camera for stills'); };
