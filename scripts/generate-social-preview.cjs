@@ -10,9 +10,11 @@ const { pathToFileURL } = require('node:url');
         const fonts = await page.evaluate(() => document.fonts.load('500 64px "Bricolage"').then(loaded => loaded.length));
         if (!fonts) throw new Error('The Bricolage Grotesque font did not load (run npm ci first); preview was not generated.');
         await page.locator('.sky').evaluate(image => image.decode());
+        // Old social cards may still reference the PNG; keep both URLs current.
+        await page.screenshot({ path: resolve(__dirname, '../public/social-preview.png') });
         // JPEG: the image is photographic, so it is a fraction of the size of a PNG.
         await page.screenshot({ path: resolve(__dirname, '../public/social-preview.jpg'), type: 'jpeg', quality: 92 });
-        console.log('Generated public/social-preview.jpg (1200 × 630)');
+        console.log('Generated public/social-preview.png and public/social-preview.jpg (1200 × 630)');
     } finally {
         await browser.close();
     }

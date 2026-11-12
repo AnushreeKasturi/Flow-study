@@ -95,7 +95,7 @@ Database RLS protects table access. Private Realtime Broadcast authorization nee
 
 ## Shared-link preview
 
-All pages include static Open Graph and large-image card metadata, with a branded 1200 × 630 JPEG at `/social-preview.jpg`. Room invitations use the same generic preview; room codes and PINs are not included in the card metadata.
+All pages include static Open Graph and large-image card metadata, with a branded 1200 × 630 JPEG at `/social-preview.jpg`. The legacy `/social-preview.png` URL serves the same artwork for cards with cached metadata; the generator updates both formats together. Room invitations use the same generic preview; room codes and PINs are not included in the card metadata.
 
 The artwork source is [`scripts/social-preview.html`](scripts/social-preview.html). After editing it, regenerate the committed image:
 
