@@ -95,7 +95,7 @@ Database RLS protects table access. Private Realtime Broadcast authorization nee
 
 ## Shared-link preview
 
-All pages include static Open Graph and large-image card metadata, with a branded 1200 × 630 PNG at `/social-preview.png`. Room invitations use the same generic preview; room codes and PINs are not included in the card metadata.
+All pages include static Open Graph and large-image card metadata, with a branded 1200 × 630 JPEG at `/social-preview.jpg`. Room invitations use the same generic preview; room codes and PINs are not included in the card metadata.
 
 The artwork source is [`scripts/social-preview.html`](scripts/social-preview.html). After editing it, regenerate the committed image:
 
@@ -104,7 +104,7 @@ npx playwright install chromium
 npm run preview:social
 ```
 
-Generation loads Instrument Sans from Google Fonts; the deployed PNG has no font or browser dependency. CI checks that crawlers can fetch the metadata and correctly sized image without authentication. Social apps control their own preview caches, so existing shared links may take time to refresh.
+Generation uses the local Bricolage Grotesque font and the committed [lake artwork](scripts/assets/social-preview-lake.png), created with the built-in imagegen tool ([prompt](scripts/assets/social-preview-prompt.md)). No network access is needed to render it; the deployed JPEG has no font or browser dependency. CI checks that crawlers can fetch the metadata and correctly sized image without authentication. Social apps control their own preview caches, so existing shared links may take time to refresh.
 
 ## Architecture
 

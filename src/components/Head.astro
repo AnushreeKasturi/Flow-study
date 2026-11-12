@@ -4,8 +4,8 @@ import '../styles/global.css';
 interface Props { title?: string; page?: string; }
 const { title = 'Flow | Study better, together', page = '' } = Astro.props;
 const description = 'A shared space for focused study. Set a timer, work on your goals, and study better together with Flow.';
-const image = 'https://flow-study.me/social-preview.png';
-const imageAlt = 'Flow. Study until the sun sets. A sun low over the horizon beside a 25-minute focus timer.';
+const image = 'https://flow-study.me/social-preview.jpg';
+const imageAlt = 'flow-study.me, centered over a dreamy, blurred blue lake framed by soft green grasses.';
 // Every public page points at itself. The room is behind a login and has no
 // public content, so it (like the built index) keeps the home page.
 const homePaths = new Set(['/index.html', '/room.html']);
@@ -23,7 +23,7 @@ const pageUrl = new URL(homePaths.has(Astro.url.pathname) ? '/' : Astro.url.path
 <meta property="og:title" content="Flow | Study better, together">
 <meta property="og:description" content={description}>
 <meta property="og:image" content={image}>
-<meta property="og:image:type" content="image/png">
+<meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content={imageAlt}>
