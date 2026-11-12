@@ -223,11 +223,27 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.throws(() => asUser(two, `SELECT public.transfer_host('${openRoom}', '${two}');`), /Command failed/, 'Only the host can hand over');
             assert.throws(() => asUser(one, `SELECT public.transfer_host('${openRoom}', '${stranger}');`), /Command failed/, 'The new host must be in the room');
             assert.throws(() => asUser(one, `SELECT public.transfer_host('${openRoom}', '${three}');`), /Command failed/, 'Someone removed cannot become host');
+            // Someone who already lists another room keeps that listing; this room comes off the board instead.
+            const otherRoom = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+            run(database, `INSERT INTO public.rooms(id,room_code,is_locked,created_by) VALUES('${otherRoom}','OTHER3',false,'${fresh}');
+                INSERT INTO public.room_participants(room_id,user_id) VALUES ('${otherRoom}','${fresh}'), ('${openRoom}','${fresh}');
+                INSERT INTO public.open_rooms(host_id,room_id,host_name,topic,seats) VALUES('${fresh}','${otherRoom}','Kai','Kai''s own group',4);`);
+            asUser(one, `SELECT public.transfer_host('${openRoom}', '${fresh}');`);
+            assert.equal(run(database, `SELECT count(*) FROM public.open_rooms WHERE room_id = '${openRoom}';`).trim(), '0', 'This room comes off the board');
+            assert.equal(run(database, `SELECT topic FROM public.open_rooms WHERE host_id = '${fresh}';`).trim(), "Kai's own group", 'Their own listing is left alone');
+            asUser(fresh, `SELECT public.transfer_host('${openRoom}', '${one}');`);
+            run(database, `INSERT INTO public.open_rooms(host_id,room_id,host_name,topic,seats) VALUES('${one}','${openRoom}','Alex','Organic chemistry revision',6); DELETE FROM realtime.sent;`);
             assert.equal(asUser(one, `SELECT public.transfer_host('${openRoom}', '${two}');`), 'Sam', 'Handing over returns the new host\'s name');
             assert.equal(run(database, `SELECT created_by::text FROM public.rooms WHERE id = '${openRoom}';`).trim(), two, 'The room has a new host');
             assert.equal(run(database, `SELECT host_id::text || ' ' || host_name FROM public.open_rooms WHERE room_id = '${openRoom}';`).trim(), two + ' Sam', 'The listing follows the new host, under their name');
             assert.equal(run(database, "SELECT count(*) FROM realtime.sent WHERE event = 'host-changed' AND payload->>'name' = 'Sam';").trim(), '1', 'The room is told who the host is now');
             assert.notEqual(run(database, "SELECT count(*) FROM realtime.sent WHERE topic = 'board' AND event = 'changed';").trim(), '0', 'The board is pinged when a listing changes');
+            // A statement that changes nothing sends nothing; real changes are throttled.
+            run(database, "DELETE FROM realtime.sent WHERE topic = 'board'; UPDATE public.board_ping SET at = 'epoch';");
+            asUser(one, "UPDATE public.open_rooms SET topic = 'Nothing' WHERE host_id = '00000000-0000-4000-8000-000000000000';");
+            assert.equal(run(database, "SELECT count(*) FROM realtime.sent WHERE topic = 'board';").trim(), '0', 'An update that changes no rows does not ping');
+            asUser(two, "UPDATE public.open_rooms SET seats = 5; UPDATE public.open_rooms SET seats = 4; UPDATE public.open_rooms SET seats = 6;");
+            assert.equal(run(database, "SELECT count(*) FROM realtime.sent WHERE topic = 'board';").trim(), '1', 'A burst of changes sends one ping');
             assert.throws(() => asUser(one, `SELECT public.end_room('${openRoom}');`), /Command failed/, 'The old host can no longer end the room');
             run(database, `INSERT INTO public.sessions(room_id,user_id,mode,duration_seconds) VALUES('${openRoom}','${one}','focus',600);`);
             asUser(two, `SELECT public.end_room('${openRoom}');`);

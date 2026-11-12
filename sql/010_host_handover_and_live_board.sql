@@ -108,9 +108,13 @@ BEGIN
   SELECT COALESCE(NULLIF(trim(display_name), ''), 'Host') INTO v_name FROM public.profiles WHERE id = p_user;
   v_name := left(COALESCE(v_name, 'Host'), 40);
   UPDATE public.rooms SET created_by = p_user WHERE id = p_room;
-  -- One listing per host: an old listing of theirs elsewhere gives way to this one.
-  DELETE FROM public.open_rooms WHERE host_id = p_user AND room_id <> p_room;
-  UPDATE public.open_rooms SET host_id = p_user, host_name = v_name WHERE room_id = p_room;
+  -- One listing per host. If they already list another room, that listing is
+  -- theirs and is left alone; this room comes off the board instead.
+  IF EXISTS (SELECT 1 FROM public.open_rooms WHERE host_id = p_user AND room_id <> p_room) THEN
+    DELETE FROM public.open_rooms WHERE room_id = p_room;
+  ELSE
+    UPDATE public.open_rooms SET host_id = p_user, host_name = v_name WHERE room_id = p_room;
+  END IF;
   PERFORM public.flow_notify('room:' || p_room::text, 'host-changed', jsonb_build_object('host', p_user, 'name', v_name));
   RETURN v_name;
 END $$;
@@ -184,17 +188,36 @@ REVOKE ALL ON FUNCTION public.room_send(UUID, TEXT, JSONB) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.room_send(UUID, TEXT, JSONB) TO authenticated;
 
 -- ── The board, live ─────────────────────────────────────────────────────────
--- Any change to a listing or a plan pings the private "board" channel. The ping
+-- A change to a listing or a plan pings the private "board" channel. The ping
 -- carries nothing; pages fetch the board again, through the usual policies.
+-- Only statements that really changed a row ping, and never more than twice a
+-- second in total, so no one can flood everyone's board.
+CREATE TABLE IF NOT EXISTS public.board_ping (id INT PRIMARY KEY CHECK (id = 1), at TIMESTAMPTZ NOT NULL);
+INSERT INTO public.board_ping VALUES (1, 'epoch') ON CONFLICT (id) DO NOTHING;
+ALTER TABLE public.board_ping ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.board_ping FROM anon, authenticated;
+
 CREATE OR REPLACE FUNCTION public.board_changed() RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  PERFORM public.flow_notify('board', 'changed', '{}'::jsonb);
+  IF NOT EXISTS (SELECT 1 FROM changed_rows) THEN RETURN NULL; END IF;
+  UPDATE public.board_ping SET at = now() WHERE id = 1 AND at < now() - interval '500 milliseconds';
+  IF FOUND THEN PERFORM public.flow_notify('board', 'changed', '{}'::jsonb); END IF;
   RETURN NULL;
 END $$;
 DROP TRIGGER IF EXISTS open_rooms_board_changed ON public.open_rooms;
-CREATE TRIGGER open_rooms_board_changed AFTER INSERT OR UPDATE OR DELETE ON public.open_rooms FOR EACH STATEMENT EXECUTE FUNCTION public.board_changed();
 DROP TRIGGER IF EXISTS planned_groups_board_changed ON public.planned_groups;
-CREATE TRIGGER planned_groups_board_changed AFTER INSERT OR UPDATE OR DELETE ON public.planned_groups FOR EACH STATEMENT EXECUTE FUNCTION public.board_changed();
+DO $$
+DECLARE t TEXT; e TEXT;
+BEGIN
+  -- A trigger with a transition table can watch only one kind of change, so one per kind.
+  FOREACH t IN ARRAY ARRAY['open_rooms', 'planned_groups'] LOOP
+    FOREACH e IN ARRAY ARRAY['INSERT', 'UPDATE', 'DELETE'] LOOP
+      EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', t || '_board_' || lower(e), t);
+      EXECUTE format('CREATE TRIGGER %I AFTER %s ON public.%I REFERENCING %s TABLE AS changed_rows FOR EACH STATEMENT EXECUTE FUNCTION public.board_changed()',
+        t || '_board_' || lower(e), e, t, CASE WHEN e = 'DELETE' THEN 'OLD' ELSE 'NEW' END);
+    END LOOP;
+  END LOOP;
+END $$;
 
 -- Anyone may listen on the board channel (the board itself is public); nobody may send on it.
 DO $$
