@@ -39,7 +39,6 @@ test('HTTP boundaries and bounded local concurrency', async t => {
         const expected = {
             'og:type': 'website',
             'og:site_name': 'Flow',
-            'og:url': 'https://flow-study.me/',
             'og:title': 'Flow | Study better, together',
             'og:image': 'https://flow-study.me/social-preview.png',
             'og:image:type': 'image/png',
@@ -48,8 +47,18 @@ test('HTTP boundaries and bounded local concurrency', async t => {
             'twitter:card': 'summary_large_image',
             'twitter:image': 'https://flow-study.me/social-preview.png'
         };
+        // Every public page points at itself; the room (also served for /?room=)
+        // is behind a login and keeps the home page.
+        const canonicalFor = {
+            '/': 'https://flow-study.me/',
+            '/start.html': 'https://flow-study.me/start.html',
+            '/login.html': 'https://flow-study.me/login.html',
+            '/groups.html': 'https://flow-study.me/groups.html',
+            '/docs.html': 'https://flow-study.me/docs.html',
+            '/?room=FOCUS6': 'https://flow-study.me/'
+        };
         const crawler = { headers: { 'User-Agent': 'facebookexternalhit/1.1' } };
-        for (const path of ['/', '/login.html', '/?room=FOCUS6']) {
+        for (const [path, canonical] of Object.entries(canonicalFor)) {
             const response = await fetch(origin + path, crawler);
             assert.equal(response.status, 200);
             const head = (await response.text()).split('</head>')[0];
@@ -61,7 +70,8 @@ test('HTTP boundaries and bounded local concurrency', async t => {
             for (const key of ['description', 'og:description', 'og:image:alt', 'twitter:title', 'twitter:description', 'twitter:image:alt']) {
                 assert.match(head, new RegExp('<meta (?:property|name)="' + key + '" content="[^"]+"'), path + ': ' + key);
             }
-            assert.match(head, /<link rel="canonical" href="https:\/\/flow-study\.me\/">/);
+            assert.equal(head.match(/<meta property="og:url" content="([^"]+)">/)?.[1], canonical, path + ': og:url');
+            assert.equal(head.match(/<link rel="canonical" href="([^"]+)">/)?.[1], canonical, path + ': canonical');
         }
         const image = await fetch(origin + '/social-preview.png', crawler);
         assert.equal(image.status, 200);

@@ -6,16 +6,20 @@ const { title = 'Flow | Study better, together', page = '' } = Astro.props;
 const description = 'A shared space for focused study. Set a timer, work on your goals, and study better together with Flow.';
 const image = 'https://flow-study.me/social-preview.png';
 const imageAlt = 'Flow. Study until the sun sets. A sun low over the horizon beside a 25-minute focus timer.';
+// Every public page points at itself. The room is behind a login and has no
+// public content, so it (like the built index) keeps the home page.
+const homePaths = new Set(['/index.html', '/room.html']);
+const pageUrl = new URL(homePaths.has(Astro.url.pathname) ? '/' : Astro.url.pathname, Astro.site ?? new URL('https://flow-study.me/'));
 ---
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{title}</title>
 <meta name="description" content={description}>
-<link rel="canonical" href="https://flow-study.me/">
+<link rel="canonical" href={pageUrl.href}>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Flow">
 <meta property="og:locale" content="en_US">
-<meta property="og:url" content="https://flow-study.me/">
+<meta property="og:url" content={pageUrl.href}>
 <meta property="og:title" content="Flow | Study better, together">
 <meta property="og:description" content={description}>
 <meta property="og:image" content={image}>
