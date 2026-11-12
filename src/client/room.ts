@@ -757,6 +757,14 @@ function bindRoomControls() {
         requestAnimationFrame(() => inviteInput.select());
     });
     on('invite-empty-btn', () => byId<HTMLButtonElement>('share-link-btn').click());
+    on('header-room-code', async () => {
+        try {
+            await navigator.clipboard.writeText(currentRoomCode);
+            notify('Room code copied.');
+        } catch {
+            notify(`Copying was blocked. The room code is ${currentRoomCode}.`, 'error');
+        }
+    });
     on('copy-invite-btn', async () => {
         try {
             await navigator.clipboard.writeText(inviteInput.value);

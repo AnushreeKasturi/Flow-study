@@ -27,6 +27,7 @@ body[data-timer="break"] .sun { animation: breathe 10s ease-in-out infinite; }
 .header-right select { width: 132px; border-color: color-mix(in srgb, var(--text) 22%, transparent); }
 .room-info { display: flex; gap: 16px; align-items: center; font-size: .86rem; font-weight: 500; }
 .room-info .highlight { padding: 4px 10px; margin-left: 6px; border-radius: 999px; background: var(--text); color: var(--bg); font-weight: 700; letter-spacing: .1em; }
+.room-info button.highlight { border: 0; font: inherit; font-weight: 700; cursor: copy; }
 .participant-count { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
 .me-chip { display: flex; align-items: center; gap: 10px; min-width: 0; margin-right: 6px; padding: 4px 14px 4px 4px; border-radius: 14px; background: color-mix(in srgb, var(--sky-top) 55%, transparent); cursor: pointer; transition: background-color .15s; }
 .me-chip:hover { background: color-mix(in srgb, var(--text) 14%, transparent); }

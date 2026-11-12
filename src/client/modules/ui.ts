@@ -21,7 +21,9 @@ export const initial = (name: string) => (name.trim().charAt(0) || '?').toUpperC
 const statusText = (status: string) => status.replace(/^[🟢🟡]\s*/u, '');
 
 export const updateRoomInfo = (roomCode: string, count: number) => {
-    byId<HTMLElement>('header-room-code').textContent = roomCode;
+    const code = byId<HTMLElement>('header-room-code');
+    code.textContent = roomCode;
+    code.setAttribute('aria-label', `Copy room code ${roomCode}`);
     els.count.textContent = String(count);
 };
 

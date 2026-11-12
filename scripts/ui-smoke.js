@@ -261,6 +261,20 @@ async (page) => {
     await page.keyboard.press('Escape');
     assert(await page.evaluate(() => document.activeElement.id) === 'open-timer-settings-btn', 'Dialog should restore focus');
 
+    // The room code in the header copies itself, by mouse or keyboard.
+    await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.__copied = text; } } }));
+    const codeButton = page.getByRole('button', { name: 'Copy room code FOCUS6', exact: true });
+    await codeButton.click();
+    assert(await page.evaluate(() => window.__copied) === 'FOCUS6', 'Clicking the room code should copy it');
+    assert((await page.locator('#toast').innerText()) === 'Room code copied.', 'Copying the room code should confirm with a toast');
+    await page.evaluate(() => { window.__copied = ''; });
+    await codeButton.focus();
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => window.__copied === 'FOCUS6');
+    await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('Denied'); } } }));
+    await codeButton.click();
+    await page.waitForFunction(() => document.getElementById('toast').textContent.includes('The room code is FOCUS6'));
+
     // Clipboard denial falls back to a selectable invite link.
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('Denied'); } } }));
     await page.getByRole('button', { name: 'Invite', exact: true }).click();
