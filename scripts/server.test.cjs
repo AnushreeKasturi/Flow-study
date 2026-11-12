@@ -40,12 +40,12 @@ test('HTTP boundaries and bounded local concurrency', async t => {
             'og:type': 'website',
             'og:site_name': 'Flow',
             'og:title': 'Flow | Study better, together',
-            'og:image': 'https://flow-study.me/social-preview.png',
-            'og:image:type': 'image/png',
+            'og:image': 'https://flow-study.me/social-preview.jpg',
+            'og:image:type': 'image/jpeg',
             'og:image:width': '1200',
             'og:image:height': '630',
             'twitter:card': 'summary_large_image',
-            'twitter:image': 'https://flow-study.me/social-preview.png'
+            'twitter:image': 'https://flow-study.me/social-preview.jpg'
         };
         // Every public page points at itself; the room (also served for /?room=)
         // is behind a login and keeps the home page.
@@ -73,14 +73,17 @@ test('HTTP boundaries and bounded local concurrency', async t => {
             assert.equal(head.match(/<meta property="og:url" content="([^"]+)">/)?.[1], canonical, path + ': og:url');
             assert.equal(head.match(/<link rel="canonical" href="([^"]+)">/)?.[1], canonical, path + ': canonical');
         }
-        const image = await fetch(origin + '/social-preview.png', crawler);
+        const image = await fetch(origin + '/social-preview.jpg', crawler);
         assert.equal(image.status, 200);
-        assert.match(image.headers.get('content-type'), /^image\/png/);
-        const png = Buffer.from(await image.arrayBuffer());
-        assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
-        assert.equal(png.readUInt32BE(16), 1200);
-        assert.equal(png.readUInt32BE(20), 630);
-        assert(png.length < 1000000, 'Preview should remain below 1 MB');
+        assert.match(image.headers.get('content-type'), /^image\/jpeg/);
+        const jpeg = Buffer.from(await image.arrayBuffer());
+        assert.equal(jpeg.subarray(0, 2).toString('hex'), 'ffd8');
+        // Chromium's baseline JPEG stores its dimensions in the SOF0 frame header.
+        const frame = jpeg.indexOf(Buffer.from([0xff, 0xc0]));
+        assert(frame > 0, 'Preview should contain a baseline JPEG frame');
+        assert.equal(jpeg.readUInt16BE(frame + 7), 1200);
+        assert.equal(jpeg.readUInt16BE(frame + 5), 630);
+        assert(jpeg.length < 1000000, 'Preview should remain below 1 MB');
     });
     await t.test('pages carry security headers and never ship the offline demo backend', async () => {
         for (const path of ['/', '/start.html', '/login.html', '/room.html', '/groups.html', '/docs.html']) {
