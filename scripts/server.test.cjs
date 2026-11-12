@@ -40,12 +40,12 @@ test('HTTP boundaries and bounded local concurrency', async t => {
             'og:type': 'website',
             'og:site_name': 'Flow',
             'og:title': 'Flow | Study better, together',
-            'og:image': 'https://flow-study.me/social-preview.jpg',
+            'og:image': 'https://flow-study.me/social-preview-lake.jpg',
             'og:image:type': 'image/jpeg',
             'og:image:width': '1200',
             'og:image:height': '630',
             'twitter:card': 'summary_large_image',
-            'twitter:image': 'https://flow-study.me/social-preview.jpg'
+            'twitter:image': 'https://flow-study.me/social-preview-lake.jpg'
         };
         // Every public page points at itself; the room (also served for /?room=)
         // is behind a login and keeps the home page.
@@ -73,7 +73,7 @@ test('HTTP boundaries and bounded local concurrency', async t => {
             assert.equal(head.match(/<meta property="og:url" content="([^"]+)">/)?.[1], canonical, path + ': og:url');
             assert.equal(head.match(/<link rel="canonical" href="([^"]+)">/)?.[1], canonical, path + ': canonical');
         }
-        const image = await fetch(origin + '/social-preview.jpg', crawler);
+        const image = await fetch(origin + '/social-preview-lake.jpg', crawler);
         assert.equal(image.status, 200);
         assert.match(image.headers.get('content-type'), /^image\/jpeg/);
         const jpeg = Buffer.from(await image.arrayBuffer());
@@ -84,6 +84,10 @@ test('HTTP boundaries and bounded local concurrency', async t => {
         assert.equal(jpeg.readUInt16BE(frame + 7), 1200);
         assert.equal(jpeg.readUInt16BE(frame + 5), 630);
         assert(jpeg.length < 1000000, 'Preview should remain below 1 MB');
+        const legacyJpeg = await fetch(origin + '/social-preview.jpg', crawler);
+        assert.equal(legacyJpeg.status, 200);
+        assert.match(legacyJpeg.headers.get('content-type'), /^image\/jpeg/);
+        assert.deepEqual(Buffer.from(await legacyJpeg.arrayBuffer()), jpeg, 'Both JPEG URLs should serve the current artwork');
         const legacyImage = await fetch(origin + '/social-preview.png', crawler);
         assert.equal(legacyImage.status, 200, 'Cached cards can still fetch the legacy image URL');
         assert.match(legacyImage.headers.get('content-type'), /^image\/png/);
