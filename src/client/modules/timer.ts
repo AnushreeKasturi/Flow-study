@@ -2,7 +2,7 @@ import type { TimerState, TimerMode, Durations } from '../types';
 import { byId } from '../dom';
 import { updateTimer as socketUpdateTimer, getMyUserId } from './socket';
 import { getSupabase } from './supabase';
-import { finishFocus, confirmFocus } from './focus-progress';
+import { finishFocus, confirmFocus, startFocus } from './focus-progress';
 import { fetchDailyFocusTime } from './presence';
 import { openModal, closeModal, notify } from './feedback';
 import { ROUNDS } from './ui';
@@ -143,23 +143,33 @@ const stopLocalTick = () => {
     }
 };
 
+// Saves the focus time not yet stored. A block that ran to the end is saved as
+// 'focus' and counts as a completed session; time from a block that was paused,
+// switched, or left (or a checkpoint of one still running) is saved as
+// 'focus-partial', which counts toward minutes and streaks but not sessions.
+// With `keepGoing`, the block carries on being timed afterwards.
+export function saveFocus(kind: 'focus' | 'focus-partial' = 'focus-partial', keepGoing = false) {
+    const userId = getMyUserId();
+    const completed = finishFocus();
+    if (keepGoing) startFocus();
+    // Under fifteen seconds is not worth a row; it still counts while the page is open.
+    if (!userId || !roomId || !completed || (kind === 'focus-partial' && completed.seconds < 15)) return Promise.resolve();
+    return Promise.resolve(getSupabase().from('sessions').insert([{
+        id: completed.id, user_id: userId, room_id: roomId, mode: kind,
+        duration_seconds: completed.seconds, completed_at: completed.completedAt
+    }])).then(async ({ error }) => {
+        if (error) throw error;
+        if (await fetchDailyFocusTime()) confirmFocus(completed.id);
+        document.dispatchEvent(new Event('session-completed'));
+    }).catch(() => notify('Your focus time could not be saved. It is still counted while this page stays open.', 'error'));
+}
+
 const handleComplete = () => {
     stopLocalTick();
     let title, msg;
 
     if (state.mode === 'focus') {
-        const userId = getMyUserId();
-        const completed = finishFocus();
-        if (userId && completed) {
-            Promise.resolve(getSupabase().from('sessions').insert([{
-                id: completed.id, user_id: userId, room_id: roomId, mode: 'focus',
-                duration_seconds: completed.seconds, completed_at: completed.completedAt
-            }])).then(async ({ error }) => {
-                if (error) throw error;
-                if (await fetchDailyFocusTime()) confirmFocus(completed.id);
-                document.dispatchEvent(new Event('session-completed'));
-            }).catch(() => notify('This session could not be saved. Its focus time is still included while this page stays open.', 'error'));
-        }
+        saveFocus('focus');
 
         // Every fourth focus block earns the long break.
         state.sessionCount++;

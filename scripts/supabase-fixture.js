@@ -37,7 +37,7 @@ window.supabase = { createClient() {
                 delete() { action = 'delete'; return this; },
                 then(resolve, reject) {
                     return (async () => {
-                    fixture.calls.push({ table, action });
+                    fixture.calls.push(table === 'open_rooms' && action !== 'select' ? { table, action, payload } : { table, action });
                     await new Promise(resolve => setTimeout(resolve, fixture.delay));
                     // The real open_rooms table hides room_id, and an upsert must read what it overwrites.
                     if (action === 'denied') return { data: null, error: { code: '42501', message: 'permission denied for table open_rooms' } };
@@ -51,10 +51,10 @@ window.supabase = { createClient() {
                     let rows = tables[table].filter(row => filters.every(filter => filter(row)));
                     if (action === 'insert') {
                         // Stands in for column defaults: a new room belongs to whoever made it.
-                        rows = (Array.isArray(payload) ? payload : [payload]).map(row => ({ id: crypto.randomUUID(), ...(table === 'rooms' ? { created_by: user.id } : {}), ...(table === 'planned_groups' ? { going: 1, base: 1 } : {}), ...row }));
+                        rows = (Array.isArray(payload) ? payload : [payload]).map(row => ({ id: crypto.randomUUID(), ...(table === 'rooms' ? { created_by: user.id } : {}), ...(table === 'planned_groups' ? { going: 1, base: 1 } : {}), ...row, ...(table === 'open_rooms' ? { last_seen: new Date().toISOString() } : {}) }));
                         tables[table].push(...rows);
                     }
-                    if (action === 'update') rows.forEach(row => Object.assign(row, payload));
+                    if (action === 'update') rows.forEach(row => Object.assign(row, payload, table === 'open_rooms' ? { last_seen: new Date().toISOString() } : {})); // like the database's check-in stamp
                     if (action === 'delete') tables[table] = tables[table].filter(row => !rows.includes(row));
                     // Stands in for the database trigger that keeps "going" in step with sign-ups.
                     if (table === 'planned_group_members' && action !== 'select') tables.planned_groups.forEach(group => { group.going = group.base + tables.planned_group_members.filter(member => member.group_id === group.id).length; });

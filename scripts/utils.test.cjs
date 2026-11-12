@@ -96,3 +96,32 @@ test('hosted Speed Insights omits invitation parameters and stays off localhost'
         assert.equal(filter({ url: 'https://' + hostname + '/?room=PRIVATE#token', metric: 'LCP' }).url, 'https://' + hostname + '/');
     }
 });
+
+test('reminder commands are understood without the assistant', async () => {
+    const source = compile('src/client/modules/reminder-parse.ts');
+    const { parseRemind, describeWhen } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+    const now = new Date(2026, 10, 12, 21, 0, 0).getTime(); // 9:00 pm local
+    const minutesFrom = request => Math.round((request.at - now) / 60000);
+    assert.deepEqual([parseRemind('/remind 20m stretch', now).text, minutesFrom(parseRemind('/remind 20m stretch', now))], ['stretch', 20]);
+    assert.equal(minutesFrom(parseRemind('/remind in 1h 30m send the email', now)), 90);
+    assert.equal(parseRemind('/remind in 1h 30m send the email', now).text, 'send the email');
+    assert.equal(minutesFrom(parseRemind('/remind me in half an hour to review chapter 4', now)), 30);
+    assert.equal(parseRemind('/remind me in half an hour to review chapter 4', now).text, 'review chapter 4');
+    assert.equal(minutesFrom(parseRemind('/remind 45 minutes check the oven', now)), 45);
+    // Clock times: later today, or tomorrow once passed.
+    assert.equal(new Date(parseRemind('/remind at 21:30 call home', now).at).getHours(), 21);
+    assert.equal(minutesFrom(parseRemind('/remind at 21:30 call home', now)), 30);
+    assert.equal(minutesFrom(parseRemind('/remind at 10pm call home', now)), 60);
+    assert.equal(minutesFrom(parseRemind('/remind at 8:15 am gym', now)), 11 * 60 + 15, 'A time already past is tomorrow');
+    assert.equal(minutesFrom(parseRemind('/remind at 12am sleep', now)), 3 * 60);
+    // Timer-linked.
+    assert.deepEqual(parseRemind('/remind break drink water', now), { trigger: 'break', text: 'drink water' });
+    assert.deepEqual(parseRemind('/remind at the next break stand up', now), { trigger: 'break', text: 'stand up' });
+    assert.deepEqual(parseRemind('/remind after this block email Sam', now), { trigger: 'break', text: 'email Sam' });
+    assert.deepEqual(parseRemind('/remind when focus starts phone away', now), { trigger: 'focus', text: 'phone away' });
+    // Refused: no time, no text, out of range.
+    for (const bad of ['/remind', '/remind stretch', '/remind 20m', '/remind 0m stretch', '/remind 2000m stretch', '/remind at 25:00 x', '/remind at 7:75 x', '/remind break']) assert.equal(parseRemind(bad, now), null, bad);
+    assert.equal(parseRemind('/remind 5m ' + 'x'.repeat(500), now).text.length, 120);
+    assert.equal(describeWhen({ trigger: 'break' }, now), 'at the next break');
+    assert.match(describeWhen({ at: now + 20 * 60000 }, now), /^in 20 min/);
+});

@@ -238,6 +238,48 @@ async (page) => {
     assert(await page.locator('#chat-unread').isHidden(), 'A message read as it arrives needs no badge');
     await page.getByRole('tab', { name: 'Tasks', exact: true }).click();
 
+    // Reminders: set from chat, listed in the bell, cancelled, and fired by the timer; never posted to the room.
+    await page.getByRole('tab', { name: 'Chat', exact: true }).click();
+    const sendsBefore = await page.evaluate(() => window.__fixture.calls.filter(call => call.value?.event === 'chat-message').length);
+    await page.getByLabel('Message to room').fill('/remind 20m stretch');
+    await page.getByLabel('Message to room').press('Enter');
+    assert((await page.locator('#chat-messages .local-note').last().innerText()).includes('Reminder set in 20 min'), 'A reminder is confirmed privately in the chat');
+    await page.getByLabel('Message to room').fill('/remind break drink water');
+    await page.getByLabel('Message to room').press('Enter');
+    await page.getByLabel('Message to room').fill('/remind sometime maybe');
+    await page.getByLabel('Message to room').press('Enter');
+    assert(await page.getByLabel('Message to room').inputValue() === '/remind sometime maybe', 'An unreadable reminder keeps the text for fixing');
+    await page.getByLabel('Message to room').fill('');
+    assert(await page.evaluate(() => window.__fixture.calls.filter(call => call.value?.event === 'chat-message').length) === sendsBefore, 'Reminders are never sent to the room');
+    await page.locator('#notify-summary').click();
+    assert((await page.locator('#reminder-list').innerText()).includes('stretch') && (await page.locator('#reminder-list').innerText()).includes('drink water'), 'Upcoming reminders are listed in the bell');
+    await page.getByRole('button', { name: 'Cancel reminder: stretch', exact: true }).click();
+    assert(!(await page.locator('#reminder-list').innerText()).includes('stretch'), 'A reminder can be cancelled');
+    await page.locator('#notify-summary').click();
+    assert(await page.evaluate(() => JSON.parse(localStorage.getItem('flow_reminders')).length) === 1, 'Reminders survive a reload');
+    await page.getByRole('button', { name: 'Break', exact: true }).click();
+    await page.waitForFunction(() => document.getElementById('notify-list').textContent.includes('Reminder: drink water'));
+    assert(await page.locator('#reminders').isHidden(), 'A fired reminder leaves the list');
+    await page.locator('#notify-summary').click();
+    await page.getByRole('button', { name: 'Snooze 5 min', exact: true }).click();
+    assert((await page.locator('#reminder-list').innerText()).includes('drink water'), 'Snoozing puts the reminder back');
+    await page.getByRole('button', { name: 'Cancel reminder: drink water', exact: true }).click();
+    await page.locator('#notify-summary').click();
+    await page.getByRole('button', { name: 'Focus', exact: true }).click();
+    // Asked in words: the assistant's reminder is kept private too.
+    await page.route('**/api/ai', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ text: '', reminder: { text: 'review notes', at: new Date(Date.now() + 3 * 60000).toISOString() } }) }));
+    await page.getByLabel('Message to room').fill('/ai remind me to review notes in 3 minutes');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#chat-messages .local-note:last-child')?.textContent.includes('review notes'));
+    assert(await page.evaluate(() => window.__fixture.calls.filter(call => call.value?.event === 'chat-message').length) === sendsBefore, 'An assistant reminder is not posted to the room');
+    await page.unroute('**/api/ai');
+    await page.locator('#notify-summary').click();
+    await page.getByRole('button', { name: 'Cancel reminder: review notes', exact: true }).click();
+    await page.getByRole('button', { name: 'Clear', exact: true }).click();
+    await page.locator('#notify-summary').click();
+    await page.evaluate(() => document.getElementById('chat-messages').replaceChildren());
+    await page.getByRole('tab', { name: 'Tasks', exact: true }).click();
+
     await page.getByRole('tab', { name: 'Tasks', exact: true }).focus();
     await page.keyboard.press('ArrowRight');
     assert(await page.getByRole('tab', { name: 'Chat', exact: true }).getAttribute('aria-selected') === 'true', 'Arrow key should activate Chat');
@@ -531,8 +573,9 @@ async (page) => {
     await page.screenshot({ path: 'output/playwright/profile-live-focus.png' });
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Pause timer', exact: true }).click();
+    await page.waitForFunction(() => window.__fixture.tables.sessions.some(row => row.mode === 'focus-partial' && row.duration_seconds >= 120));
     await page.clock.fastForward(60000);
-    assert((await page.locator('#my-focus-time').textContent()).includes('2m'), 'Paused time must not count as focus');
+    assert((await page.locator('#my-focus-time').textContent()).includes('2m'), 'Paused time must not count as focus, and saved time must not count twice');
     await page.getByRole('button', { name: 'Reset timer', exact: true }).click();
 
     // Local timer rejects malformed peer state and completes without waiting 25 minutes.
@@ -545,7 +588,9 @@ async (page) => {
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     assert(await page.locator('#rounds i.done').count() === 1 && await page.locator('.mode-btn.active').innerText() === 'Break', 'A finished focus block should fill one round and move to a break');
 
-    await page.waitForFunction(() => window.__fixture.tables.sessions.length === 1);
+    // The paused stretch was saved as partial focus. (The block that ran out here lasted under a
+    // second, so whether it is long enough to store varies; it is never stored twice.)
+    await page.waitForFunction(() => { const modes = window.__fixture.tables.sessions.map(row => row.mode); return modes.includes('focus-partial') && modes.filter(mode => mode === 'focus').length <= 1; });
     await page.getByRole('button', { name: 'Edit your profile', exact: true }).click();
     await page.waitForFunction(() => document.getElementById('profile-today-value')?.textContent === '2m');
     assert((await page.locator('#my-focus-time').textContent()).includes('2m'), 'Saved focus must replace live focus without double counting');
@@ -613,7 +658,7 @@ async (page) => {
     await page.getByRole('button', { name: 'Open a room', exact: true }).click();
     await page.waitForURL(url => url.pathname === '/room.html');
     await page.waitForFunction(() => window.__fixture.tables.open_rooms.length === 1 && !document.getElementById('new-task-input').disabled);
-    assert(await page.evaluate(() => { const row = window.__fixture.tables.open_rooms[0]; return row.seats === 4 && row.seats_taken === 1 && row.host_id === 'test-user' && row.subject === 'maths' && row.camera === 'off' && row.timer_mode === 'focus' && row.closed === false && !('last_seen' in row); }), 'A hosted room should be listed with its details, and never send its own last-seen time');
+    assert(await page.evaluate(() => { const row = window.__fixture.tables.open_rooms[0]; return row.seats === 4 && row.seats_taken === 1 && row.host_id === 'test-user' && row.subject === 'maths' && row.camera === 'off' && row.timer_mode === 'focus' && row.closed === false; }) && await page.evaluate(() => window.__fixture.calls.filter(call => call.table === 'open_rooms' && call.payload).every(call => !('last_seen' in call.payload))), 'A hosted room should be listed with its details, and never send its own last-seen time');
     await page.getByRole('button', { name: 'Invite', exact: true }).click();
     await visible('#board-unlist-btn');
     await page.getByLabel('Stop new people joining').check();
@@ -668,6 +713,17 @@ async (page) => {
     // Browsing: search, subjects, plans, reports, and a seat that leads straight into the room.
     await page.goto(origin + '/groups.html?board');
     await page.locator('.group').first().waitFor();
+    // An expired listing never shows, and your own is taken off the board.
+    await page.evaluate(() => {
+        const stale = new Date(Date.now() - 5 * 60000).toISOString();
+        window.__fixture.tables.open_rooms.push({ id: 'stale-mine', host_id: 'test-user', host_name: 'Alex', topic: 'Left an hour ago', subject: 'other', camera: 'optional', vibe: 'quiet', seats: 4, seats_taken: 1, closed: false, timer_mode: 'focus', timer_ends_at: null, last_seen: stale });
+        window.__fixture.tables.open_rooms.push({ id: 'stale-theirs', host_id: 'kai', host_name: 'Kai', topic: 'Gone quiet', subject: 'other', camera: 'optional', vibe: 'quiet', seats: 4, seats_taken: 1, closed: false, timer_mode: null, timer_ends_at: null, last_seen: stale });
+    });
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click().catch(() => {});
+    await page.reload();
+    await page.locator('.group').first().waitFor();
+    assert(!(await page.locator('#board-list').innerText()).match(/Left an hour ago|Gone quiet/), 'Expired listings must not be shown');
+    await page.waitForFunction(() => !window.__fixture.tables.open_rooms.some(row => row.id === 'stale-mine'));
     await page.screenshot({ path: 'output/playwright/groups-desktop.png', fullPage: true });
     assert(await page.locator('#board-list .group').count() === 3 && await page.locator('#planned-list .group').count() === 2, 'Open and planned groups are listed separately');
     assert((await page.locator('#board-list .group-status').first().innerText()).startsWith('Focusing, 14 min'), 'A card should say what the room is doing');
@@ -715,10 +771,26 @@ async (page) => {
     await page.goto(origin + '/login.html');
     await page.screenshot({ path: 'output/playwright/after-login-mobile.png', fullPage: true });
 
+    // New accounts are made in setup: the login page's "Create an account" goes there, keeping an invite.
+    await page.goto(origin + '/login.html?room=FOCUS6');
+    await page.getByRole('link', { name: 'Create an account', exact: true }).click();
+    await page.waitForURL(origin + '/start.html?room=FOCUS6');
+    await page.goto(origin + '/login.html?room=FOCUS6');
     await page.getByLabel('Email address').fill('alex@example.com');
     await page.getByLabel('Password', { exact: true }).fill('test-password');
-    await page.getByRole('button', { name: 'Create an account', exact: true }).click();
-    await page.waitForURL(origin + '/room.html');
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
+    await page.waitForURL(origin + '/room.html?room=FOCUS6');
+    await visible('#join-modal');
+    // Arriving from an invite: Home says so, and joining is the main action.
+    assert(await page.locator('#join-heading').innerText() === 'You’re invited' && (await page.locator('#join-hint').innerText()).includes('FOCUS6'), 'Home should say you were invited');
+    assert(await page.locator('#join-btn').evaluate(button => button.classList.contains('btn-primary')) && !(await page.locator('#host-btn').evaluate(button => button.classList.contains('btn-primary'))), 'Join should be the main button when invited');
+    assert(await page.locator('#app').isHidden(), 'An invite still waits for Join');
+    // Signed in, every page calls the after-login screen Home.
+    for (const path of ['/', '/groups.html', '/docs.html']) {
+        await page.goto(origin + path);
+        assert(await page.getByRole('link', { name: 'Home', exact: true }).first().getAttribute('href') === '/room.html', path + ' should link to Home');
+    }
+    await page.goto(origin + '/room.html');
     await visible('#join-modal');
     // Flow keeps no copy of the account: nothing it stores holds the email or id.
     assert(await page.evaluate(() => Object.keys(localStorage).filter(key => key !== 'fixture-session').every(key => !/alex@example\.com|test-user/.test(localStorage.getItem(key)))), 'The account must not be copied into browser storage');

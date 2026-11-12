@@ -58,7 +58,7 @@ const computeStreak = (localDateStrings: string[]) => {
 
 export const getStats = async (userId: string) => {
     const [{ data: sessions, error: sessionError }, { count: tasksCompleted, error: taskError }] = await Promise.all([
-        getSupabase().from('sessions').select('id, duration_seconds, completed_at').eq('user_id', userId),
+        getSupabase().from('sessions').select('id, mode, duration_seconds, completed_at').eq('user_id', userId),
         getSupabase().from('tasks').select('id', { count: 'exact', head: true }).eq('created_by', userId).eq('completed', true)
     ]);
     if (sessionError || taskError) throw new Error('Profile stats are unavailable');
@@ -86,7 +86,8 @@ export const getStats = async (userId: string) => {
         weekSeconds,
         persistedIds: rows.map(row => row.id),
         streak,
-        sessionsCompleted: rows.length,
+        // Only blocks that ran to the end are sessions; partial focus still counts toward time and streaks.
+        sessionsCompleted: rows.filter(row => row.mode === 'focus').length,
         tasksCompleted: tasksCompleted || 0
     });
 };

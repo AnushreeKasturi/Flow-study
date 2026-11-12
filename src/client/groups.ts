@@ -202,9 +202,6 @@ form.addEventListener('submit', async event => {
 if (!user) {
     form.classList.add('hidden');
     byId('host-signed-out').classList.remove('hidden');
-    const link = byId<HTMLAnchorElement>('board-room-link');
-    link.textContent = 'Log in';
-    link.href = '/login.html';
 }
 
 load();

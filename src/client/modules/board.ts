@@ -9,10 +9,21 @@ export * from './board-options';
 const OPEN = 'id, host_id, host_name, topic, subject, camera, vibe, seats, seats_taken, closed, timer_mode, timer_ends_at, last_seen';
 const PLANNED = 'id, host_id, host_name, topic, subject, camera, vibe, seats, starts_at, going';
 
+// A listing is live while its host's room checks in (every 45 s). The database
+// stops handing out seats two minutes after the last check-in, but still shows a
+// host their own expired listing, so expired ones are dropped here too.
+const LIVE_FOR_MS = 2 * 60 * 1000;
+export const isLive = (room: Pick<OpenRoom, 'last_seen'>, now = Date.now()) => now - new Date(room.last_seen).getTime() < LIVE_FOR_MS;
+
 export async function fetchOpenRooms(): Promise<OpenRoom[]> {
     const { data, error } = await getSupabase().from('open_rooms').select(OPEN).order('last_seen', { ascending: false }).limit(60);
     if (error) throw error;
-    return data ?? [];
+    const rooms = data ?? [];
+    // Your own expired listing (you left, or the tab closed): take it off the board.
+    const { data: session } = await getSupabase().auth.getSession();
+    const me = session.session?.user?.id;
+    if (me && rooms.some(room => room.host_id === me && !isLive(room))) unlistRoom(me).then(undefined, () => {});
+    return rooms.filter(room => isLive(room));
 }
 
 export async function fetchPlanned(): Promise<PlannedGroup[]> {
@@ -54,14 +65,14 @@ export async function listRoom(listing: GroupDetails & { host_id: string; room_i
 export const refreshListing = (hostId: string, live: { seats_taken: number; timer_mode: string | null; timer_ends_at: string | null }) =>
     getSupabase().from('open_rooms').update(live).eq('host_id', hostId);
 export const setClosed = (hostId: string, closed: boolean) => getSupabase().from('open_rooms').update({ closed }).eq('host_id', hostId);
-export const unlistRoom = (hostId: string) => getSupabase().from('open_rooms').delete().eq('host_id', hostId);
+export function unlistRoom(hostId: string) { return getSupabase().from('open_rooms').delete().eq('host_id', hostId); }
 
 // Returns the room's code, or says why there is no seat.
 export async function takeSeat(listingId: string): Promise<{ code: string } | { reason: string }> {
     const { data, error } = await getSupabase().rpc('join_open_room', { p_listing: listingId });
     if (data) return { code: data };
     const message = error?.message ?? '';
-    return { reason: message.includes('full') ? 'This group just filled up.' : message.includes('not found') ? 'This group has closed.' : message.includes('Removed') ? 'The host removed you from this group.' : 'Could not join this group. Check your connection and try again.' };
+    return { reason: message.includes('full') ? 'This group just filled up.' : message.includes('not found') ? 'This group has just closed.' : message.includes('Removed') ? 'The host removed you from this group.' : 'Could not join this group. Check your connection and try again.' };
 }
 
 // What a room is doing right now, in a few words.

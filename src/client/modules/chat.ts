@@ -2,6 +2,8 @@ import { byId } from '../dom';
 import { sendToRoom } from './socket';
 import { notify } from './feedback';
 import { api } from './api';
+import { parseRemind, describeWhen } from './reminder-parse';
+import { addReminder } from './reminders';
 
 let username: string | null = null;
 let aiPending = false;
@@ -52,9 +54,32 @@ export const handleIncomingMessage = (message: unknown, own = false) => {
     if (!own) onOthers?.(label, text);
 };
 
+// A line in the chat that only this person sees: reminders are theirs, not the room's.
+export function showLocalNote(text: string) {
+    const div = document.createElement('div');
+    div.className = 'chat-message local-note';
+    const name = Object.assign(document.createElement('div'), { className: 'message-sender', textContent: 'Only you can see this' });
+    const body = Object.assign(document.createElement('div'), { textContent: text });
+    div.append(name, body);
+    chatMessages.append(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function setReminder(request: Parameters<typeof addReminder>[0]) {
+    const reminder = addReminder(request);
+    showLocalNote(reminder ? `Reminder set ${describeWhen(reminder)}: ${reminder.text}` : 'You already have twenty reminders waiting. Cancel one from the bell first.');
+}
+
 async function sendMessage() {
     const text = chatInput.value.trim();
     if (!text || text.length > 300) return;
+    if (/^\/remind(?:\s|$)/i.test(text)) {
+        const request = parseRemind(text);
+        if (!request) { notify('Try /remind 20m stretch, /remind at 6pm call home, or /remind break drink water.', 'error'); return; }
+        chatInput.value = '';
+        setReminder(request);
+        return;
+    }
     const isAi = /^\/ai(?:\s|$)/.test(text);
     if (isAi && aiPending) return;
     if (!isAi) {
@@ -77,9 +102,17 @@ async function sendMessage() {
     const pending = byId<HTMLElement>('ai-pending');
     pending.classList.remove('hidden');
     try {
-        const response = await api('/api/ai', { message: query }, 20000);
+        // The offset lets the assistant turn "at 6pm" into the right moment for this person.
+        const response = await api('/api/ai', { message: query, tz: new Date().getTimezoneOffset() }, 20000);
         const data = await response.json();
         if (!response.ok) throw new Error('Assistant unavailable');
+        // The assistant set a reminder: keep it private, rather than posting to the room.
+        const reminder = data.reminder;
+        if (reminder && typeof reminder.text === 'string') {
+            const at = typeof reminder.at === 'string' ? Date.parse(reminder.at) : NaN;
+            const trigger = reminder.trigger === 'break' || reminder.trigger === 'focus' ? reminder.trigger : undefined;
+            if (trigger || (Number.isFinite(at) && at > Date.now())) { setReminder(trigger ? { text: reminder.text, trigger } : { text: reminder.text, at }); return; }
+        }
         if (typeof data.text !== 'string') throw new Error('Invalid assistant response');
         const message = { sender: 'AI Assistant', text: data.text };
         handleIncomingMessage(message, true);

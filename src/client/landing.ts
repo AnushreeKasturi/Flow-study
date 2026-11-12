@@ -1,16 +1,7 @@
 import { byId } from './dom';
 import { currentTheme, setTheme, type Theme } from './theme';
 
-// Signed-in visitors skip the login step.
-try {
-    if (localStorage.getItem('flow_signed_in') || localStorage.getItem('flow_user')) {
-        const login = byId<HTMLAnchorElement>('nav-login');
-        login.textContent = 'Open your room';
-        login.href = '/room.html';
-        document.querySelectorAll<HTMLAnchorElement>('[data-start]').forEach(link => { link.href = '/room.html'; link.textContent = 'Open your room'; });
-        document.querySelectorAll<HTMLElement>('[data-login]').forEach(link => link.remove());
-    }
-} catch { /* Storage blocked: the default links still work. */ }
+// Signed-in visitors' links point at Home; see src/client/nav.ts.
 
 // Hero demo: a whole 25-minute focus block, played in ten seconds, so a
 // visitor sees the one idea (the sun is the timer) before reading anything.
