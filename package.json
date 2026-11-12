@@ -37,7 +37,7 @@
     "cookie": "^2.0.2",
     "esbuild": "^0.28.2",
     "playwright": "1.65.0",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "license": "MIT"
 }
