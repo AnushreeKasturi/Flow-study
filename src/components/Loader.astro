@@ -1,0 +1,12 @@
+---
+interface Props { message?: string; }
+const { message = 'One moment' } = Astro.props;
+---
+<!-- Shown only during slow transitions; see src/client/loader.ts. -->
+<div id="loader" class="loader" role="status" aria-live="polite">
+    <div class="loader-scene" aria-hidden="true">
+        <div class="loader-sky"><i class="loader-sun"><b></b></i></div>
+        <i class="loader-horizon"></i>
+    </div>
+    <p id="loader-text">{message}</p>
+</div>

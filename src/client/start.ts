@@ -5,6 +5,7 @@ import { currentTheme, setTheme, type Theme } from './theme';
 import supabase from './modules/supabase';
 import { saveDisplayName } from './modules/profile';
 import { loadUser, markSignedIn } from './modules/session';
+import { showLoader, hideLoader, leaveWithLoader } from './loader';
 import { playSound, stopSound, setSoundVolume, type Sound } from './modules/soundscape';
 
 // Read the session before building the steps: someone signed in skips the account step.
@@ -114,12 +115,13 @@ function savePreferences() {
 
 async function finish(user: { id: string; email?: string }) {
     markSignedIn();
+    showLoader('Setting up your space…');
     // If saving the name fails here, the room's lobby asks for it again with this value filled in.
     if (await saveDisplayName(user.id, firstName())) {
         localStorage.setItem('flow_named', '1');
         localStorage.removeItem('flow_pending_name');
     }
-    window.location.href = '/room.html' + location.search;
+    leaveWithLoader('/room.html' + location.search, 'Opening your space…');
 }
 
 async function createAccount() {
@@ -146,6 +148,7 @@ form.addEventListener('submit', async event => {
     try {
         if (signedIn) await finish(signedIn); else await createAccount();
     } catch {
+        hideLoader();
         say('Could not reach the sign-in service. Check your connection and try again.');
     } finally {
         busy = next.disabled = false;

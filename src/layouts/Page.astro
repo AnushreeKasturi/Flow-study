@@ -1,6 +1,7 @@
 ---
 import { readFileSync } from 'node:fs';
 import Head from '../components/Head.astro';
+import Loader from '../components/Loader.astro';
 interface Props { title?: string; bodyClass?: string; page?: string; }
 const { title, bodyClass, page } = Astro.props;
 // `npm run dev:demo` swaps Supabase for the test fixture so the app runs offline.
@@ -15,7 +16,12 @@ const demo = import.meta.env.DEV && process.env.FLOW_DEMO ? readFileSync('script
         <slot name="head" />
     </head>
     <body class={bodyClass}>
+        <Loader message={page === 'room' ? 'Getting your space ready' : 'One moment'} />
         <slot />
-        <script>import '../client/speed-insights';</script>
+        <script>
+            import '../client/speed-insights';
+            import { releaseWhenLoaded } from '../client/loader';
+            releaseWhenLoaded();
+        </script>
     </body>
 </html>

@@ -1,5 +1,6 @@
 // The room page: lobby (name, join, create) first, then the live room.
 import { reveal } from './motion';
+import { showLoader, hideLoader, leaveWithLoader, loaderText } from './loader';
 import type { Participants, ProfileStats, TimerMode } from './types';
 import { byId } from './dom';
 import { bindThemePicker } from './theme';
@@ -69,11 +70,12 @@ const cancelLeave = (userId: string) => {
 const ROOM_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const generateRoomCode = () => Array.from({ length: 6 }, () => ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)]).join('');
 
-function signOutLocally() {
+function signOutLocally(message?: string) {
     markSignedOut();
     localStorage.removeItem('flow_named');
     sessionStorage.removeItem('flow_last_room');
-    window.location.replace('/login.html');
+    if (message) leaveWithLoader('/login.html', message, true);
+    else window.location.replace('/login.html');
 }
 function setRoomBusy(busy: boolean, action = 'join') {
     roomActionBusy = busy;
@@ -155,6 +157,7 @@ async function createRoom(open?: Omit<GroupDetails, 'host_name'> & { planId?: st
     if (pin && !/^\d{4}$/.test(pin)) { showLobbyError('A PIN is 4 digits. Fix it, or leave it empty for no PIN.'); return; }
     setRoomBusy(true, 'host');
     lobbyError.classList.add('hidden');
+    showLoader(open ? 'Opening your study group…' : 'Creating your room…');
     let createdCode;
     try {
         for (let attempt = 0; attempt < 5 && !createdCode; attempt++) {
@@ -205,6 +208,7 @@ async function joinRoom() {
     if (!user) return signOutLocally();
     setRoomBusy(true);
     lobbyError.classList.add('hidden');
+    showLoader('Opening your room…');
     try {
         const { data: roomUuid, error } = await supabase.rpc('join_room', { p_room_code: roomCode, p_pin: pin });
         if (error || !roomUuid) {
@@ -237,6 +241,7 @@ async function joinRoom() {
         showLobbyError('Could not open the room. Check your connection and try again.');
     } finally {
         setRoomBusy(false);
+        hideLoader();
     }
 }
 
@@ -258,7 +263,11 @@ async function enterRoom(roomId: string, roomCode: string) {
     const addTaskBtn = byId<HTMLButtonElement>('add-task-btn');
     taskInput.disabled = addTaskBtn.disabled = true;
 
+    // A long wait here is almost always the browser asking for camera access; say so.
+    const asking = setTimeout(() => loaderText('Allow camera and microphone to continue'), 1200);
     await initMedia(byId<HTMLVideoElement>('local-video'));
+    clearTimeout(asking);
+    loaderText('Opening your room…');
     if (leaving) return;
     showLocalCamera(isVideoActive());
     // The camera can work while the microphone is busy or denied. With no
@@ -514,7 +523,7 @@ async function confirmRemoval() {
     sessionStorage.removeItem('flow_last_room');
     sessionStorage.setItem('flow_notice', 'The host removed you from that room.');
     await Promise.race([disconnectSocket(), new Promise(resolve => setTimeout(resolve, 1000))]);
-    window.location.replace('/room.html');
+    leaveWithLoader('/room.html', 'Back to your space…', true);
 }
 
 // ── Lobby home ─────────────────────────────────────────────────────────────
@@ -847,6 +856,7 @@ function bindRoomControls() {
         leaving = true;
         event.currentTarget.disabled = true;
         sendBye(); // tell the room now; presence may take a while, or never say
+        showLoader('Leaving the room…');
         cleanupMedia();
         stopSound();
         // A one-line summary, shown in the lobby we are about to return to.
@@ -855,7 +865,7 @@ function bindRoomControls() {
         sessionStorage.setItem('flow_recap', `Last session: ${formatFocusTime(minutes)} in room ${currentRoomCode}` + (tasks.total ? `, ${tasks.completed} of ${tasks.total} tasks done.` : '.'));
         const goodbye = [disconnectSocket(), listed ? unlistRoom(getMyUserId()) : null];
         try { await Promise.race([Promise.allSettled(goodbye), new Promise(resolve => setTimeout(resolve, 1500))]); }
-        finally { window.location.replace('/room.html'); }
+        finally { leaveWithLoader('/room.html', 'Back to your space…', true); }
     });
 
     on('open-shortcuts-btn', () => openModal('shortcuts-modal'));
@@ -888,8 +898,9 @@ async function start() {
     }));
     on('logout-link', async event => {
         event.preventDefault();
+        showLoader('Signing you out…');
         try { await supabase.auth.signOut(); } catch { /* Clear the local login even when offline. */ }
-        signOutLocally();
+        signOutLocally('Signing you out…');
     });
 
     window.addEventListener('offline', () => connectionStatus('OFFLINE'));
@@ -916,6 +927,8 @@ async function start() {
         roomCodeInput.value = seat;
         await joinRoom();
     }
+    // The page held the loader through start-up; the home screen (or the room) is ready now.
+    hideLoader();
 }
 
-start().catch(() => showLobbyError('Flow could not start. Refresh this page to try again.'));
+start().catch(() => { hideLoader(); showLobbyError('Flow could not start. Refresh this page to try again.'); });
