@@ -84,6 +84,13 @@ test('HTTP boundaries and bounded local concurrency', async t => {
         assert.equal(jpeg.readUInt16BE(frame + 7), 1200);
         assert.equal(jpeg.readUInt16BE(frame + 5), 630);
         assert(jpeg.length < 1000000, 'Preview should remain below 1 MB');
+        const legacyImage = await fetch(origin + '/social-preview.png', crawler);
+        assert.equal(legacyImage.status, 200, 'Cached cards can still fetch the legacy image URL');
+        assert.match(legacyImage.headers.get('content-type'), /^image\/png/);
+        const png = Buffer.from(await legacyImage.arrayBuffer());
+        assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+        assert.equal(png.readUInt32BE(16), 1200);
+        assert.equal(png.readUInt32BE(20), 630);
     });
     await t.test('pages carry security headers and never ship the offline demo backend', async () => {
         for (const path of ['/', '/start.html', '/login.html', '/room.html', '/groups.html', '/docs.html']) {
