@@ -3,9 +3,10 @@ import { byId } from './dom';
 import type { GroupDetails, OpenRoom, PlannedGroup } from './types';
 import { fetchOpenRooms, fetchPlanned, fetchMyPlans, takeSeat, planGroup, cancelPlan, setGoing, report, statusOf, watchBoard, labelOf, SUBJECTS, CAMERAS, VIBES } from './modules/board';
 import { getMyProfile } from './modules/profile';
-import { getStoredUser } from './modules/utils';
+import { loadUser } from './modules/session';
 
-const user = getStoredUser();
+// Signed-out visitors can read the board; the session decides what they can do on it.
+const user = await loadUser();
 const message = byId<HTMLElement>('board-message');
 const search = byId<HTMLInputElement>('board-search');
 let rooms: OpenRoom[] = [];

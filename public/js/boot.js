@@ -7,7 +7,8 @@
         var sky = localStorage.getItem('flow_theme');
         if (sky) document.documentElement.dataset.theme = sky;
 
-        var signedIn = !!localStorage.getItem('flow_user');
+        // A plain flag; the session itself is Supabase's. flow_user is the older form, cleared on the next page that reads the session.
+        var signedIn = !!(localStorage.getItem('flow_signed_in') || localStorage.getItem('flow_user'));
         // The room needs an account; an invite code rides along to login and back.
         if (page === 'room' && !signedIn) location.replace('/login.html' + location.search);
         if (page === 'login' && signedIn) location.replace('/room.html' + location.search);

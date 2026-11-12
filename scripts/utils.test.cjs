@@ -32,15 +32,12 @@ test('media parser accepts supported links and rejects lookalikes and malformed 
     for (const url of ['', 'not a link', 'javascript:alert(1)', 'https://youtube.com.attacker.example/watch?v=jfKfPfyJRdk', 'https://attacker.example/youtu.be/jfKfPfyJRdk', 'https://youtube.com/watch?v=short', 'https://youtube.com/watch?v=jfKfPfyJRdk%22%3E']) assert.equal(youtubeEmbedUrl(url), null, url);
 });
 
-test('corrupt stored login falls back to signed-out state', async () => {
-    const { getStoredUser } = await load();
-    let value;
-    global.localStorage = { getItem: () => value };
-    try {
-        for (value of [null, '{broken', '{}', 'null', '{"id":1,"email":"name@example.com"}']) assert.equal(getStoredUser(), null);
-        value = '{"id":"user","email":"name@example.com"}';
-        assert.equal(getStoredUser().id, 'user');
-    } finally { delete global.localStorage; }
+test('players can only be pointed at the official embed addresses', async () => {
+    const { isEmbedUrl, youtubeEmbedUrl, spotifyEmbedUrl } = await load();
+    for (const url of ['https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1', 'https://open.spotify.com/embed/track/4uLU6hMCjMI75M1A2tKUQC?theme=0']) assert.equal(isEmbedUrl(url), true, url);
+    for (const url of ['javascript:alert(1)', 'data:text/html,hi', 'https://www.youtube.com.evil.example/embed/x', 'http://www.youtube.com/embed/jfKfPfyJRdk', 'https://www.youtube.com/watch?v=jfKfPfyJRdk', 'https://evil.example/?https://www.youtube.com/embed/', 'not a url', '']) assert.equal(isEmbedUrl(url), false, url);
+    // Everything the parsers return passes the check at the point of use.
+    for (const url of [youtubeEmbedUrl('https://youtu.be/jfKfPfyJRdk'), youtubeEmbedUrl('https://www.youtube.com/playlist?list=PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG'), spotifyEmbedUrl('https://open.spotify.com/album/4uLU6hMCjMI75M1A2tKUQC')]) assert.equal(isEmbedUrl(url), true, url);
 });
 
 test('Supabase fetch has a deadline and preserves caller cancellation', async () => {

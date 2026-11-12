@@ -4,10 +4,11 @@ import { byId } from './dom';
 import { currentTheme, setTheme, type Theme } from './theme';
 import supabase from './modules/supabase';
 import { saveDisplayName } from './modules/profile';
-import { getStoredUser } from './modules/utils';
+import { loadUser, markSignedIn } from './modules/session';
 import { playSound, stopSound, setSoundVolume, type Sound } from './modules/soundscape';
 
-const signedIn = getStoredUser();
+// Read the session before building the steps: someone signed in skips the account step.
+const signedIn = await loadUser();
 // Someone already signed in is here to redo their setup; they skip the account step.
 const steps = ['name', 'sky', 'length', 'sound', ...(signedIn ? [] : ['account'])];
 // Where the sun rests on each step (0 = high, 1 = set).
@@ -112,7 +113,7 @@ function savePreferences() {
 }
 
 async function finish(user: { id: string; email?: string }) {
-    localStorage.setItem('flow_user', JSON.stringify({ id: user.id, email: user.email }));
+    markSignedIn();
     // If saving the name fails here, the room's lobby asks for it again with this value filled in.
     if (await saveDisplayName(user.id, firstName())) {
         localStorage.setItem('flow_named', '1');

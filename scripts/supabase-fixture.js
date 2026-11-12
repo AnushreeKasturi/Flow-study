@@ -21,6 +21,8 @@ window.supabase = { createClient() {
             fixture.calls.push({ action: 'auth' });
             await new Promise(resolve => setTimeout(resolve, fixture.delay));
             if (fixture.authFailure) throw new Error('Network unavailable');
+            // Like Supabase, the session outlives the page (tests sign out by removing it).
+            localStorage.setItem('fixture-session', '1');
             return { data: { user, session: {} }, error: null };
         }
         function from(table) {
@@ -85,8 +87,8 @@ window.supabase = { createClient() {
                 return { data: fixture.rpcError ? null : name === 'join_open_room' ? 'FOCUS6' : 'test-room', error: fixture.rpcError ? { message: fixture.rpcError } : null };
             },
             auth: {
-                signInWithPassword: authResult, signUp: authResult, signOut: async () => {},
-                getSession: async () => ({ data: { session: { access_token: 'fixture-token' } }, error: null }),
+                signInWithPassword: authResult, signUp: authResult, signOut: async () => { localStorage.removeItem('fixture-session'); },
+                getSession: async () => ({ data: { session: localStorage.getItem('fixture-session') ? { access_token: 'fixture-token', user } : null }, error: null }),
                 onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } })
             }
         };
