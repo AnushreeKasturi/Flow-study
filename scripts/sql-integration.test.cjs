@@ -232,7 +232,7 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.equal(run(database, `SELECT count(*) FROM public.open_rooms WHERE room_id = '${openRoom}';`).trim(), '0', 'This room comes off the board');
             assert.equal(run(database, `SELECT topic FROM public.open_rooms WHERE host_id = '${fresh}';`).trim(), "Kai's own group", 'Their own listing is left alone');
             asUser(fresh, `SELECT public.transfer_host('${openRoom}', '${one}');`);
-            run(database, `INSERT INTO public.open_rooms(host_id,room_id,host_name,topic,seats) VALUES('${one}','${openRoom}','Alex','Organic chemistry revision',6); DELETE FROM realtime.sent;`);
+            run(database, `INSERT INTO public.open_rooms(host_id,room_id,host_name,topic,seats) VALUES('${one}','${openRoom}','Alex','Organic chemistry revision',6); DELETE FROM realtime.sent; UPDATE public.board_ping SET at = 'epoch';`);
             assert.equal(asUser(one, `SELECT public.transfer_host('${openRoom}', '${two}');`), 'Sam', 'Handing over returns the new host\'s name');
             assert.equal(run(database, `SELECT created_by::text FROM public.rooms WHERE id = '${openRoom}';`).trim(), two, 'The room has a new host');
             assert.equal(run(database, `SELECT host_id::text || ' ' || host_name FROM public.open_rooms WHERE room_id = '${openRoom}';`).trim(), two + ' Sam', 'The listing follows the new host, under their name');

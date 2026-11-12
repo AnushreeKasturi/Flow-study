@@ -87,10 +87,15 @@ export function statusOf(room: Pick<OpenRoom, 'timer_mode' | 'timer_ends_at'>, n
 // Calls back whenever a listing or plan changes, so open boards stay current without polling.
 // The database pings the private "board" channel whenever a listing or plan
 // changes (sql/010), and the page fetches the board again. Pings arrive in
-// bursts (a host's check-in, then a seat), so they are gathered for a moment.
+// bursts, so they are gathered for a moment. The database sends at most two a
+// second, so a second look a second later catches a change that was held back.
 export function watchBoard(onChange: () => void) {
-    let soon: ReturnType<typeof setTimeout> | undefined;
+    let soon: ReturnType<typeof setTimeout> | undefined, again: ReturnType<typeof setTimeout> | undefined;
     return getSupabase().channel('board', { config: { private: true } })
-        .on('broadcast', { event: 'changed' }, () => { clearTimeout(soon); soon = setTimeout(onChange, 400); })
+        .on('broadcast', { event: 'changed' }, () => {
+            clearTimeout(soon); clearTimeout(again);
+            soon = setTimeout(onChange, 400);
+            again = setTimeout(onChange, 1400);
+        })
         .subscribe(() => {});
 }
