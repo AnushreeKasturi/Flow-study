@@ -72,24 +72,76 @@ const limiter = max => rateLimit({
 const hasGroqApiKey = Boolean(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here');
 const groq = hasGroqApiKey ? new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: 15000, maxRetries: 0 }) : null;
 
+// The assistant can set a reminder for the person asking. It only describes the
+// reminder; normalizeReminder() decides what is acceptable and when it is due.
+const REMINDER_TOOL = {
+    type: 'function',
+    function: {
+        name: 'set_reminder',
+        description: 'Set a reminder for the person asking. Use only when they ask to be reminded of something.',
+        parameters: {
+            type: 'object',
+            properties: {
+                text: { type: 'string', description: 'What to remind them about, short, in their own words.' },
+                minutes_from_now: { type: 'integer', description: 'For a delay such as "in 20 minutes".' },
+                local_time: { type: 'string', description: 'For a clock time such as "at 6pm": 24-hour HH:MM in their local time.' },
+                timer: { type: 'string', enum: ['break', 'focus'], description: 'When tied to the study timer: the next break, or the next focus block.' }
+            },
+            required: ['text']
+        }
+    }
+};
+
+// Turns the model's description into a reminder the browser can schedule, or null.
+// `tz` is the browser's getTimezoneOffset(): minutes to add to local time to get UTC.
+function normalizeReminder(args, { now = Date.now(), tz = 0 } = {}) {
+    const text = typeof args?.text === 'string' ? args.text.trim().slice(0, 120) : '';
+    if (!text) return null;
+    if (args.timer === 'break' || args.timer === 'focus') return { text, trigger: args.timer };
+    const minutes = Number(args.minutes_from_now);
+    if (Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440) return { text, at: new Date(now + minutes * 60000).toISOString() };
+    const clock = typeof args.local_time === 'string' && /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(args.local_time.trim());
+    if (clock) {
+        // Work on the person's wall clock: today at that time, or tomorrow if it has passed.
+        const local = new Date(now - tz * 60000);
+        let target = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), Number(clock[1]), Number(clock[2]));
+        if (target <= local.getTime()) target += 24 * 60 * 60000;
+        return { text, at: new Date(target + tz * 60000).toISOString() };
+    }
+    return null;
+}
+
 app.post('/api/ai', limiter(10), requireUser('ai'), async (req, res) => {
     try {
         const message = req.body?.message;
         if (typeof message !== 'string' || !message.trim() || message.length > 500) {
             return res.status(400).json({ text: 'Enter a message between 1 and 500 characters.' });
         }
+        const tz = Number.isInteger(req.body?.tz) && Math.abs(req.body.tz) <= 840 ? req.body.tz : 0;
         if (!groq) return res.status(503).json({ text: 'The study assistant is not configured on this server.' });
 
+        const localNow = new Date(Date.now() - tz * 60000).toISOString().slice(0, 16).replace('T', ' ');
         const completion = await groq.chat.completions.create({
             messages: [
-                { role: 'system', content: 'You are a helpful study assistant in a virtual study room. Answer concisely.' },
+                { role: 'system', content: `You are a helpful study assistant in a virtual study room. Answer concisely. The person's local time is ${localNow}. If they ask to be reminded of something, call set_reminder instead of replying.` },
                 { role: 'user', content: message }
             ],
             // Groq retired llama-3.1-8b-instant on 2026-08-16; this is its designated replacement.
             model: 'openai/gpt-oss-20b',
+            tools: [REMINDER_TOOL],
+            tool_choice: 'auto',
             max_completion_tokens: 700 // an answer for a chat panel, and a bound on what one request can cost
         });
-        res.json({ text: completion.choices[0].message.content });
+        const reply = completion.choices[0].message;
+        const call = reply.tool_calls?.find(item => item.function?.name === 'set_reminder');
+        if (call) {
+            let args = null;
+            try { args = JSON.parse(call.function.arguments); } catch { /* treated as no reminder */ }
+            const reminder = normalizeReminder(args, { tz });
+            if (reminder) return res.json({ text: '', reminder });
+            return res.json({ text: 'I couldn’t work out when to remind you. Try “remind me in 20 minutes to stretch”, or use /remind.' });
+        }
+        res.json({ text: reply.content || 'I don’t have an answer for that.' });
     } catch (error) {
         console.error('AI error:', error);
         res.status(500).json({ text: 'The study assistant could not answer. Try again.' });
@@ -120,3 +172,4 @@ app.use((error, req, res, next) => {
 
 if (require.main === module) app.listen(PORT, () => console.log(`Flow running on port ${PORT}`));
 module.exports = app;
+module.exports.normalizeReminder = normalizeReminder; // for scripts/server.test.cjs

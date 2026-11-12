@@ -35,7 +35,7 @@ const steps = [
         </nav>
         <div class="site-nav-actions">
             <GitHubStar label="Star" />
-            <a id="nav-login" href="/login.html" class="btn">Log in</a>
+            <a id="nav-login" href="/login.html" class="btn" data-home-when-signed-in>Log in</a>
         </div>
     </header>
 
@@ -44,8 +44,8 @@ const steps = [
         <div class="hero-side">
             <p>Flow is a study room you share with friends. Start a focus block and a sun starts sinking for everyone in the room. When it sets, you all take a break. It’s free, and the code is open.</p>
             <div class="hero-actions">
-                <a href="/start.html" class="btn btn-primary btn-lg" data-start>Set up your space</a>
-                <a href="/login.html" class="btn btn-lg" data-login>I have an account</a>
+                <a href="/start.html" class="btn btn-primary btn-lg" data-home-when-signed-in="Go to Home">Set up your space</a>
+                <a href="/login.html" class="btn btn-lg" data-hide-when-signed-in>I have an account</a>
             </div>
         </div>
         <div class="demo">
@@ -116,7 +116,7 @@ const steps = [
 
         <section class="band closing">
             <h2>Your next session can start now.</h2>
-            <a href="/start.html" class="btn btn-primary btn-lg" data-start>Set up your space</a>
+            <a href="/start.html" class="btn btn-primary btn-lg" data-home-when-signed-in="Go to Home">Set up your space</a>
         </section>
     </main>
 
@@ -127,7 +127,7 @@ const steps = [
             <a href="/groups.html">Study groups</a>
             <a href="/docs.html">Docs</a>
             <a href={repo} target="_blank" rel="noopener noreferrer">GitHub</a>
-            <a href="/login.html">Log in</a>
+            <a href="/login.html" data-home-when-signed-in>Log in</a>
         </nav>
     </footer>
     <script>import '../client/landing';</script>

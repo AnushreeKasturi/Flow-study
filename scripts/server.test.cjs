@@ -169,3 +169,19 @@ test('HTTP boundaries and bounded local concurrency', async t => {
         console.log('100 concurrent static requests: ' + Math.round(performance.now() - start) + 'ms');
     });
 });
+
+test('assistant reminders are checked and timed on the server', () => {
+    const { normalizeReminder } = require('../server');
+    const now = Date.UTC(2026, 10, 12, 15, 30); // 15:30 UTC, which is 21:00 in India (UTC+5:30)
+    const india = { now, tz: -330 };
+    assert.equal(normalizeReminder({ text: 'stretch', minutes_from_now: 20 }, india).at, new Date(now + 20 * 60000).toISOString());
+    assert.equal(normalizeReminder({ text: 'call home', local_time: '21:30' }, india).at, '2026-11-12T16:00:00.000Z', 'Local clock times use the person\'s timezone');
+    assert.equal(normalizeReminder({ text: 'gym', local_time: '08:00' }, india).at, '2026-11-13T02:30:00.000Z', 'A time already past is tomorrow');
+    assert.equal(normalizeReminder({ text: 'call home', local_time: '21:30' }, { now, tz: 0 }).at, '2026-11-12T21:30:00.000Z');
+    assert.deepEqual(normalizeReminder({ text: 'water', timer: 'break' }, india), { text: 'water', trigger: 'break' });
+    assert.equal(normalizeReminder({ text: 'x'.repeat(500), minutes_from_now: 5 }, india).text.length, 120);
+    for (const bad of [null, {}, { text: '' }, { text: 'no time' }, { text: 'x', minutes_from_now: 0 }, { text: 'x', minutes_from_now: 99999 }, { text: 'x', minutes_from_now: 2.5 }, { text: 'x', local_time: '25:00' }, { text: 'x', local_time: '<script>' }, { text: 'x', timer: 'lunch' }, { text: 42, minutes_from_now: 5 }]) {
+        assert.equal(normalizeReminder(bad, india), null, JSON.stringify(bad));
+    }
+});
+

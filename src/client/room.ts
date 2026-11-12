@@ -7,7 +7,7 @@ import { bindThemePicker } from './theme';
 import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, updateMyUsername, sendReaction, sendHandRaise, sendRemoved, sendBye } from './modules/socket';
 import { initNotifications, pushNote, systemNotify } from './modules/notifications';
 import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack } from './modules/rtc';
-import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState } from './modules/timer';
+import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState, saveFocus } from './modules/timer';
 import { initTasks, addTask, toggleTask, deleteTask, assignTask, rerenderTasks, setSharedTasks } from './modules/tasks';
 import { initPresence, updatePresence, startFocusTracking, stopFocusTracking, formatFocusTime } from './modules/presence';
 import { initChat, handleIncomingMessage } from './modules/chat';
@@ -20,6 +20,7 @@ import { loadUser, currentUser, markSignedOut } from './modules/session';
 import { ensureTile, attachStream, removeTile, markLeft, setCameraOff, showReaction, setHandRaised } from './modules/stage';
 import { playSound, stopSound, setSoundVolume, isSound, type Sound } from './modules/soundscape';
 import { chime } from './modules/chime';
+import { initReminders, timerReached } from './modules/reminders';
 import { listRoom, refreshListing, unlistRoom, setClosed, cancelPlan, fetchOpenRooms, takeSeat, statusOf } from './modules/board';
 import { timerSnapshot } from './modules/timer';
 import { getStats as getTaskStats } from './modules/tasks';
@@ -406,6 +407,13 @@ async function enterRoom(roomId: string, roomCode: string) {
     initTimer(roomId, timerState => {
         UI.updateTimerUI(timerState);
         if (timerState.isRunning) check('timer');
+        // A stretch of focus just ended (paused, switched, reset, or stopped by someone else): save it now.
+        const focusing = timerState.isRunning && timerState.mode === 'focus';
+        if (wasFocusing && !focusing) saveFocus('focus-partial');
+        wasFocusing = focusing;
+        // Reminders tied to the timer fire when the room moves into a break, or back into focus.
+        if (lastMode && timerState.mode !== lastMode) timerReached(timerState.mode === 'focus' ? 'focus' : 'break');
+        lastMode = timerState.mode;
         // The callback fires every second; the board only needs to hear when the clock starts, stops, or changes mode.
         const phase = timerState.mode + timerState.isRunning;
         if (phase !== lastPhase) { lastPhase = phase; refreshBoardSoon(); }
@@ -488,6 +496,10 @@ const boardForm = () => ({
 // listing nobody refreshes disappears from the board within two minutes.
 // Timer changes arrive in bursts; one refresh shortly after the last is enough.
 let lastPhase = '';
+let lastMode = '';
+let wasFocusing = false;
+// A long block is saved every five minutes as it runs, so a crash loses little.
+setInterval(() => { if (wasFocusing) saveFocus('focus-partial', true); }, 5 * 60 * 1000);
 let boardSoon: ReturnType<typeof setTimeout> | undefined;
 const refreshBoardSoon = () => { clearTimeout(boardSoon); boardSoon = setTimeout(refreshBoard, 2000); };
 const refreshBoard = () => { if (listed) refreshListing(getMyUserId(), { seats_taken: peopleHere(), ...timerSnapshot() }).then(undefined, () => {}); };
@@ -863,7 +875,7 @@ function bindRoomControls() {
         const minutes = Math.max(1, Math.round((Date.now() - enteredAt) / 60000));
         const tasks = getTaskStats();
         sessionStorage.setItem('flow_recap', `Last session: ${formatFocusTime(minutes)} in room ${currentRoomCode}` + (tasks.total ? `, ${tasks.completed} of ${tasks.total} tasks done.` : '.'));
-        const goodbye = [disconnectSocket(), listed ? unlistRoom(getMyUserId()) : null];
+        const goodbye = [saveFocus('focus-partial'), disconnectSocket(), listed ? unlistRoom(getMyUserId()) : null];
         try { await Promise.race([Promise.allSettled(goodbye), new Promise(resolve => setTimeout(resolve, 1500))]); }
         finally { leaveWithLoader('/room.html', 'Back to your space…', true); }
     });
@@ -887,11 +899,24 @@ async function start() {
 
     initDialogs();
     initNotifications();
+    initReminders();
     initAudio();
     bindThemePicker(byId<HTMLSelectElement>('theme-picker'));
     bindRoomControls();
 
-    roomCodeInput.value = new URLSearchParams(location.search).get('room') || sessionStorage.getItem('flow_last_room') || '';
+    const invited = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
+    roomCodeInput.value = invited || sessionStorage.getItem('flow_last_room') || '';
+    // Arriving from an invite link: say so, and make joining the obvious next step.
+    // (The person still presses Join; a link never puts anyone in a room by itself.)
+    if (/^[A-Z0-9]{6}$/.test(invited)) {
+        byId<HTMLElement>('join-heading').textContent = 'You’re invited';
+        byId<HTMLElement>('join-hint').textContent = `Room ${invited} is waiting for you. Press Join to go in.`;
+        byId<HTMLElement>('join-heading').closest('.home-card')!.classList.add('invited');
+        joinBtn.classList.add('btn-primary');
+        hostBtn.classList.remove('btn-primary');
+        joinBtn.dataset.autofocus = '';
+        roomCodeInput.removeAttribute('data-autofocus');
+    }
     on('join-btn', joinRoom);
     [roomCodeInput, pinInput].forEach(input => input.addEventListener('keydown', event => {
         if (event.key === 'Enter') { event.preventDefault(); joinRoom(); }
@@ -907,7 +932,14 @@ async function start() {
     window.addEventListener('online', () => connectionStatus('CONNECTING'));
     connectionStatus('CONNECTING');
     // Drop from presence at once when the tab closes or reloads.
-    window.addEventListener('pagehide', () => { sendBye(); cleanupMedia(); disconnectSocket(); });
+    window.addEventListener('pagehide', () => {
+        saveFocus('focus-partial'); // sent with keepalive, so it outlives the closing tab
+        sendBye();
+        // Closing the tab ends the listing now, rather than when it expires two minutes later.
+        if (listed) unlistRoom(getMyUserId()).then(undefined, () => {});
+        cleanupMedia();
+        disconnectSocket();
+    });
 
     await firstRunName(user.id);
     setRoomBusy(false);

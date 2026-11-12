@@ -66,7 +66,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
 
                     <section class="home-card" aria-labelledby="join-heading">
                         <h3 id="join-heading">Join with a code</h3>
-                        <p>Someone sent you a link or a six-character code.</p>
+                        <p id="join-hint">Someone sent you a link or a six-character code.</p>
                         <label for="room-code-input">Room code</label>
                         <input type="text" id="room-code-input" class="input room-code-field" aria-describedby="lobby-error" placeholder="ABC123" maxlength="6" autocomplete="off" spellcheck="false" data-autofocus>
                         <label for="room-pin-input">Room PIN <span class="muted">(only if it has one)</span></label>
@@ -110,7 +110,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
             </div>
         </div>
         <div id="profile-stats" aria-live="polite"></div>
-        <p class="profile-footnote">Finished focus sessions are saved to your history. Time from a session still in progress counts while this page stays open.</p>
+        <p class="profile-footnote">All your focus time is saved, including blocks you pause or leave part-way. Only blocks that run to the end count as sessions.</p>
     </div>
 
     <div id="timer-alert-modal" class="modal hidden centered" role="dialog" aria-modal="true" aria-labelledby="timer-alert-title">

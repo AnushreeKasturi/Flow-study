@@ -8,7 +8,6 @@ import supabase from './modules/supabase';
 const emailInput = byId<HTMLInputElement>('email-input');
 const passwordInput = byId<HTMLInputElement>('password-input');
 const loginBtn = byId<HTMLButtonElement>('login-btn');
-const signupBtn = byId<HTMLButtonElement>('signup-btn');
 const errorMsg = byId<HTMLElement>('error-message');
 const successMsg = byId<HTMLElement>('success-message');
 let authBusy = false;
@@ -49,80 +48,44 @@ const persistAndRedirect = (_user: { id: string; email?: string }, action: strin
     leaveWithLoader('/room.html' + location.search, 'Opening your space…');
 };
 
-const handleAuth = async (action: 'login' | 'signup') => {
+// Logging in only. New accounts are made at the end of setup (/start.html), so
+// there is one way in for new people, and it gives them a name and a sky first.
+const logIn = async () => {
     if (authBusy) return;
     clearMessages();
     if (!byId<HTMLFormElement>('auth-form').reportValidity()) return;
     const email = emailInput.value.trim();
     const password = passwordInput.value;
+    if (!email.includes('@')) { showError('Enter the email address you signed up with.'); return; }
+    if (password.length < 6) { showError('Password must be at least 6 characters.'); return; }
 
-    if (!email || !email.includes('@')) {
-        showError('Please enter a valid email address.');
-        return;
-    }
-    if (password.length < (action === 'signup' ? 8 : 6)) {
-        showError(action === 'signup' ? 'Choose a password with at least 8 characters.' : 'Password must be at least 6 characters.');
-        return;
-    }
-    const btn = action === 'login' ? loginBtn : signupBtn;
-    const originalText = btn.innerText;
-    btn.innerText = action === 'login' ? 'Logging in…' : 'Creating account…';
-    authBusy = true;
-    loginBtn.disabled = signupBtn.disabled = true;
+    authBusy = loginBtn.disabled = true;
+    loginBtn.innerText = 'Logging in…';
     try {
-
-        let result;
-        if (action === 'login') {
-            result = await supabase.auth.signInWithPassword({ email, password });
-        } else {
-            result = await supabase.auth.signUp({ email, password });
-        }
-
-
-        if (result.error) {
-            if (action === 'signup' && /already registered|already exists|user already/i.test(result.error.message)) {
-                showError('An account with this email already exists. Please log in.');
-                return;
-            }
-            showError(result.error.message);
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+            showError(/confirm|verif/i.test(error.message) ? 'Confirm your email first: open the link we sent you, then log in.'
+                : /invalid/i.test(error.message) ? 'That email and password don’t match an account. Check them, or set up a new space.'
+                : error.message);
             return;
         }
-
-        if (result.data?.session && result.data?.user) {
-            persistAndRedirect(result.data.user, action);
-            return;
-        }
-
-        if (action === 'signup') {
-            // Some Supabase configs create the user but don't return a session immediately.
-            // Try signing in directly so "Confirm email OFF" works without any extra steps.
-            const signInResult = await supabase.auth.signInWithPassword({ email, password });
-            if (!signInResult.error && signInResult.data?.session && signInResult.data?.user) {
-                persistAndRedirect(signInResult.data.user, 'signup');
-                return;
-            }
-
-            if (signInResult.error && /confirm|confirmed|verification/i.test(signInResult.error.message)) {
-                showSuccess('Check your email for a confirmation link, then return here to log in.');
-                return;
-            }
-        }
-
-        showError('Authentication failed. Please try again.');
+        if (data?.session && data.user) { persistAndRedirect(data.user, 'login'); return; }
+        showError('Logging in did not complete. Try again.');
     } catch {
         showError('Could not reach the sign-in service. Check your connection and try again.');
     } finally {
         authBusy = false;
-        btn.innerText = originalText;
-        loginBtn.disabled = signupBtn.disabled = redirectPending;
+        loginBtn.innerText = 'Log in';
+        loginBtn.disabled = redirectPending;
     }
 };
 
-byId<HTMLFormElement>('auth-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    handleAuth('login');
+byId<HTMLFormElement>('auth-form').addEventListener('submit', event => {
+    event.preventDefault();
+    logIn();
 });
-signupBtn.addEventListener('click', () => handleAuth('signup'));
+// Setup keeps an invite: someone invited who has no account still lands in that room.
+byId<HTMLAnchorElement>('signup-link').href = '/start.html' + location.search;
 
 byId<HTMLButtonElement>('toggle-password').addEventListener('click', event => {
     const visible = passwordInput.type === 'password';
