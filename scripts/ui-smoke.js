@@ -32,6 +32,20 @@ async (page) => {
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
     assert(await page.locator('.intro').isHidden(), 'Reduced motion must skip the opening animation');
+    // Installable: Chrome reads the manifest under the real Content-Security-Policy, the installed window opens the room, and each icon is the size it says.
+    const cdp = await page.context().newCDPSession(page);
+    const { url: manifestUrl, data: manifestData, errors: manifestErrors } = await cdp.send('Page.getAppManifest');
+    await cdp.detach();
+    assert(manifestData && !manifestErrors.length, 'Chrome should read the web app manifest: ' + (manifestErrors.map(error => error.message).join('; ') || 'none is linked'));
+    const manifest = JSON.parse(manifestData);
+    assert(manifest.name === 'Flow' && manifest.display === 'standalone' && new URL(manifest.start_url, manifestUrl).href === origin + '/room.html', 'The installed app should be Flow, in its own window, opening the room');
+    const iconSizes = await page.evaluate(icons => Promise.all(icons.map(icon => new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(icon.sizes === image.naturalWidth + 'x' + image.naturalHeight);
+        image.onerror = () => reject(new Error('App icon did not load: ' + icon.src));
+        image.src = icon.src;
+    }))), manifest.icons);
+    assert(['192x192', '512x512'].every(size => manifest.icons.some(icon => icon.sizes === size)) && iconSizes.every(Boolean), 'The manifest needs 192 and 512 pixel icons that match their stated sizes');
     await page.screenshot({ path: 'output/playwright/landing-desktop.png' });
     await page.getByRole('button', { name: 'Play the demo', exact: true }).click();
     await page.waitForFunction(() => document.getElementById('preview-time').textContent !== '25:00' && Number(getComputedStyle(document.body).getPropertyValue('--sun-y')) > .43);
