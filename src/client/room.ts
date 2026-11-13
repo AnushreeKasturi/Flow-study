@@ -951,7 +951,13 @@ function bindRoomControls() {
         if (!turningOn) return stopSound();
         if (!playSound(button.dataset.sound as Sound)) notify('This browser cannot generate audio.', 'error');
     }));
-    volume.addEventListener('input', () => setSoundVolume(Number(volume.value) / 100));
+    // The volume is kept between visits. Anything stored that the slider could not have set keeps its default.
+    const savedVolume = localStorage.getItem('flow_sound_volume');
+    if (savedVolume && /^(100|\d{1,2})$/.test(savedVolume)) volume.value = savedVolume;
+    volume.addEventListener('input', () => {
+        setSoundVolume(Number(volume.value) / 100);
+        localStorage.setItem('flow_sound_volume', volume.value);
+    });
     setSoundVolume(Number(volume.value) / 100);
 
     // Tabs
