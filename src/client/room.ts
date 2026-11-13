@@ -1,6 +1,7 @@
 // The room page: lobby (name, join, create) first, then the live room.
 import { reveal } from './motion';
 import { showLoader, hideLoader, leaveWithLoader, loaderText } from './loader';
+import { setMarkup } from './modules/markup';
 import type { Participants, ProfileStats, TimerMode, TimerState } from './types';
 import { byId } from './dom';
 import { bindThemePicker } from './theme';
@@ -745,9 +746,9 @@ async function showHome(user: { id: string; email: string }) {
 
     getProfileStats(user.id).then(stats => {
         // Numbers and locale weekday names only; nothing here comes from another user.
-        byId<HTMLElement>('home-stats').innerHTML =
+        setMarkup(byId<HTMLElement>('home-stats'),
             `<div class="home-today"><div><span>Focused today</span><strong>${formatFocusTime(stats.todayMinutes)}</strong></div>${weekChart(stats)}</div>` +
-            `<dl class="home-figures"><div><dt>Streak</dt><dd>${stats.streak} day${stats.streak === 1 ? '' : 's'}</dd></div><div><dt>All time</dt><dd>${formatFocusTime(stats.totalMinutes)}</dd></div><div><dt>Sessions</dt><dd>${stats.sessionsCompleted}</dd></div></dl>`;
+            `<dl class="home-figures"><div><dt>Streak</dt><dd>${stats.streak} day${stats.streak === 1 ? '' : 's'}</dd></div><div><dt>All time</dt><dd>${formatFocusTime(stats.totalMinutes)}</dd></div><div><dt>Sessions</dt><dd>${stats.sessionsCompleted}</dd></div></dl>`);
     }).catch(() => {});
 
     // Open groups on Home stay current: the board's ping refreshes them within a second.
@@ -820,7 +821,7 @@ function renderProfileStats(stats: ProfileStats) {
     const markup = `<div class="focus-summary"><div><span>Focused today</span><strong id="profile-today-value">${formatFocusTime(stats.todayMinutes)}</strong><p>${note}</p></div>${week}</div>` +
         `<dl class="profile-stat-list">${rows.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>`;
     const container = byId<HTMLElement>('profile-stats');
-    if (container.innerHTML !== markup) container.innerHTML = markup;
+    if (container.innerHTML !== markup) setMarkup(container, markup);
 }
 const profileOpen = () => !byId<HTMLElement>('profile-modal').classList.contains('hidden');
 
@@ -830,7 +831,7 @@ async function openProfile() {
     byId<HTMLElement>('profile-avatar').textContent = UI.initial(currentUsername);
     const statsEl = byId<HTMLElement>('profile-stats');
     cachedProfileStats = null;
-    statsEl.innerHTML = '<p class="panel-description">Loading…</p>';
+    statsEl.replaceChildren(Object.assign(document.createElement('p'), { className: 'panel-description', textContent: 'Loading…' }));
     try {
         cachedProfileStats = await getProfileStats(getMyUserId());
         renderProfileStats(withLiveFocus(cachedProfileStats));

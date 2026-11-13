@@ -125,3 +125,13 @@ test('reminder commands are understood without the assistant', async () => {
     assert.equal(describeWhen({ trigger: 'break' }, now), 'at the next break');
     assert.match(describeWhen({ at: now + 20 * 60000 }, now), /^in 20 min/);
 });
+
+// Trusted Types (vercel.json) makes any other HTML-string sink throw; this keeps the code honest before it ever runs.
+test('HTML strings reach the page only through setMarkup', () => {
+    const { readdirSync, readFileSync, statSync } = require('node:fs');
+    const { join } = require('node:path');
+    const files = dir => readdirSync(dir).flatMap(name => statSync(join(dir, name)).isDirectory() ? files(join(dir, name)) : [join(dir, name)]);
+    const offenders = files('src/client').filter(file => /\.ts$/.test(file) && !file.endsWith('markup.ts'))
+        .filter(file => /\.(innerHTML|outerHTML)\s*=[^=]|insertAdjacentHTML|document\.write/.test(readFileSync(file, 'utf8')));
+    assert.deepEqual(offenders, []);
+});

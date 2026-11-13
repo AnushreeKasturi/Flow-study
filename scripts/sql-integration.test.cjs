@@ -307,6 +307,31 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.equal(fn(stranger, 'claim_host'), 'f', 'Nobody else can take it once the host is back');
             assert.equal(asUser(fresh, `SELECT public.lists_room('${otherRoom}');`), 't', 'The host can tell this room\'s listing is theirs');
             assert.equal(asUser(two, `SELECT public.lists_room('${otherRoom}');`), 'f');
+
+            // 013: a ceiling on the whole project, so many accounts together can't run up the bill.
+            const migration013 = readFileSync('sql/013_global_quotas.sql', 'utf8');
+            run(database, migration013);
+            run(database, migration013);
+            run(database, `DELETE FROM public.api_usage; INSERT INTO public.api_usage (user_id, kind, at) SELECT '${one}', 'ai', now() - interval '30 minutes' FROM generate_series(1, 600);`);
+            assert.equal(asUser(stranger, "SELECT public.api_allow('ai');"), 'f', 'Past the hourly ceiling, even a fresh account is refused');
+            assert.equal(asUser(stranger, "SELECT public.api_allow('turn');"), 't', 'Each kind has its own ceiling');
+            run(database, "UPDATE public.api_usage SET at = now() - interval '2 hours' WHERE kind = 'ai';");
+            assert.equal(asUser(stranger, "SELECT public.api_allow('ai');"), 't', 'The ceiling is per hour');
+            run(database, `DELETE FROM public.api_usage WHERE user_id = '${two}'; INSERT INTO public.api_usage (user_id, kind, at) SELECT '${two}', 'ai', now() - interval '20 minutes' FROM generate_series(1, 30);`);
+            assert.equal(asUser(two, "SELECT public.api_allow('ai');"), 'f', 'One account cannot take more than its hourly share of the ceiling');
+            assert.equal(run(database, "SELECT count(*) FROM public.api_usage WHERE at < now() - interval '1 day';").trim(), '0', 'Old usage is cleared for everyone, not just the caller');
+
+            const migration014 = readFileSync('sql/014_deny_by_default.sql', 'utf8');
+            run(database, migration014);
+            run(database, migration014);
+            assert.equal(asUser(one, `SELECT count(*) > 0 FROM public.sessions WHERE room_id::text = '${openRoom}';`), 't', 'People still see their own focus history');
+            assert.equal(asUser(stranger, 'SELECT count(*) FROM public.sessions;'), '0', 'Nobody sees anyone else\'s');
+            run(database, 'SET ROLE anon; SELECT count(*) FROM public.open_rooms, public.planned_groups;'); // the public board stays readable
+            assert.throws(() => run(database, 'SET ROLE anon; SELECT count(*) FROM public.profiles;'), /Command failed/, 'Signed-out visitors cannot read profiles');
+            // Deny by default: after every migration, each table in public has row-level security,
+            // and signed-out visitors can write to nothing.
+            assert.equal(run(database, "SELECT string_agg(relname, ', ') FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relkind IN ('r', 'p') AND NOT relrowsecurity;").trim(), '', 'Every table must have row-level security');
+            assert.equal(run(database, "SELECT string_agg(DISTINCT table_name || ':' || privilege_type, ', ') FROM information_schema.role_table_grants WHERE grantee = 'anon' AND table_schema = 'public' AND privilege_type IN ('INSERT', 'UPDATE', 'DELETE', 'TRUNCATE');").trim(), '', 'Signed-out visitors can write to nothing');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

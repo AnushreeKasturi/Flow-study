@@ -2,6 +2,7 @@ import { completeTask } from '../motion';
 import type { TimerState, Participants, Task, TaskStats, PresenceState } from '../types';
 import { byId } from '../dom';
 import { escapeHTML } from './utils';
+import { setMarkup } from './markup';
 import { AWAY_STATUSES } from './presence';
 
 export const ROUNDS = 4;
@@ -96,7 +97,7 @@ const TASK_ROW = `
 export const renderTaskList = (container: HTMLElement, tasks: Task[], onToggle: (id: string) => void, onDelete: (id: string) => void, participants: Participants, onAssign: (id: string, userId: string | null) => void) => {
     const emptyMsg = container.querySelector('.task-empty-msg');
     if (tasks.length === 0) {
-        if (!emptyMsg) container.innerHTML = '<li class="task-empty-msg"><strong>Set a goal for this session.</strong>Add a task above to track progress together.</li>';
+        if (!emptyMsg) setMarkup(container, '<li class="task-empty-msg"><strong>Set a goal for this session.</strong>Add a task above to track progress together.</li>');
         return;
     }
     emptyMsg?.remove();
@@ -114,7 +115,7 @@ export const renderTaskList = (container: HTMLElement, tasks: Task[], onToggle: 
             li = document.createElement('li');
             li.className = 'task-item scale-in';
             li.dataset.taskId = key;
-            li.innerHTML = TASK_ROW;
+            setMarkup(li, TASK_ROW);
             li.querySelector<HTMLButtonElement>('.task-checkbox')!.addEventListener('click', () => onToggle(task.id));
             li.querySelector<HTMLButtonElement>('.task-delete')!.addEventListener('click', () => onDelete(task.id));
         }
@@ -129,13 +130,13 @@ export const renderTaskList = (container: HTMLElement, tasks: Task[], onToggle: 
         checkbox.setAttribute('aria-label', `${task.completed ? 'Mark incomplete' : 'Complete task'}: ${task.title}`);
         checkbox.setAttribute('aria-pressed', String(!!task.completed));
         if (justCompleted) completeTask(checkbox);
-        checkbox.innerHTML = task.completed ? CHECK_ICON : '';
+        setMarkup(checkbox, task.completed ? CHECK_ICON : '');
 
         const titleEl = li.querySelector<HTMLElement>('.task-title')!;
         if (titleEl.textContent !== task.title) titleEl.textContent = task.title;
 
         const select = li.querySelector<HTMLSelectElement>('.task-assignee-select')!;
-        select.innerHTML = buildAssigneeOptions(participants, task.assigned_to || '');
+        setMarkup(select, buildAssigneeOptions(participants, task.assigned_to || ''));
         // Assigning .onchange (not addEventListener) keeps one listener across re-renders.
         select.onchange = () => onAssign(task.id, select.value || null);
 

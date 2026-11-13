@@ -32,6 +32,9 @@ async (page) => {
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
     assert(await page.locator('.intro').isHidden(), 'Reduced motion must skip the opening animation');
+    // Trusted Types: a raw HTML string is refused by the browser itself, so a missed escape cannot become script.
+    assert(await page.evaluate(() => { try { document.createElement('div').innerHTML = '<img src=x onerror=alert(1)>'; return false; } catch { return true; } }), 'The page must refuse raw HTML strings (Trusted Types)');
+    assert(await page.evaluate(() => { try { document.createElement('script').src = '/elsewhere.js'; return false; } catch { return true; } }), 'Script URLs must go through a policy too');
     // Installable: Chrome reads the manifest under the real Content-Security-Policy, the installed window opens the room, and each icon is the size it says.
     const cdp = await page.context().newCDPSession(page);
     const { url: manifestUrl, data: manifestData, errors: manifestErrors } = await cdp.send('Page.getAppManifest');

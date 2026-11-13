@@ -20,9 +20,9 @@ Please don't open a public issue. Use GitHub's private reporting: **Security →
 | Abusive listings | Any signed-in user can report a listing. Reports are recorded against the host by the database, and three different reporters within a week hide everything that host has on the board. Only accounts at least a day old count, and one account can file ten reports a day |
 | Text from other people | Names, tasks, and chat are always inserted as text, never as HTML. Tests feed markup through every one of these paths and assert it stays inert |
 | Shared audio links | Only real YouTube and Spotify hosts are accepted, converted to the official embed URL, and the Content-Security-Policy allows frames from those two origins only |
-| Assistant and TURN endpoints | Require a signed-in user and count each request against a per-account quota held in the database, so the limit holds across server instances. Provider keys stay on the server. TURN credentials are issued per request and expire after an hour. Assistant answers are capped in length |
+| Assistant and TURN endpoints | Require a signed-in user and count each request against a per-account quota held in the database, so the limit holds across server instances. A project-wide hourly ceiling on top (`sql/013`) bounds what many accounts together can spend. Provider keys stay on the server. TURN credentials are issued per request and expire after an hour. Assistant answers are capped in length |
 | Assistant | Receives only the text typed after `/ai`. It has no access to the database, the room, or earlier messages, and nothing is kept after the reply |
-| Pages | A Content-Security-Policy that allows scripts from this site only (no inline scripts), plus `nosniff`, a referrer policy, a permissions policy limiting camera and microphone to this site, HSTS, and no framing by other sites |
+| Pages | A Content-Security-Policy that allows scripts from this site only (no inline scripts) and requires Trusted Types: assigning an HTML string or script URL anywhere in the page throws unless it goes through one of two audited policies (`modules/markup.ts`, and one for the Speed Insights script), so a missed escape cannot become script. A test fails the build if code writes HTML any other way. Also plus `nosniff`, a referrer policy, a permissions policy limiting camera and microphone to this site, HSTS, and no framing by other sites |
 | Video and voice | Encrypted by WebRTC (DTLS-SRTP) with keys negotiated between the two browsers on each call. Media goes directly between browsers when a direct path exists; otherwise a TURN relay forwards the encrypted packets without being able to read them. Flow's servers never receive media |
 | The codebase | Dependency audit on every pull request, weekly dependency updates, CodeQL static analysis, secret scanning with push protection, and private vulnerability reporting |
 
@@ -41,6 +41,17 @@ These are real gaps. They are listed so nobody assumes more than is true.
 - **Rooms created before `sql/006` have no host,** so nobody can remove people from them.
 - **The shared timer trusts participants.** Anyone in a room can start, pause, or reset it; that is the feature. Message floods are limited in the browser, not yet in the database.
 - **Styles still allow inline rules** in the Content-Security-Policy; scripts do not.
+
+## Checking a live project
+
+The numbered files in `sql/` leave every table with row-level security and keep signed-out visitors to the public board (`sql/014`); CI checks both after every migration. Projects can drift, for example a table added by hand, so this read-only query in the Supabase SQL editor shows anything open on yours. Every column should come back empty.
+
+```sql
+SELECT
+  (SELECT string_agg(relname, ', ') FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relkind IN ('r', 'p') AND NOT relrowsecurity) AS tables_without_rls,
+  (SELECT string_agg(DISTINCT table_name || ':' || privilege_type, ', ') FROM information_schema.role_table_grants
+     WHERE grantee = 'anon' AND table_schema = 'public' AND (privilege_type <> 'SELECT' OR table_name NOT IN ('open_rooms', 'planned_groups'))) AS signed_out_access_beyond_the_board;
+```
 
 ## Verified senders
 
