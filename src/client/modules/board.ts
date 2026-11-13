@@ -6,14 +6,19 @@ import { getSupabase } from './supabase';
 export * from './board-options';
 
 // room_id is not readable by design (see sql/005), so it is never selected.
-const OPEN = 'id, host_id, host_name, topic, subject, camera, vibe, seats, seats_taken, closed, timer_mode, timer_ends_at, last_seen';
+const OPEN = 'id, host_id, host_name, topic, subject, camera, vibe, seats, seats_taken, closed, timer_mode, timer_ends_at, last_seen, away_until, acting_name';
 const PLANNED = 'id, host_id, host_name, topic, subject, camera, vibe, seats, starts_at, going';
 
-// A listing is live while its host's room checks in (every 45 s). The database
-// stops handing out seats two minutes after the last check-in, but still shows a
-// host their own expired listing, so expired ones are dropped here too.
+// A listing is live while its host's room checks in (every 45 s), or while its
+// host has stepped away (sql/012). The database stops handing out seats after
+// that, but still shows a host their own expired listing, so those go here too.
 const LIVE_FOR_MS = 2 * 60 * 1000;
-export const isLive = (room: Pick<OpenRoom, 'last_seen'>, now = Date.now()) => now - new Date(room.last_seen).getTime() < LIVE_FOR_MS;
+export const isLive = (room: Pick<OpenRoom, 'last_seen' | 'away_until'>, now = Date.now()) =>
+    now - new Date(room.last_seen).getTime() < LIVE_FOR_MS || (!!room.away_until && new Date(room.away_until).getTime() > now);
+
+// Who is hosting, for the board: the host, someone standing in, or nobody yet.
+export const hostedBy = (room: Pick<OpenRoom, 'host_name' | 'away_until' | 'acting_name'>) =>
+    room.acting_name ? `Hosted by ${room.acting_name} for now` : room.away_until ? `${room.host_name} stepped away` : `Hosted by ${room.host_name}`;
 
 export async function fetchOpenRooms(): Promise<OpenRoom[]> {
     const { data, error } = await getSupabase().from('open_rooms').select(OPEN).order('last_seen', { ascending: false }).limit(60);

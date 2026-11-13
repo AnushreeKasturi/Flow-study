@@ -21,7 +21,7 @@ import { ensureTile, attachStream, removeTile, markLeft, setCameraOff, showReact
 import { playSound, stopSound, setSoundVolume, isSound, type Sound } from './modules/soundscape';
 import { chime } from './modules/chime';
 import { initReminders, timerReached } from './modules/reminders';
-import { listRoom, refreshListing, unlistRoom, setClosed, cancelPlan, fetchOpenRooms, takeSeat, statusOf, watchBoard } from './modules/board';
+import { listRoom, refreshListing, unlistRoom, setClosed, cancelPlan, fetchOpenRooms, takeSeat, statusOf, hostedBy, watchBoard } from './modules/board';
 import { timerSnapshot } from './modules/timer';
 import { getStats as getTaskStats } from './modules/tasks';
 import type { GroupDetails } from './types';
@@ -32,7 +32,9 @@ let currentRoomCode = '';
 let currentPin = '';
 let listed = false; // this room is on the study-groups board, and we are its host
 let isHost = false; // we host this room, so we may remove people, hand it over, or end it
-let hostId = '';
+let isActing = false; // the host stepped away and we host for now (sql/012): we keep the listing current
+let hostAway = false;
+let hostId = ''; // whoever hosts right now: the host, someone standing in, or nobody
 let enteredAt = 0;
 let currentUsername = '';
 let partners: Participants = {};
@@ -228,9 +230,8 @@ async function joinRoom() {
         currentRoomCode = roomCode;
         currentPin = pin;
         enteredAt = Date.now();
-        // Whoever created the room is its host. Older rooms, and servers without sql/006, have none.
-        const { data: owner } = await supabase.from('rooms').select('created_by').eq('room_code', roomCode).maybeSingle();
-        applyHost(owner?.created_by ?? '');
+        await syncHost('', false);
+        if (isHost) adoptListing(); // back after stepping away: the listing is still ours
         // A saved display name overrides the email-derived default.
         currentUsername = (await getMyProfile(user.id))?.display_name || user.email.split('@')[0];
         await enterRoom(roomUuid, roomCode);
@@ -381,7 +382,7 @@ async function enterRoom(roomId: string, roomCode: string) {
         onYouTubeSync: url => loadRoomAudio('youtube', url),
         onAudioSync: loadRoomAudio,
         onReaction: data => showReaction(data.userId, data.emoji),
-        onHostChanged: (newHostId, name) => { hostChanged(newHostId, name); },
+        onHostChanged: (_host, name) => { syncHost(name); },
         onRoomEnded: () => { roomEnded(); },
         onNotice: kind => {
             if (kind !== 'pin-guessing') return;
@@ -504,44 +505,82 @@ let wasFocusing = false;
 setInterval(() => { if (wasFocusing) saveFocus('focus-partial', true); }, 5 * 60 * 1000);
 let boardSoon: ReturnType<typeof setTimeout> | undefined;
 const refreshBoardSoon = () => { clearTimeout(boardSoon); boardSoon = setTimeout(refreshBoard, 2000); };
-const refreshBoard = () => { if (listed) refreshListing(getMyUserId(), { seats_taken: peopleHere(), host_name: currentUsername.slice(0, 40), ...timerSnapshot() }).then(undefined, () => {}); };
+const refreshBoard = () => {
+    if (listed) refreshListing(getMyUserId(), { seats_taken: peopleHere(), host_name: currentUsername.slice(0, 40), ...timerSnapshot() }).then(undefined, () => {});
+    if (!currentRoomId || !hostAway) return;
+    // The host stepped away. Whoever stands in checks in for the room (their seat stays
+    // counted); if nobody does, or the stand-in has gone quiet, the database lets us take over.
+    if (isActing) {
+        const { timer_mode, timer_ends_at } = timerSnapshot();
+        supabase.rpc('room_checkin', { p_room: currentRoomId, p_seats_taken: peopleHere() + 1, p_timer_mode: timer_mode, p_timer_ends_at: timer_ends_at })
+            .then(({ data }) => { if (data === false) syncHost(); }, () => {});
+    } else if (!hostId || !partners[hostId]) claimHost();
+};
 setInterval(refreshBoard, 45000);
 
 // ── Who hosts ──────────────────────────────────────────────────────────────
 
 // One place that decides who the host is, for the tiles, the remove buttons, and the leave dialog.
-function applyHost(newHostId: string) {
-    hostId = newHostId;
-    isHost = !!hostId && hostId === currentUser()?.id;
+// While the host is away, whoever stands in is shown as host, but cannot remove people,
+// hand the room on, or end it: those stay with the person who made it.
+function applyHost(owner: string, away = false, acting = '') {
+    const me = currentUser()?.id;
+    hostAway = !!owner && away;
+    hostId = hostAway ? acting : owner;
+    isHost = !!owner && owner === me && !hostAway;
+    isActing = hostAway && !!acting && acting === me;
     document.body.classList.toggle('is-host', isHost);
     setHost(hostId);
 }
 
-// The database says the host changed. Confirm it, then bring everything in line.
-async function hostChanged(newHostId: string, name: string) {
-    const { data } = await supabase.from('rooms').select('created_by').eq('room_code', currentRoomCode).maybeSingle();
-    if (!data || data.created_by !== newHostId) return;
-    const wasHost = isHost;
-    applyHost(newHostId);
-    if (isHost && !wasHost) {
+// Reads who hosts from the database, the only source trusted, and says what changed.
+// `name` comes with the room's message about the change, for the note.
+async function syncHost(name = '', announce = true) {
+    const room = () => supabase.from('rooms').select('created_by, host_away, acting_host').eq('room_code', currentRoomCode).maybeSingle();
+    let { data, error } = await room();
+    // Before sql/012 there is no stepping away; fall back to whoever created the room.
+    if (error) ({ data } = await supabase.from('rooms').select('created_by').eq('room_code', currentRoomCode).maybeSingle());
+    const [wasHost, wasActing, wasAway, was] = [isHost, isActing, hostAway, hostId];
+    applyHost(data?.created_by ?? '', !!data?.host_away, data?.acting_host ?? '');
+    if (hostAway && !hostId) claimHost(); // nobody is hosting: offer to
+    if (!announce || (was === hostId && wasAway === hostAway)) return;
+    const who = name || partners[hostId]?.username || 'Someone';
+    if (isActing) {
+        pushNote('You’re the room host for now.');
+        notify('You’re the room host for now. The host gets the role back when they return.');
+    } else if (isHost && !wasHost) {
         pushNote('You’re the host now.');
         notify('You’re the host now. You can remove people, and hand the room on when you leave.');
-        // If the room is on the board, the listing is yours now: keep it checked in.
-        const { data: listing } = await supabase.from('open_rooms').select('topic, subject, camera, vibe, seats, closed').eq('host_id', getMyUserId()).maybeSingle();
-        if (listing) {
-            listed = true;
-            byId<HTMLInputElement>('board-topic').value = listing.topic;
-            for (const [id, value] of [['board-seats', String(listing.seats)], ['board-subject', listing.subject], ['board-camera', listing.camera], ['board-vibe', listing.vibe]]) byId<HTMLSelectElement>(id).value = value;
-            byId<HTMLInputElement>('board-closed').checked = listing.closed;
-            byId<HTMLElement>('board-unlist-btn').classList.remove('hidden');
-            byId<HTMLElement>('board-closed-row').classList.remove('hidden');
-            byId<HTMLButtonElement>('board-list-btn').textContent = 'Update listing';
-            refreshBoard();
-        }
+        adoptListing();
     } else if (!isHost) {
-        pushNote(`${name || partners[newHostId]?.username || 'Someone'} is the host now.`);
         listed = false;
+        if (hostAway && !hostId) pushNote(wasActing ? 'You’re no longer hosting.' : 'The host stepped away. The room stays open.');
+        else if (hostAway) pushNote(`${who} is hosting for now.`);
+        else if (wasAway) pushNote(`${who} is back and hosting again.`);
+        else pushNote(`${who} is the host now.`);
     }
+}
+
+// Only one person stands in at a time; the database decides who.
+async function claimHost() {
+    const { data } = await supabase.rpc('claim_host', { p_room: currentRoomId });
+    if (data === true && !isActing) await syncHost();
+}
+
+// If this room is on the board under our name, keep its listing checked in.
+async function adoptListing() {
+    const { data: ours } = await supabase.rpc('lists_room', { p_room: currentRoomId });
+    if (ours !== true) return;
+    const { data: listing } = await supabase.from('open_rooms').select('topic, subject, camera, vibe, seats, closed').eq('host_id', getMyUserId()).maybeSingle();
+    if (!listing) return;
+    listed = true;
+    byId<HTMLInputElement>('board-topic').value = listing.topic;
+    for (const [id, value] of [['board-seats', String(listing.seats)], ['board-subject', listing.subject], ['board-camera', listing.camera], ['board-vibe', listing.vibe]]) byId<HTMLSelectElement>(id).value = value;
+    byId<HTMLInputElement>('board-closed').checked = listing.closed;
+    byId<HTMLElement>('board-unlist-btn').classList.remove('hidden');
+    byId<HTMLElement>('board-closed-row').classList.remove('hidden');
+    byId<HTMLButtonElement>('board-list-btn').textContent = 'Update listing';
+    refreshBoard();
 }
 
 // The host ended the room. Leave quietly, with a calm note on Home.
@@ -557,25 +596,28 @@ async function roomEnded() {
     leaveWithLoader('/room.html', 'The host ended the room', true);
 }
 
-// The leave dialog asks the host what should happen to the room.
+// The leave dialog says plainly what happens to the room.
+const LEAVE_TEXT = 'Your camera and microphone will disconnect. You can rejoin with the room code; saved shared tasks stay in the room.';
 function prepareLeave() {
     const others = Object.entries(partners).filter(([id]) => !(id in pendingLeaves));
+    byId<HTMLElement>('leave-text').textContent = isActing
+        ? 'You’re hosting for now. When you leave, the next person here takes over until the host is back.' : LEAVE_TEXT;
     byId<HTMLElement>('leave-host').classList.toggle('hidden', !isHost);
-    if (!isHost) return;
+    if (!isHost) return updateLeaveButton();
     const select = byId<HTMLSelectElement>('leave-new-host');
     select.replaceChildren(...others.map(([id, partner]) => Object.assign(document.createElement('option'), { value: id, textContent: partner.username || 'Partner' })));
     byId<HTMLElement>('leave-handover-row').classList.toggle('hidden', !others.length);
-    // Alone, the choice is between keeping the room for later and closing it.
-    byId<HTMLElement>('leave-keep-label').textContent = others.length ? 'Just leave' : 'Keep the room';
-    byId<HTMLElement>('leave-keep-text').textContent = others.length ? 'The room stays open for the others, with no host.' : 'Rejoin any time with the code.';
-    byId<HTMLElement>('leave-end-label').textContent = others.length ? 'End it for everyone' : 'End the room';
-    const choice = document.querySelector<HTMLInputElement>(`input[name="leave-choice"][value="${others.length ? 'handover' : 'leave'}"]`)!;
-    choice.checked = true;
+    const board = listed ? ' and on the board' : '';
+    byId<HTMLElement>('leave-away-text').textContent = (others.length
+        ? `The room stays open${board}. Someone here hosts for now`
+        : `The room stays open${board}. The next person to join hosts for now`) + ', and the role comes back to you when you return.';
+    byId<HTMLElement>('leave-end-text').textContent = `Closes the room for good: ${others.length ? 'everyone here is sent Home, ' : ''}the code stops working${listed ? ', and it comes off the board' : ''}. Tasks and focus time are kept.`;
+    document.querySelector<HTMLInputElement>('input[name="leave-choice"][value="away"]')!.checked = true;
     updateLeaveButton();
 }
 function updateLeaveButton() {
     const choice = isHost ? document.querySelector<HTMLInputElement>('input[name="leave-choice"]:checked')?.value : 'leave';
-    byId<HTMLButtonElement>('confirm-leave-btn').textContent = choice === 'handover' ? 'Hand over and leave' : choice === 'end' ? 'End room' : 'Leave room';
+    byId<HTMLButtonElement>('confirm-leave-btn').textContent = choice === 'handover' ? 'Hand over and leave' : choice === 'end' ? 'End room for everyone' : choice === 'away' ? 'Step away' : 'Leave room';
 }
 
 // ── Host controls ──────────────────────────────────────────────────────────
@@ -663,15 +705,15 @@ async function showHome(user: { id: string; email: string }) {
 
     // Open groups on Home stay current: the board's ping refreshes them within a second.
     const homeGroups = () => fetchOpenRooms().then(rooms => {
-        const free = rooms.filter(room => !room.closed && room.seats_taken < room.seats && room.host_id !== user.id);
+        const free = rooms.filter(room => !room.closed && room.seats_taken < room.seats && (room.host_id !== user.id || !!room.away_until));
         byId<HTMLElement>('lobby-board').replaceChildren(Object.assign(document.createElement('a'), {
             href: '/groups.html', textContent: free.length ? `${free.length} group${free.length === 1 ? ' has' : 's have'} a free seat right now` : 'No group is open this minute. See what’s planned'
         }), '.');
         byId<HTMLElement>('home-groups').replaceChildren(...free.slice(0, 3).map(room => {
             const item = document.createElement('li');
             const text = document.createElement('div');
-            text.append(Object.assign(document.createElement('strong'), { textContent: room.topic }), Object.assign(document.createElement('span'), { textContent: `${room.host_name}, ${statusOf(room).toLowerCase()}` }));
-            const sit = Object.assign(document.createElement('button'), { className: 'btn btn-primary', type: 'button', textContent: 'Join' });
+            text.append(Object.assign(document.createElement('strong'), { textContent: room.topic }), Object.assign(document.createElement('span'), { textContent: `${room.host_id === user.id ? 'Your room' : hostedBy(room)}, ${statusOf(room).toLowerCase()}` }));
+            const sit = Object.assign(document.createElement('button'), { className: 'btn btn-primary', type: 'button', textContent: room.host_id === user.id ? 'Return' : 'Join' });
             sit.setAttribute('aria-label', `Take a seat in ${room.topic}`);
             sit.addEventListener('click', async () => {
                 if (roomActionBusy) return;
@@ -947,15 +989,17 @@ function bindRoomControls() {
         // As host: hand the room on, or end it, before going. If that fails, stay.
         const choice = isHost ? document.querySelector<HTMLInputElement>('input[name="leave-choice"]:checked')?.value : 'leave';
         let ended = false;
-        if (choice === 'handover' || choice === 'end') {
+        if (choice === 'handover' || choice === 'end' || choice === 'away') {
             button.disabled = true;
             const newHost = byId<HTMLSelectElement>('leave-new-host').value;
-            const { error } = choice === 'handover'
-                ? await supabase.rpc('transfer_host', { p_room: currentRoomId, p_user: newHost })
+            const { error } = choice === 'handover' ? await supabase.rpc('transfer_host', { p_room: currentRoomId, p_user: newHost })
+                : choice === 'away' ? await supabase.rpc('step_away', { p_room: currentRoomId })
                 : await supabase.rpc('end_room', { p_room: currentRoomId });
             button.disabled = false;
-            if (error) { notify(choice === 'handover' ? 'The room could not be handed over. They may have just left; try again.' : 'The room could not be ended. Try again.', 'error'); return; }
-            if (choice === 'handover') listed = false; // the listing is theirs now
+            // Before sql/012 there is no stepping away: just leave, as hosts always could.
+            const plainLeave = choice === 'away' && error?.code === 'PGRST202';
+            if (error && !plainLeave) { notify(choice === 'handover' ? 'The room could not be handed over. They may have just left; try again.' : choice === 'away' ? 'The room could not be kept open. Try again, or end it.' : 'The room could not be ended. Try again.', 'error'); return; }
+            if (choice !== 'end' && !plainLeave) listed = false; // the listing stays up: theirs now, or kept for our return
             ended = choice === 'end';
         }
         leaving = true;
@@ -969,7 +1013,8 @@ function bindRoomControls() {
         const tasks = getTaskStats();
         sessionStorage.setItem('flow_recap', `Last session: ${formatFocusTime(minutes)} in room ${currentRoomCode}` + (tasks.total ? `, ${tasks.completed} of ${tasks.total} tasks done.` : '.'));
         if (ended) sessionStorage.removeItem('flow_last_room'); // its code no longer works
-        const goodbye = [saveFocus('focus-partial'), disconnectSocket(), listed ? unlistRoom(getMyUserId()) : null];
+        const goodbye = [saveFocus('focus-partial'), disconnectSocket(), listed ? unlistRoom(getMyUserId()) : null,
+            isActing ? supabase.rpc('release_host', { p_room: currentRoomId }) : null]; // standing in: the next person takes over
         try { await Promise.race([Promise.allSettled(goodbye), new Promise(resolve => setTimeout(resolve, 1500))]); }
         finally { leaveWithLoader('/room.html', 'Back to your space…', true); }
     });
@@ -1031,6 +1076,7 @@ async function start() {
         sendBye();
         // Closing the tab ends the listing now, rather than when it expires two minutes later.
         if (listed) unlistRoom(getMyUserId()).then(undefined, () => {});
+        if (isActing) supabase.rpc('release_host', { p_room: currentRoomId }).then(undefined, () => {});
         cleanupMedia();
         disconnectSocket();
     });

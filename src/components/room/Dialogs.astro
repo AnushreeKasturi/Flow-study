@@ -126,8 +126,8 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
         <fieldset id="leave-host" class="leave-host hidden">
             <legend>You’re the host. What should happen to the room?</legend>
             <label id="leave-handover-row"><input type="radio" name="leave-choice" value="handover"><span><strong>Hand it to <select id="leave-new-host" class="input" aria-label="New host"></select></strong><small>The room, and its board listing if it has one, carry on with them as host.</small></span></label>
-            <label><input type="radio" name="leave-choice" value="end"><span><strong id="leave-end-label">End it for everyone</strong><small id="leave-end-text">Everyone goes back Home and the code stops working. Tasks and focus time are kept.</small></span></label>
-            <label><input type="radio" name="leave-choice" value="leave"><span><strong id="leave-keep-label">Just leave</strong><small id="leave-keep-text">The room stays open for the others, with no host.</small></span></label>
+            <label><input type="radio" name="leave-choice" value="away"><span><strong>Step away</strong><small id="leave-away-text">The room stays open. Whoever is here hosts for now, and the role comes back to you when you return.</small></span></label>
+            <label><input type="radio" name="leave-choice" value="end"><span><strong>End the room for everyone</strong><small id="leave-end-text">Closes the room for good: everyone is sent Home and the code stops working. Tasks and focus time are kept.</small></span></label>
         </fieldset>
         <div class="dialog-actions">
             <button id="cancel-leave-btn" class="btn">Stay in room</button>

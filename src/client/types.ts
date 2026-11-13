@@ -53,9 +53,9 @@ export interface ProfileStats {
     totalMinutes: number; todayMinutes: number; liveMinutes: number;
 }
 interface Session { id: string; user_id: string; room_id: string; mode: string; duration_seconds: number; completed_at: string; }
-interface Room { id: string; room_code: string; is_locked: boolean; pin: string | null; created_at: string; created_by?: string | null; }
+interface Room { id: string; room_code: string; is_locked: boolean; pin: string | null; created_at: string; created_by?: string | null; host_away?: boolean; acting_host?: string | null; }
 export interface GroupDetails { host_name: string; topic: string; subject: string; camera: string; vibe: string; seats: number; }
-export interface OpenRoom extends GroupDetails { id: string; host_id: string; seats_taken: number; closed: boolean; timer_mode: string | null; timer_ends_at: string | null; last_seen: string; }
+export interface OpenRoom extends GroupDetails { id: string; host_id: string; seats_taken: number; closed: boolean; timer_mode: string | null; timer_ends_at: string | null; last_seen: string; away_until?: string | null; acting_name?: string | null; }
 export interface PlannedGroup extends GroupDetails { id: string; host_id: string; starts_at: string; going: number; }
 interface Profile { id: string; display_name: string | null; created_at: string; updated_at: string; }
 type Table<Row, Insert = Partial<Row>> = { Row: { [K in keyof Row]: Row[K] }; Insert: { [K in keyof Insert]: Insert[K] }; Update: Partial<{ [K in keyof Row]: Row[K] }>; Relationships: [] };
@@ -79,6 +79,11 @@ export interface Database {
             room_send: { Args: { p_room: string; p_event: string; p_payload: Record<string, unknown> }; Returns: undefined };
             transfer_host: { Args: { p_room: string; p_user: string }; Returns: string };
             end_room: { Args: { p_room: string }; Returns: undefined };
+            step_away: { Args: { p_room: string }; Returns: undefined };
+            claim_host: { Args: { p_room: string }; Returns: boolean };
+            release_host: { Args: { p_room: string }; Returns: undefined };
+            room_checkin: { Args: { p_room: string; p_seats_taken: number; p_timer_mode: string | null; p_timer_ends_at: string | null }; Returns: boolean };
+            lists_room: { Args: { p_room: string }; Returns: boolean };
         };
         Enums: Record<string, never>;
         CompositeTypes: Record<string, never>;

@@ -273,6 +273,40 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.throws(() => channel(stranger, 'board', "INSERT INTO realtime.messages VALUES ('board','broadcast','{}');"), /Command failed/, 'Nobody can send on the board');
             channel(two, 'room:' + room, `INSERT INTO realtime.messages VALUES ('room:${room}','presence','{}');`);
             assert.throws(() => channel(two, 'room:' + room, `INSERT INTO realtime.messages VALUES ('room:${room}','broadcast','{}');`), /Command failed/, 'Members announce presence directly, but broadcast only through room_send');
+
+            // 012: the host steps away; one person hosts for now; the host gets it back on return.
+            const migration012 = readFileSync('sql/012_temporary_host.sql', 'utf8');
+            run(database, migration012);
+            run(database, migration012);
+            const hostFor = sql => run(database, `SELECT ${sql} FROM public.rooms WHERE id = '${otherRoom}';`).trim();
+            const fn = (id, name) => asUser(id, `SELECT public.${name}('${otherRoom}');`);
+            run(database, `INSERT INTO public.room_participants(room_id,user_id) VALUES ('${otherRoom}','${two}'), ('${otherRoom}','${stranger}');`);
+            assert.throws(() => fn(two, 'step_away'), /Command failed/, 'Only the host can step away');
+            assert.equal(fn(two, 'claim_host'), 'f', 'Nobody stands in while the host is here');
+            fn(fresh, 'step_away');
+            run(database, `UPDATE public.open_rooms SET last_seen = now() - interval '1 hour' WHERE room_id = '${otherRoom}';`);
+            assert.equal(run(database, "SET ROLE anon; SELECT count(*) FROM public.open_rooms WHERE topic = 'Kai''s own group';").trim().split('\n').at(-1), '1', 'An away host\'s listing stays on the board');
+            assert.equal(fn(two, 'claim_host'), 't', 'The first person in hosts for now');
+            assert.equal(fn(stranger, 'claim_host'), 'f', 'Only one person hosts at a time');
+            assert.equal(run(database, `SELECT acting_name FROM public.open_rooms WHERE room_id = '${otherRoom}';`).trim(), 'Sam', 'The board shows who hosts for now');
+            assert.equal(asUser(two, `SELECT public.room_checkin('${otherRoom}', 9, 'focus', now() + interval '20 minutes');`), 't');
+            assert.equal(run(database, `SELECT seats_taken || ' ' || timer_mode FROM public.open_rooms WHERE room_id = '${otherRoom}';`).trim(), '4 focus', 'The stand-in keeps the listing current, within its seats');
+            assert.equal(asUser(stranger, `SELECT public.room_checkin('${otherRoom}', 1, NULL, NULL);`), 'f', 'Only the stand-in checks in');
+            assert.throws(() => fn(two, 'end_room'), /Command failed/, 'A stand-in cannot end the room');
+            assert.throws(() => asUser(two, `SELECT public.remove_participant('${otherRoom}', '${stranger}');`), /Command failed/, 'A stand-in cannot remove anyone');
+            run(database, `UPDATE public.rooms SET acting_seen = now() - interval '2 minutes' WHERE id = '${otherRoom}';`);
+            assert.equal(fn(stranger, 'claim_host'), 't', 'A stand-in who has gone quiet is replaced');
+            fn(stranger, 'release_host');
+            assert.equal(hostFor("acting_host IS NULL AND host_away"), 't', 'Leaving frees the role for the next person');
+            assert.equal(fn(two, 'claim_host'), 't');
+            run(database, 'DELETE FROM realtime.sent;');
+            asUser(fresh, "SELECT public.join_room('OTHER3', NULL);");
+            assert.equal(hostFor("host_away::text || ' ' || (acting_host IS NULL)::text"), 'false true', 'The host gets the role back the moment they return');
+            assert.equal(run(database, `SELECT (away_until IS NULL AND acting_name IS NULL)::text FROM public.open_rooms WHERE room_id = '${otherRoom}';`).trim(), 'true', 'The listing is theirs again');
+            assert.equal(run(database, `SELECT count(*) FROM realtime.sent WHERE event = 'host-changed' AND payload->>'host' = '${fresh}';`).trim(), '1', 'The room is told the host is back');
+            assert.equal(fn(stranger, 'claim_host'), 'f', 'Nobody else can take it once the host is back');
+            assert.equal(asUser(fresh, `SELECT public.lists_room('${otherRoom}');`), 't', 'The host can tell this room\'s listing is theirs');
+            assert.equal(asUser(two, `SELECT public.lists_room('${otherRoom}');`), 'f');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

@@ -1,7 +1,7 @@
 // Study-groups board page. Readable by anyone; joining and hosting need an account.
 import { byId } from './dom';
 import type { GroupDetails, OpenRoom, PlannedGroup } from './types';
-import { fetchOpenRooms, fetchPlanned, fetchMyPlans, takeSeat, planGroup, cancelPlan, setGoing, report, statusOf, watchBoard, labelOf, SUBJECTS, CAMERAS, VIBES } from './modules/board';
+import { fetchOpenRooms, fetchPlanned, fetchMyPlans, takeSeat, planGroup, cancelPlan, setGoing, report, statusOf, hostedBy, watchBoard, labelOf, SUBJECTS, CAMERAS, VIBES } from './modules/board';
 import { getMyProfile } from './modules/profile';
 import { loadUser } from './modules/session';
 import { showLoader, hideLoader, leaveWithLoader } from './loader';
@@ -74,7 +74,7 @@ function roomCard(room: OpenRoom) {
             el('h3', { textContent: room.topic }),
             el('p', { className: 'group-status' }, el('i', { className: 'live' }), statusOf(room)),
             tags(room),
-            el('p', { className: 'group-host' }, `Hosted by ${room.host_name}${own ? ' (you)' : ''}`, user && !own ? reportButton('open', room) : '')),
+            el('p', { className: 'group-host' }, `${hostedBy(room)}${own ? ' (you)' : ''}`, user && !own ? reportButton('open', room) : '')),
         el('div', { className: 'group-seats' }, seats, el('span', { textContent: room.closed ? 'Not taking new people' : free ? `${free} seat${free === 1 ? '' : 's'} free` : 'No seats free' })),
         action);
 }

@@ -92,6 +92,13 @@ window.supabase = { createClient() {
                 // Host actions: the database would also tell the room; tests send those messages themselves.
                 if (name === 'transfer_host') return fixture.rpcError ? { data: null, error: { message: fixture.rpcError } } : { data: 'New host', error: null };
                 if (name === 'end_room') return fixture.rpcError ? { data: null, error: { message: fixture.rpcError } } : { data: null, error: null };
+                // Stepping away and standing in (sql/012), against the newest room. One stand-in at a time.
+                const room = tables.rooms.at(-1) ?? {};
+                if (name === 'step_away') { Object.assign(room, { host_away: true, acting_host: null }); if (tables.open_rooms[0]) tables.open_rooms[0].away_until = new Date(Date.now() + 8 * 3600e3).toISOString(); return { data: null, error: null }; }
+                if (name === 'claim_host') { const ok = !!room.host_away && (!room.acting_host || room.acting_host === user.id); if (ok) room.acting_host = user.id; return { data: ok, error: null }; }
+                if (name === 'release_host') { if (room.acting_host === user.id) room.acting_host = null; return { data: null, error: null }; }
+                if (name === 'room_checkin') return { data: !!room.host_away && room.acting_host === user.id, error: null };
+                if (name === 'lists_room') return { data: tables.open_rooms.some(row => row.host_id === user.id), error: null };
                 // join_room answers with a room id; join_open_room with the room's code.
                 return { data: fixture.rpcError ? null : name === 'join_open_room' ? 'FOCUS6' : 'test-room', error: fixture.rpcError ? { message: fixture.rpcError } : null };
             },
