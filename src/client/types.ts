@@ -79,6 +79,7 @@ export interface Database {
             room_send: { Args: { p_room: string; p_event: string; p_payload: Record<string, unknown> }; Returns: undefined };
             transfer_host: { Args: { p_room: string; p_user: string }; Returns: string };
             end_room: { Args: { p_room: string }; Returns: undefined };
+            room_listed: { Args: { p_room: string }; Returns: boolean };
             step_away: { Args: { p_room: string }; Returns: undefined };
             claim_host: { Args: { p_room: string }; Returns: boolean };
             release_host: { Args: { p_room: string }; Returns: undefined };

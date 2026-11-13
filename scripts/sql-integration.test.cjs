@@ -332,6 +332,12 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             // and signed-out visitors can write to nothing.
             assert.equal(run(database, "SELECT string_agg(relname, ', ') FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relkind IN ('r', 'p') AND NOT relrowsecurity;").trim(), '', 'Every table must have row-level security');
             assert.equal(run(database, "SELECT string_agg(DISTINCT table_name || ':' || privilege_type, ', ') FROM information_schema.role_table_grants WHERE grantee = 'anon' AND table_schema = 'public' AND privilege_type IN ('INSERT', 'UPDATE', 'DELETE', 'TRUNCATE');").trim(), '', 'Signed-out visitors can write to nothing');
+
+            // 015: members can ask whether their room is on the board (to hide IPs by default), and nobody else can.
+            run(database, readFileSync('sql/015_room_listed.sql', 'utf8'));
+            assert.equal(asUser(two, `SELECT public.room_listed('${otherRoom}');`), 't', 'A member learns their room is listed');
+            assert.equal(asUser(one, `SELECT public.room_listed('${otherRoom}');`), 'f', 'Someone outside the room learns nothing');
+            assert.equal(asUser(two, `SELECT public.room_listed('${room}');`), 'f', 'An unlisted room is not listed');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

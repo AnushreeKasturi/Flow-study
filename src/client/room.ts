@@ -7,7 +7,7 @@ import { byId } from './dom';
 import { bindThemePicker } from './theme';
 import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, updateMyUsername, sendReaction, sendHandRaise, sendRemoved, sendBye } from './modules/socket';
 import { initNotifications, pushNote, systemNotify } from './modules/notifications';
-import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack } from './modules/rtc';
+import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack, setHideIp, whenRelayUnavailable } from './modules/rtc';
 import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState, saveFocus } from './modules/timer';
 import { initTasks, addTask, toggleTask, deleteTask, assignTask, rerenderTasks, setSharedTasks } from './modules/tasks';
 import { initPresence, updatePresence, startFocusTracking, stopFocusTracking, formatFocusTime, setAway } from './modules/presence';
@@ -158,6 +158,7 @@ async function firstRunName(userId: string) {
 // the study-groups board; such a room never has a PIN.
 async function createRoom(open?: Omit<GroupDetails, 'host_name'> & { planId?: string }) {
     if (roomActionBusy) return;
+    fromBoard = !!open;
     const pin = open ? '' : byId<HTMLInputElement>('create-pin-input').value.trim();
     if (pin && !/^\d{4}$/.test(pin)) { showLobbyError('A PIN is 4 digits. Fix it, or leave it empty for no PIN.'); return; }
     setRoomBusy(true, 'host');
@@ -232,6 +233,8 @@ async function joinRoom() {
         currentPin = pin;
         enteredAt = Date.now();
         toldLate = false;
+        applyHideIp(); // before any call is set up
+        await checkListed(); // and before anyone is called, now that the board's answer is in
         await syncHost('', false);
         if (isHost) adoptListing(); // back after stepping away: the listing is still ours
         // A saved display name overrides the email-derived default.
@@ -492,6 +495,7 @@ async function listOnBoard(details: Omit<GroupDetails, 'host_name'>) {
         seats_taken: peopleHere(), closed: byId<HTMLInputElement>('board-closed').checked, ...timerSnapshot()
     });
     listed = result === 'listed';
+    if (listed && !fromBoard) { fromBoard = true; applyHideIp(); } // now on the board: strangers may join
     status.textContent = listed ? `Listed as “${details.topic}” with ${details.seats} seats. It comes off the board when you leave.`
         : result === 'locked' ? 'This room can’t go on the board. Only the person who created it can list it, and not if it has a PIN.'
         : 'The room could not be listed just now. Check your connection and try again.';
@@ -528,6 +532,27 @@ const refreshBoard = () => {
     } else if (!hostId || !partners[hostId]) claimHost();
 };
 setInterval(refreshBoard, 45000);
+
+// ── Hiding your IP address ─────────────────────────────────────────────────
+// Your own choice wins; otherwise it is on in groups from the public board, where
+// the others are usually strangers, and off in rooms you were invited to.
+let fromBoard = false;
+let hideIpOverride: boolean | null = (() => { try { const saved = localStorage.getItem('flow_hide_ip'); return saved === null ? null : saved === '1'; } catch { return null; } })();
+const hidingIp = () => hideIpOverride ?? fromBoard;
+whenRelayUnavailable(() => notify('Calls are waiting for the relay server, which hides your IP address. To connect directly instead, turn off “Hide my IP address” in timer settings.', 'error'));
+// The room's real status decides the default, however you arrived: a listed room is
+// full of strangers even if you came in by code. Changing it reconnects calls.
+function applyHideIp() {
+    const before = hiding;
+    hiding = hidingIp();
+    setHideIp(hiding);
+    if (before !== null && before !== hiding) Object.keys(partners).forEach(removePeer);
+}
+let hiding: boolean | null = null;
+async function checkListed() {
+    const { data } = await supabase.rpc('room_listed', { p_room: currentRoomId });
+    if (data === true && !fromBoard) { fromBoard = true; applyHideIp(); }
+}
 
 // ── Stepping away ──────────────────────────────────────────────────────────
 // A quiet personal state: your tile dims and your focus time pauses, while the
@@ -766,6 +791,7 @@ async function showHome(user: { id: string; email: string }) {
             sit.addEventListener('click', async () => {
                 if (roomActionBusy) return;
                 sit.disabled = true;
+                fromBoard = true;
                 const seat = await takeSeat(room.id);
                 if ('code' in seat) { roomCodeInput.value = seat.code; pinInput.value = ''; await joinRoom(); }
                 else { showLobbyError(seat.reason); sit.disabled = false; }
@@ -892,6 +918,8 @@ function bindRoomControls() {
     on('timer-reset-btn', () => resetTimer());
     on<HTMLButtonElement>('focus-mode-toggle', event => setToggle(event.currentTarget, document.body.classList.toggle('focus-active')));
     UI.UI.timerModes.forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode as TimerMode)));
+    const hideIpBox = byId<HTMLInputElement>('setting-hide-ip');
+    on('open-timer-settings-btn', () => { hideIpBox.checked = hidingIp(); });
     const notifyBox = byId<HTMLInputElement>('setting-notify');
     notifyBox.checked = localStorage.getItem('flow_notify') === '1';
     on('open-timer-settings-btn', () => openModal('timer-settings-modal'));
@@ -910,6 +938,13 @@ function bindRoomControls() {
         }
         notifyBox.checked = allowed;
         localStorage.setItem('flow_notify', allowed ? '1' : '0');
+        // A changed choice applies at once: calls are set up again with the new route.
+        if (hideIpBox.checked !== hidingIp()) {
+            try { localStorage.setItem('flow_hide_ip', hideIpBox.checked ? '1' : '0'); } catch { /* Private mode: this visit only. */ }
+            hideIpOverride = hideIpBox.checked;
+            applyHideIp(); // the three-second check calls everyone back
+            notify(hideIpBox.checked ? 'Your IP address is hidden. Reconnecting calls through the relay…' : 'Calls connect directly again. Reconnecting…');
+        }
     });
 
     // Profile
@@ -1171,6 +1206,7 @@ async function start() {
         const plan = JSON.parse(hosting);
         if (typeof plan.topic === 'string') await createRoom({ topic: plan.topic, subject: plan.subject, camera: plan.camera, vibe: plan.vibe, seats: Math.min(6, Math.max(2, Number(plan.seats) || 4)), planId: typeof plan.planId === 'string' ? plan.planId : undefined });
     } else if (seat && /^[A-Z0-9]{6}$/.test(seat)) {
+        fromBoard = true;
         roomCodeInput.value = seat;
         await joinRoom();
     }

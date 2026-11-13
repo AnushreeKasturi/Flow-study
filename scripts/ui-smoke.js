@@ -890,10 +890,37 @@ async (page) => {
     for (const width of [1440, 768, 390, 320]) { await page.setViewportSize({ width, height: 900 }); await fitsViewport(); }
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(origin + '/room.html?board');
+    // A group from the board hides your IP: calls go through the relay, and only relay candidates leave the browser.
+    await page.route('**/api/turn-credentials', route => route.fulfill({ json: { iceServers: [{ urls: 'turn:relay.example.test:3478', username: 'u', credential: 'c' }] } }));
+    await page.evaluate(() => {
+        const Native = window.RTCPeerConnection;
+        window.__rtcPolicies = [];
+        window.RTCPeerConnection = class extends Native { constructor(config) { window.__rtcPolicies.push(config?.iceTransportPolicy); super({ iceServers: [] }); } };
+    });
     await page.getByRole('button', { name: /^Take a seat in Organic chemistry/ }).click();
     await visible('#app');
     assert(await page.locator('#header-room-code').innerText() === 'FOCUS6', 'A seat taken from home should lead straight into that room');
     assert(await page.locator('#sound-volume').inputValue() === '65', 'The soundscape volume should be remembered between visits');
+    await page.evaluate(() => window.__fixture.handlers['presence:join']({ key: 'zz-stranger', newPresences: [{ username: 'Stranger', isDummyMedia: true }] }));
+    await page.waitForFunction(() => window.__rtcPolicies.length > 0);
+    assert(await page.evaluate(() => window.__rtcPolicies.every(policy => policy === 'relay')), 'Calls in a group from the board should go through the relay');
+    await page.getByRole('button', { name: 'Timer settings', exact: true }).click();
+    assert(await page.locator('#setting-hide-ip').isChecked(), 'The setting should show that the IP is hidden here');
+    await page.locator('#setting-hide-ip').uncheck();
+    await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
+    await page.waitForFunction(() => window.__rtcPolicies.at(-1) === 'all', undefined, { timeout: 10000 });
+    assert(await page.evaluate(() => localStorage.getItem('flow_hide_ip')) === '0', 'Turning it off is remembered, and calls reconnect directly');
+    // With no relay available, hiding the IP fails closed: the call stays relay-only, and the person is told.
+    await page.unroute('**/api/turn-credentials');
+    await page.route('**/api/turn-credentials', route => route.fulfill({ status: 503, body: '' }));
+    await page.evaluate(() => { localStorage.setItem('flow_hide_ip', '1'); });
+    await page.getByRole('button', { name: 'Timer settings', exact: true }).click();
+    await page.locator('#setting-hide-ip').check();
+    await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
+    await page.waitForFunction(() => window.__rtcPolicies.at(-1) === 'relay', undefined, { timeout: 10000 });
+    await page.evaluate(() => localStorage.removeItem('flow_hide_ip'));
+    await page.unroute('**/api/turn-credentials');
+    await page.evaluate(() => window.__fixture.handlers['broadcast:bye']({ payload: { userId: 'zz-stranger' } }));
     await page.getByRole('button', { name: 'Leave', exact: true }).click();
     await page.getByRole('button', { name: 'Leave room', exact: true }).click();
     await visible('#join-modal');
