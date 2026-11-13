@@ -13,6 +13,7 @@
     "test:db": "node --test scripts/sql-integration.test.cjs",
     "test:browser": "node scripts/browser-ci.cjs",
     "preview:social": "node scripts/generate-social-preview.cjs",
+    "icons": "node scripts/generate-app-icons.cjs",
     "build": "astro build",
     "check": "astro check",
     "pretest": "npm run check && npm run build",
