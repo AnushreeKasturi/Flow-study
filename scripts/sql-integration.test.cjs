@@ -13,7 +13,7 @@ const room = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 test('compatibility migration on legacy TEXT and current UUID schemas', async t => {
     assert.equal(run('postgres', 'SELECT current_user;').trim(), 'flow_test');
-    run('postgres', "DO $$ BEGIN CREATE ROLE anon; EXCEPTION WHEN duplicate_object THEN NULL; END $$; DO $$ BEGIN CREATE ROLE authenticated; EXCEPTION WHEN duplicate_object THEN NULL; END $$;");
+    run('postgres', "DO $$ BEGIN CREATE ROLE anon; EXCEPTION WHEN duplicate_object THEN NULL; END $$; DO $$ BEGIN CREATE ROLE authenticated; EXCEPTION WHEN duplicate_object THEN NULL; END $$; DO $$ BEGIN CREATE ROLE service_role; EXCEPTION WHEN duplicate_object THEN NULL; END $$;");
     for (const variant of ['legacy', 'current']) await t.test(variant, () => {
         const database = 'flow_ui_' + variant + '_' + process.pid;
         run('postgres', 'CREATE DATABASE ' + database + ';');
@@ -338,6 +338,17 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.equal(asUser(two, `SELECT public.room_listed('${otherRoom}');`), 't', 'A member learns their room is listed');
             assert.equal(asUser(one, `SELECT public.room_listed('${otherRoom}');`), 'f', 'Someone outside the room learns nothing');
             assert.equal(asUser(two, `SELECT public.room_listed('${room}');`), 'f', 'An unlisted room is not listed');
+
+            // 016: only the server, with the service key, records usage; browsers cannot touch the quota.
+            run(database, readFileSync('sql/016_server_side_quotas.sql', 'utf8'));
+            run(database, readFileSync('sql/016_server_side_quotas.sql', 'utf8'));
+            run(database, 'DELETE FROM public.api_usage;');
+            assert.throws(() => asUser(two, "SELECT public.api_allow('ai');"), /Command failed/, 'Browsers can no longer call the quota');
+            assert.throws(() => asUser(two, `SELECT public.api_allow_for('${two}', 'ai');`), /Command failed/, 'Nor the server\'s version');
+            const asServer = sql => run(database, `SET ROLE service_role; ${sql}`).trim().split('\n').at(-1);
+            assert.equal(asServer(`SELECT public.api_allow_for('${two}', 'ai');`), 't', 'The server records usage');
+            assert.equal(run(database, `SELECT count(*) FROM public.api_usage WHERE user_id = '${two}';`).trim(), '1');
+            assert.throws(() => asServer("SELECT public.api_allow_for('99999999-9999-4999-8999-999999999999', 'ai');"), /Command failed/, 'Only for real accounts');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

@@ -10,9 +10,19 @@ test('HTTP boundaries and bounded local concurrency', async t => {
     // Stand-in for Supabase. Only the bearer token "valid" belongs to a user; the quota
     // function allows every call except for the token "spent".
     let quotaInstalled = true;
-    const auth = http.createServer((req, res) => {
+    const quotaCalls = [];
+    const auth = http.createServer(async (req, res) => {
         const token = (req.headers.authorization || '').replace('Bearer ', '');
         const known = ['valid', 'spent'].includes(token) && req.headers.apikey;
+        quotaCalls.push(req.url);
+        // The server's own quota call (sql/016): only the service key may make it.
+        if (req.url === '/rest/v1/rpc/api_allow_for') {
+            let body = '';
+            for await (const chunk of req) body += chunk;
+            if (req.headers.apikey !== 'service-test' || token !== 'service-test') return res.writeHead(401).end('{}');
+            return res.writeHead(200, { 'Content-Type': 'application/json' }).end(String(JSON.parse(body).p_user === 'user-valid'));
+        }
+        if (req.url === '/auth/v1/user' && known) return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ id: 'user-' + token }));
         if (req.url === '/rest/v1/rpc/api_allow') {
             if (!quotaInstalled) return res.writeHead(404).end('{}');
             return res.writeHead(known ? 200 : 401, { 'Content-Type': 'application/json' }).end(known ? String(token === 'valid') : '{}');
@@ -137,6 +147,19 @@ test('HTTP boundaries and bounded local concurrency', async t => {
         assert.equal((await call('forged')).status, 401, 'Fallback still rejects unknown tokens');
         assert.equal((await call('valid')).status, 500, 'Fallback still accepts known ones');
         quotaInstalled = true;
+    });
+    await t.test('with the service key, the server records usage itself and never asks the browser-callable quota', async t => {
+        process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-test';
+        delete require.cache[require.resolve('../server')];
+        const fresh = require('../server').listen(0, '127.0.0.1');
+        await once(fresh, 'listening');
+        t.after(() => new Promise(resolve => fresh.close(() => { delete process.env.SUPABASE_SERVICE_ROLE_KEY; resolve(); })));
+        const call = token => fetch('http://127.0.0.1:' + fresh.address().port + '/api/turn-credentials', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+        quotaCalls.length = 0;
+        assert.equal((await call('spent')).status, 429, 'Over quota');
+        assert.equal((await call('valid')).status, 500, 'Within quota reaches the handler');
+        assert.equal((await call('forged')).status, 401, 'An unknown sign-in is refused before any quota is touched');
+        assert(quotaCalls.includes('/rest/v1/rpc/api_allow_for') && !quotaCalls.includes('/rest/v1/rpc/api_allow'), 'Only the server-side quota is used');
     });
     await t.test('invalid payloads return JSON errors', async () => {
         for (const message of [null, 12, {}, [], '', '   ', 'a'.repeat(501)]) {

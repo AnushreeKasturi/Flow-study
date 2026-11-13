@@ -16,6 +16,8 @@ if (process.env.VERCEL) app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const SUPABASE_URL = process.env.PUBLIC_SUPABASE_URL || supabaseDefaults.url;
 const SUPABASE_KEY = process.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY || supabaseDefaults.publishableKey;
+// Server-only. With it, usage is recorded by the server (sql/016) and browsers cannot touch the quota.
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 // One definition of the security headers: vercel.json sends them from the CDN,
 // and this applies the same list when Express serves the site itself.
@@ -44,10 +46,29 @@ const supabaseCall = (path, token, body) => fetch(SUPABASE_URL + path, {
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(4000)
 });
+// The server's own call to the quota. Newer Supabase secret keys (sb_secret_…) go in the
+// apikey header only; the older service_role JWT is also sent as the bearer token.
+const serviceQuota = (userId, kind) => fetch(SUPABASE_URL + '/rest/v1/rpc/api_allow_for', {
+    method: 'POST',
+    headers: { apikey: SERVICE_KEY, ...(SERVICE_KEY.startsWith('sb_') ? {} : { Authorization: 'Bearer ' + SERVICE_KEY }), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_user: userId, p_kind: kind }),
+    signal: AbortSignal.timeout(4000)
+});
 const requireUser = kind => async (req, res, next) => {
     const token = /^Bearer (\S+)$/.exec(req.get('authorization') || '')?.[1];
     if (!token) return refuse(res, 401, 'Sign in to use this.');
     try {
+        if (SERVICE_KEY) {
+            // Who is asking comes from Supabase Auth; how much they may use, from the server's own call.
+            const who = await supabaseCall('/auth/v1/user', token);
+            if (who.status === 401 || who.status === 403) return refuse(res, 401, 'Your sign-in has expired. Log in again.');
+            if (!who.ok) return refuse(res, 503, 'Sign-in could not be checked. Try again shortly.');
+            const { id } = await who.json();
+            const quota = await serviceQuota(id, kind);
+            if (quota.ok) return await quota.json() === true ? next() : refuse(res, 429, 'You have reached the limit for now. Try again in a little while.');
+            if (quota.status !== 404) return refuse(res, 503, 'Sign-in could not be checked. Try again shortly.');
+            // sql/016 is not installed yet: count it the older way, below.
+        }
         let response = await supabaseCall('/rest/v1/rpc/api_allow', token, { p_kind: kind });
         if (response.status === 404) {
             // The quota function is not installed (sql/008 not run): fall back to checking the sign-in only.
