@@ -15,6 +15,21 @@ export function setTheme(theme: Theme) {
     document.documentElement.dataset.theme = theme;
     try { localStorage.setItem('flow_theme', theme); } catch { /* Private mode: applies for this page only. */ }
     document.dispatchEvent(new CustomEvent('flow-theme', { detail: theme }));
+    syncThemeColor();
+}
+
+// The browser's bars and the installed app's title bar take the top of the sky.
+// Read from a probe element: the page itself eases between skies, so its own
+// value is still mid-transition right after a change.
+export function syncThemeColor() {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) return;
+    const probe = Object.assign(document.createElement('i'), { hidden: true });
+    probe.dataset.theme = currentTheme();
+    document.body.append(probe);
+    const color = getComputedStyle(probe).getPropertyValue('--sky-top').trim();
+    probe.remove();
+    if (color) meta.content = color;
 }
 
 export function bindThemePicker(picker: HTMLSelectElement) {

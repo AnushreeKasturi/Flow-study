@@ -32,7 +32,8 @@ const pageUrl = new URL(homePaths.has(Astro.url.pathname) ? '/' : Astro.url.path
 <meta name="twitter:description" content={description}>
 <meta name="twitter:image" content={image}>
 <meta name="twitter:image:alt" content={imageAlt}>
-<meta name="theme-color" content="#101b16">
+<!-- The default sky's top colour; src/client/theme.ts keeps it in step with the chosen sky. -->
+<meta name="theme-color" content="#0b2a22">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="manifest" href="/manifest.webmanifest">
 <!-- Before first paint: saved sky, sign-in redirects, and the once-per-session opening. -->

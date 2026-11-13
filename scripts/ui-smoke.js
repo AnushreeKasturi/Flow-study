@@ -51,7 +51,13 @@ async (page) => {
     await page.waitForFunction(() => document.getElementById('preview-time').textContent !== '25:00' && Number(getComputedStyle(document.body).getPropertyValue('--sun-y')) > .43);
     await page.getByRole('button', { name: 'Daylight', exact: true }).click();
     assert(await page.locator('html').getAttribute('data-theme') === 'daylight', 'Landing swatches should change the atmosphere');
+    // The browser's bars follow the sky: its top colour, at once, and again on the next visit.
+    const themeColor = () => page.locator('meta[name="theme-color"]').getAttribute('content');
+    assert(await themeColor() === 'rgb(127, 187, 230)', 'The theme colour should follow the chosen sky, not stay fixed');
+    await page.reload();
+    assert(await themeColor() === 'rgb(127, 187, 230)', 'A saved sky should set the theme colour when the page loads');
     await page.getByRole('button', { name: 'Forest', exact: true }).click();
+    assert(await themeColor() === 'rgb(11, 42, 34)', 'The default sky should match the manifest\'s theme colour (#0b2a22)');
     assert(await page.getByRole('link', { name: 'Log in', exact: true }).first().getAttribute('href') === '/login.html', 'Signed-out visitors are sent to login');
 
     // Setup flow: every answer changes the page, is kept for the room, and ends in an account.
