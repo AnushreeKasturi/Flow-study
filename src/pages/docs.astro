@@ -4,7 +4,7 @@ import Sky from '../components/Sky.astro';
 import '../styles/pages.css';
 import { SOUNDS } from '../client/modules/soundscape';
 const repo = 'https://github.com/ManasDasri/Flow-study';
-const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focus mode'], ['M', 'Mute or unmute your microphone'], ['V', 'Turn your camera on or off'], ['?', 'Show the shortcut list']];
+const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focus mode'], ['M', 'Mute or unmute your microphone'], ['V', 'Turn your camera on or off'], ['C', 'Open chat and start a message'], ['N', 'Open notifications'], ['?', 'Show the shortcut list']];
 ---
 <Page title="Docs | Flow" bodyClass="plain-page">
     <Sky />
@@ -58,7 +58,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
         <section id="shortcuts">
             <h2>Shortcuts</h2>
             <dl class="docs-keys">{shortcuts.map(([key, action]) => <div><dt><kbd>{key}</kbd></dt><dd>{action}</dd></div>)}</dl>
-            <p>Shortcuts are ignored while you’re typing or a dialog is open.</p>
+            <p>Shortcuts are ignored while you’re typing or a dialog is open. <kbd>C</kbd> and <kbd>N</kbd> leave focus mode to show chat or notifications.</p>
         </section>
 
         <section id="data">

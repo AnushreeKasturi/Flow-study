@@ -203,6 +203,28 @@ async (page) => {
     await page.getByLabel('New shared task').fill('s');
     assert(await page.locator('#timer-toggle-btn').getAttribute('aria-pressed') === 'false', 'Typing must not trigger shortcuts');
     await page.getByLabel('New shared task').fill('');
+    // C opens chat ready to type and N opens notifications; both leave focus mode, and typing a message never triggers them.
+    const focusedId = () => page.evaluate(() => document.activeElement?.id);
+    const notificationsOpen = () => page.locator('#notify').evaluate(panel => panel.open);
+    await page.locator('.stage-header h1').click();
+    await page.keyboard.press('c');
+    assert(await page.getByRole('tab', { name: 'Chat', exact: true }).getAttribute('aria-selected') === 'true' && await focusedId() === 'chat-input' && await page.locator('#chat-input').inputValue() === '', 'C should open the Chat tab with the message box focused');
+    await page.keyboard.press('n');
+    assert(await page.locator('#chat-input').inputValue() === 'n' && !await notificationsOpen(), 'Typing a message must not trigger shortcuts');
+    await page.locator('#chat-input').fill('');
+    await page.locator('.stage-header h1').click();
+    await page.keyboard.press('n');
+    assert(await notificationsOpen() && await focusedId() === 'notify-summary', 'N should open notifications');
+    await page.locator('.stage-header h1').click();
+    assert(!await notificationsOpen(), 'Clicking elsewhere should close notifications');
+    await page.keyboard.press('f');
+    await page.keyboard.press('n');
+    assert(!await page.evaluate(() => document.body.classList.contains('focus-active')) && await notificationsOpen(), 'N should leave focus mode to show notifications');
+    await page.locator('.stage-header h1').click();
+    await page.keyboard.press('f');
+    await page.keyboard.press('c');
+    assert(!await page.evaluate(() => document.body.classList.contains('focus-active')) && await focusedId() === 'chat-input', 'C should leave focus mode to show chat');
+    await page.locator('#chat-input').blur();
 
     // Soundscape buttons are exclusive toggles and generate audio locally.
     await page.getByRole('tab', { name: 'Sound', exact: true }).click();
