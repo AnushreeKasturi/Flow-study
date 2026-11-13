@@ -976,11 +976,15 @@ function bindRoomControls() {
 
     on('open-shortcuts-btn', () => openModal('shortcuts-modal'));
     on('close-shortcuts-btn', closeModal);
+    // Focus mode hides chat and the bell, so C and N leave it first.
+    const leaveFocusMode = () => { if (document.body.classList.contains('focus-active')) byId('focus-mode-toggle').click(); };
     initShortcuts({
         s: () => toggleTimer(),
         f: () => byId('focus-mode-toggle').click(),
         m: () => byId('toggle-mic').click(),
         v: () => byId('toggle-cam').click(),
+        c: () => { leaveFocusMode(); byId('chat-tab-button').click(); byId('chat-input').focus(); },
+        n: () => { leaveFocusMode(); byId<HTMLDetailsElement>('notify').open = true; byId('notify-summary').focus(); },
         '?': () => openModal('shortcuts-modal')
     });
 }
