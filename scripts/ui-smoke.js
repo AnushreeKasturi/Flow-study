@@ -818,9 +818,13 @@ async (page) => {
     assert(await page.evaluate(() => window.__fixture.tables.rooms.length) === 0, 'An open group needs a topic before any room is made');
     await page.getByLabel('Topic for the board').fill('Past papers, timed');
     await page.getByLabel('Subject', { exact: true }).first().selectOption('exams');
+    assert(await page.locator('#create-camera').inputValue() === 'optional' && await page.locator('#create-vibe').inputValue() === 'quiet', 'A group opened from home should default to optional cameras and quiet');
+    await page.getByLabel('Cameras', { exact: true }).first().selectOption('on');
+    await page.getByLabel('Talking', { exact: true }).first().selectOption('chatty');
     await page.getByRole('button', { name: 'Open a study group', exact: true }).click();
     await page.waitForFunction(() => window.__fixture.tables.open_rooms.length === 1 && !document.getElementById('new-task-input').disabled);
     assert(await page.evaluate(() => { const row = window.__fixture.tables.open_rooms[0]; return row.topic === 'Past papers, timed' && row.subject === 'exams' && window.__fixture.tables.rooms.at(-1).is_locked === false; }), 'Opening a study group from home should create an unlocked room and list it');
+    assert(await page.evaluate(() => { const row = window.__fixture.tables.open_rooms[0]; return row.camera === 'on' && row.vibe === 'chatty'; }), 'A group opened from home should carry the chosen camera and talking rules onto the board');
     await page.getByRole('button', { name: 'Leave', exact: true }).click();
     await page.getByRole('button', { name: 'Step away', exact: true }).click();
     await visible('#join-modal');

@@ -740,7 +740,7 @@ async function showHome(user: { id: string; email: string }) {
         if (audience() !== 'open') return createRoom();
         const topic = byId<HTMLInputElement>('create-topic').value.trim();
         if (topic.length < 3) { showLobbyError('Say what you’re studying, so people know what the group is for.'); byId('create-topic').focus(); return; }
-        createRoom({ topic, subject: byId<HTMLSelectElement>('create-subject').value, seats: Number(byId<HTMLSelectElement>('create-seats').value), camera: 'optional', vibe: 'quiet' });
+        createRoom({ topic, subject: byId<HTMLSelectElement>('create-subject').value, seats: Number(byId<HTMLSelectElement>('create-seats').value), camera: byId<HTMLSelectElement>('create-camera').value, vibe: byId<HTMLSelectElement>('create-vibe').value });
     });
 }
 
