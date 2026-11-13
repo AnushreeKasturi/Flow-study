@@ -78,22 +78,29 @@ test('Spotify parser accepts official content and rejects untrusted or malformed
 });
 
 
-test('hosted Speed Insights omits invitation parameters and stays off localhost', () => {
+test('hosted analytics omit invitation parameters, load only their own scripts, and stay off localhost', () => {
     const { runInNewContext } = require('node:vm');
-    const source = compile('src/client/speed-insights.ts');
+    const source = compile('src/client/analytics.ts');
     for (const hostname of ['localhost', 'flow-study.me', 'flow-study-example.vercel.app']) {
         const injected = [];
         const window = {};
+        // A stand-in for Trusted Types: script URLs must come from the page's own policy.
+        let policy;
+        window.trustedTypes = { createPolicy: (name, rules) => (policy = { name, ...rules }) };
         runInNewContext(source.replace(/export \{\};?/, ''), {
             window, location: { hostname, origin: 'https://' + hostname }, URL,
             document: { createElement: () => ({}), head: { appendChild: script => injected.push(script) } }
         });
-        assert.equal(injected.length, hostname === 'localhost' ? 0 : 1);
+        assert.equal(injected.length, hostname === 'localhost' ? 0 : 2);
         if (!injected.length) continue;
-        assert.equal(injected[0].src, '/_vercel/speed-insights/script.js');
-        assert.equal(injected[0].defer, true);
-        const filter = window.siq[0][1];
-        assert.equal(filter({ url: 'https://' + hostname + '/?room=PRIVATE#token', metric: 'LCP' }).url, 'https://' + hostname + '/');
+        assert.deepEqual(injected.map(script => script.src), ['/_vercel/insights/script.js', '/_vercel/speed-insights/script.js']);
+        assert(injected.every(script => script.defer));
+        assert.equal(policy.name, 'flow-script');
+        assert.throws(() => policy.createScriptURL('https://elsewhere.example/x.js'), /Unexpected script/);
+        for (const queue of [window.vaq, window.siq]) {
+            const filter = queue[0][1];
+            assert.equal(filter({ url: 'https://' + hostname + '/room.html?room=PRIVATE#token', metric: 'LCP' }).url, 'https://' + hostname + '/room.html');
+        }
     }
 });
 

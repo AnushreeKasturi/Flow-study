@@ -19,7 +19,7 @@ const demo = import.meta.env.DEV && process.env.FLOW_DEMO ? readFileSync('script
         <Loader message={page === 'room' ? 'Getting your space ready' : 'One moment'} />
         <slot />
         <script>
-            import '../client/speed-insights';
+            import '../client/analytics';
             import { releaseWhenLoaded } from '../client/loader';
             import { homeLinks } from '../client/nav';
             import { syncThemeColor } from '../client/theme';
