@@ -48,6 +48,12 @@ const SKY = process.env.FLOW_MARKETING_SKY || 'warm';
         await page.waitForTimeout(900);
         await shot('setup-drag-the-sun');
 
+        // Home, where you land after signing in, with the board seeded so it has open groups to show.
+        await page.goto(origin + '/room.html?board');
+        await page.getByRole('button', { name: /^Take a seat in / }).first().waitFor();
+        await page.waitForTimeout(600);
+        await shot('home');
+
         await page.goto(origin + '/room.html');
         await page.getByRole('button', { name: 'Create a room', exact: true }).click();
         await page.waitForFunction(() => !document.getElementById('new-task-input').disabled);
