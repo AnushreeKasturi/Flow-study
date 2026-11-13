@@ -86,6 +86,7 @@
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 html { -webkit-text-size-adjust: 100%; }
 html, body { min-height: 100%; }
 body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.5; min-height: 100vh; }

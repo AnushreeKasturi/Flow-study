@@ -10,6 +10,8 @@ import Icon from '../Icon.astro';
             <div id="rounds" class="rounds" role="img" aria-label="Round 1 of 4"><i></i><i></i><i></i><i></i></div>
         </div>
         <div class="time-display display" id="time-display" role="timer">25:00</div>
+        <!-- Some people find a ticking clock stressful; the sun still shows how far along the block is. -->
+        <button id="time-visibility" class="time-toggle" type="button">Hide time</button>
         <p class="breath">Breathe in as the sun grows, out as it shrinks.</p>
         <div class="timer-controls">
             <button id="timer-toggle-btn" class="icon-btn toggle" aria-label="Start timer" aria-pressed="false" title="Start or pause (S)"><Icon name="play" size={18} class="off" /><Icon name="pause" size={18} class="on" /></button>

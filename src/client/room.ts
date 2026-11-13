@@ -1,7 +1,7 @@
 // The room page: lobby (name, join, create) first, then the live room.
 import { reveal } from './motion';
 import { showLoader, hideLoader, leaveWithLoader, loaderText } from './loader';
-import type { Participants, ProfileStats, TimerMode } from './types';
+import type { Participants, ProfileStats, TimerMode, TimerState } from './types';
 import { byId } from './dom';
 import { bindThemePicker } from './theme';
 import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, updateMyUsername, sendReaction, sendHandRaise, sendRemoved, sendBye } from './modules/socket';
@@ -9,7 +9,7 @@ import { initNotifications, pushNote, systemNotify } from './modules/notificatio
 import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack } from './modules/rtc';
 import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState, saveFocus } from './modules/timer';
 import { initTasks, addTask, toggleTask, deleteTask, assignTask, rerenderTasks, setSharedTasks } from './modules/tasks';
-import { initPresence, updatePresence, startFocusTracking, stopFocusTracking, formatFocusTime } from './modules/presence';
+import { initPresence, updatePresence, startFocusTracking, stopFocusTracking, formatFocusTime, setAway } from './modules/presence';
 import { initChat, handleIncomingMessage } from './modules/chat';
 import { getMyProfile, hasDisplayName, saveDisplayName, getStats as getProfileStats, withLiveFocus } from './modules/profile';
 import * as UI from './modules/ui';
@@ -17,7 +17,7 @@ import supabase from './modules/supabase';
 import { initAudio, loadRoomAudio } from './modules/audio';
 import { notify, openModal, closeModal, initDialogs } from './modules/feedback';
 import { loadUser, currentUser, markSignedOut } from './modules/session';
-import { ensureTile, attachStream, removeTile, markLeft, setCameraOff, showReaction, setHandRaised, setHost } from './modules/stage';
+import { ensureTile, attachStream, removeTile, markLeft, setCameraOff, showReaction, setHandRaised, setHost, setAwayTile } from './modules/stage';
 import { playSound, stopSound, setSoundVolume, isSound, type Sound } from './modules/soundscape';
 import { chime } from './modules/chime';
 import { initReminders, timerReached } from './modules/reminders';
@@ -230,6 +230,7 @@ async function joinRoom() {
         currentRoomCode = roomCode;
         currentPin = pin;
         enteredAt = Date.now();
+        toldLate = false;
         await syncHost('', false);
         if (isHost) adoptListing(); // back after stepping away: the listing is still ours
         // A saved display name overrides the email-derived default.
@@ -422,6 +423,15 @@ async function enterRoom(roomId: string, roomCode: string) {
         if (phase !== lastPhase) { lastPhase = phase; refreshBoardSoon(); }
         if (timerState.isRunning && timerState.mode === 'focus') startFocusTracking();
         else stopFocusTracking(timerState.isRunning ? 'On Break' : 'Online');
+        lastTimer = timerState;
+        if (away) setAway(awayStatus());
+        updateAwayButton();
+        // Arriving partway through a block: the sun is already where the room's is. Say so, once.
+        const elapsed = Math.floor((timerState.duration - timerState.timeLeft) / 60);
+        if (!toldLate && timerState.isRunning && timerState.mode === 'focus' && elapsed >= 1 && Date.now() - enteredAt < 15000) {
+            toldLate = true;
+            notify(`The room is ${elapsed} min into a focus block. Settle in; your time counts from now.`);
+        }
     });
     initTasks(roomId, [], (tasks, stats) => {
         const everyone = { [getMyUserId() || '']: { username: currentUsername }, ...partners };
@@ -517,6 +527,43 @@ const refreshBoard = () => {
     } else if (!hostId || !partners[hostId]) claimHost();
 };
 setInterval(refreshBoard, 45000);
+
+// ── Stepping away ──────────────────────────────────────────────────────────
+// A quiet personal state: your tile dims and your focus time pauses, while the
+// room's sun carries on untouched. Nobody is told, and nobody waits for you.
+
+let away = false;
+let awaySince = 0;
+let toldLate = false;
+let lastTimer: TimerState | null = null;
+const focusRunning = () => !!lastTimer?.isRunning && lastTimer.mode === 'focus';
+const awayStatus = () => focusRunning() ? 'Stepped away' : 'Back for the next block';
+function updateAwayButton() {
+    const button = byId<HTMLButtonElement>('toggle-away');
+    button.setAttribute('aria-pressed', String(away));
+    button.textContent = away ? 'I’m back' : focusRunning() ? 'Be right back' : 'Back next block';
+    // Shown as a hint on hover and focus (room.css), and read out by screen readers.
+    const hint = away ? 'Let the room know you’re back.' : focusRunning() ? 'Dims your tile and pauses your focus time. The room’s timer keeps going.' : 'Need a longer break? The room can start the next block without you.';
+    button.dataset.tip = hint;
+    button.setAttribute('aria-description', hint);
+}
+function setAwayState(on: boolean) {
+    if (on === away) return;
+    away = on;
+    awaySince = Date.now();
+    setAway(on ? awayStatus() : null);
+    setAwayTile(getMyUserId(), on);
+    updateAwayButton();
+    if (on || !lastTimer) return;
+    notify(focusRunning() ? `Welcome back. ${Math.ceil(lastTimer.timeLeft / 60)} min left in this block.` : lastTimer.isRunning ? 'Welcome back. The room is on a break.' : 'Welcome back.');
+}
+// Coming back to the keyboard, or to the tab, ends it, after a moment so a stray key doesn't.
+const backOnReturn = (event: Event) => {
+    if (away && Date.now() - awaySince > 15000 && !(event.target instanceof Element && event.target.closest('#toggle-away'))) setAwayState(false);
+};
+document.addEventListener('keydown', backOnReturn);
+document.addEventListener('pointerdown', backOnReturn);
+document.addEventListener('visibilitychange', event => { if (!document.hidden) backOnReturn(event); });
 
 // ── Who hosts ──────────────────────────────────────────────────────────────
 
@@ -729,6 +776,21 @@ async function showHome(user: { id: string; email: string }) {
     homeGroups();
     watchBoard(() => { if (!appContainer.classList.contains('hidden')) return; homeGroups(); });
 
+    // An open group's details, summed up on one line; the panel that edits them sits over the card.
+    const details = byId<HTMLDetailsElement>('create-details');
+    const optionText = (id: string) => byId<HTMLSelectElement>(id).selectedOptions[0]?.textContent ?? '';
+    const summarise = () => { const line = byId<HTMLElement>('create-summary'); line.title = line.textContent = `${optionText('create-subject')} · ${optionText('create-seats')} seats · Cameras ${optionText('create-camera').toLowerCase()} · ${optionText('create-vibe')}`; };
+    ['create-subject', 'create-seats', 'create-camera', 'create-vibe'].forEach(id => byId(id).addEventListener('change', summarise));
+    summarise();
+    on('create-details-done', () => { details.open = false; details.querySelector('summary')!.focus(); });
+    details.addEventListener('keydown', event => { if (event.key === 'Escape' && details.open) { event.stopPropagation(); details.open = false; details.querySelector('summary')!.focus(); } });
+    // These small menus close on a click anywhere else, or Escape, like the bell does.
+    const menus = () => document.querySelectorAll<HTMLDetailsElement>('.reactions-menu[open], #create-details[open]');
+    document.addEventListener('click', event => {
+        const target = event.target as Node;
+        if (target.isConnected) menus().forEach(menu => { if (!menu.contains(target)) menu.open = false; });
+    });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') menus().forEach(menu => { menu.open = false; }); });
     // "Start a room": the audience choice swaps between a PIN and a board topic.
     const audience = () => (document.querySelector<HTMLInputElement>('input[name="audience"]:checked')!).value;
     document.querySelectorAll('input[name="audience"]').forEach(radio => radio.addEventListener('change', () => {
@@ -815,6 +877,8 @@ function bindRoomControls() {
         sendReaction(emoji);
         showReaction(getMyUserId(), emoji); // broadcasts don't echo to the sender
     }));
+    on('toggle-away', () => setAwayState(!away));
+    on('time-visibility', () => UI.setTimeHidden(!UI.timeHidden()));
     on<HTMLButtonElement>('toggle-hand', event => {
         handRaised = !handRaised;
         setToggle(event.currentTarget, handRaised);

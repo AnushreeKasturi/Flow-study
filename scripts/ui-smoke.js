@@ -161,13 +161,56 @@ async (page) => {
     await page.getByRole('button', { name: 'Join room', exact: true }).click();
     await page.locator('#new-task-input').waitFor({ state: 'visible' });
     await page.waitForFunction(() => !document.getElementById('new-task-input').disabled);
+    // Arriving partway through a block: the sun takes the room's place, and a note says so.
+    await page.evaluate(() => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 600, isRunning: true } }));
+    await page.waitForFunction(() => document.getElementById('toast').textContent.includes('15 min into a focus block'));
+    // Stepping away during the block: the room's clock carries on, your tile quiets down.
+    await page.getByRole('button', { name: 'Be right back', exact: true }).hover();
+    await page.waitForFunction(() => { const button = document.getElementById('toggle-away'); return button.dataset.tip.includes('pauses your focus time') && getComputedStyle(button, '::after').opacity === '1'; });
+    await page.getByRole('button', { name: 'Be right back', exact: true }).click();
+    assert(await page.locator('#video-wrapper-local').evaluate(tile => tile.classList.contains('is-away')) && await page.locator('#toggle-away').getAttribute('aria-pressed') === 'true', 'Stepping away should dim your tile');
+    assert(await page.locator('#timer-toggle-btn').getAttribute('aria-pressed') === 'true', 'Stepping away must not touch the room\'s timer');
+    await page.waitForFunction(() => document.body.textContent.includes('Stepped away'));
+    await page.getByRole('button', { name: 'I’m back', exact: true }).click();
+    await page.waitForFunction(() => /Welcome back\. \d+ min left in this block\./.test(document.getElementById('toast').textContent));
+    assert(!await page.locator('#video-wrapper-local').evaluate(tile => tile.classList.contains('is-away')), 'Coming back should restore your tile');
+    // Between blocks the same button means "start without me".
+    await page.evaluate(() => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'shortBreak', duration: 300, timeLeft: 300, isRunning: false } }));
+    await page.getByRole('button', { name: 'Back next block', exact: true }).click();
+    await page.waitForFunction(() => document.body.textContent.includes('Back for the next block'));
+    await page.getByRole('button', { name: 'I’m back', exact: true }).click();
+    await page.evaluate(() => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 1500, isRunning: false } }));
+    // The digits can be hidden; the sun still shows the block, and the choice is remembered.
+    await page.evaluate(() => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 900, isRunning: true } }));
+    await page.getByRole('button', { name: 'Hide time', exact: true }).click();
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('time-display')).visibility === 'hidden');
+    assert(await page.title() === 'Focusing | Flow' && await page.evaluate(() => localStorage.getItem('flow_hide_time')) === '1', 'Hiding the time should hide the digits, also from the tab title');
+    await page.getByRole('button', { name: 'Show time', exact: true }).click();
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('time-display')).visibility === 'visible');
+    assert(/^\d\d:\d\d \| Flow$/.test(await page.title()), 'Showing the time brings the digits back');
+    await page.evaluate(() => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 1500, isRunning: false } }));
+    // Someone else stepping away is shown on their tile only: no sound, no note.
+    await page.evaluate(() => window.__fixture.handlers['presence:join']({ key: 'zz-away', newPresences: [{ username: 'Noor', isDummyMedia: true, status: 'Stepped away' }] }));
+    await page.waitForFunction(() => document.getElementById('video-wrapper-zz-away')?.classList.contains('is-away'));
+    await page.evaluate(() => window.__fixture.handlers['broadcast:bye']({ payload: { userId: 'zz-away' } }));
+    await page.waitForFunction(() => !document.getElementById('video-wrapper-zz-away'), undefined, { timeout: 10000 });
     assert(await page.locator('#toggle-cam').getAttribute('aria-pressed') === 'false', 'Unavailable camera should display its off state');
     await page.locator('.reactions-menu summary').click();
     for (const name of ['Thumbs up', 'Heart', 'Laugh', 'Celebrate']) await page.getByRole('button', { name, exact: true }).click();
+    // Reactions are drawn icons thrown into the tile; they settle on its floor and are gone after a few seconds.
+    assert(await page.locator('#video-wrapper-local .floating-reaction svg').count() === 4, 'Each reaction shows its icon, not an emoji');
+    await page.waitForTimeout(2500);
+    assert(await page.locator('#video-wrapper-local').evaluate(tile => [...tile.querySelectorAll('.floating-reaction')].every(el => { const box = el.getBoundingClientRect(), frame = tile.getBoundingClientRect(); return box.left >= frame.left - 1 && box.right <= frame.right + 1 && box.bottom <= frame.bottom + 1; })), 'Reactions stay inside the tile');
+    await page.waitForFunction(() => !document.querySelector('#video-wrapper-local .floating-reaction'), undefined, { timeout: 4000 });
     await page.getByRole('button', { name: 'Raise hand', exact: true }).click();
     await visible('.hand-raised-badge');
     await page.getByRole('button', { name: 'Raise hand', exact: true }).click();
+    assert(await page.locator('.reactions-menu').evaluate(menu => menu.open), 'Picking reactions keeps the tray open');
+    await page.locator('.stage-header h1').click();
+    assert(!await page.locator('.reactions-menu').evaluate(menu => menu.open), 'Clicking anywhere else closes the reaction tray');
     await page.locator('.reactions-menu summary').click();
+    await page.keyboard.press('Escape');
+    assert(!await page.locator('.reactions-menu').evaluate(menu => menu.open), 'Escape closes the reaction tray');
     await page.getByRole('button', { name: 'Toggle microphone', exact: true }).click();
     assert(await page.locator('#toggle-mic').getAttribute('aria-pressed') === 'false', 'Mic should toggle off');
     await page.getByRole('button', { name: 'Toggle microphone', exact: true }).click();
@@ -823,10 +866,17 @@ async (page) => {
     await visible('#lobby-error');
     assert(await page.evaluate(() => window.__fixture.tables.rooms.length) === 0, 'An open group needs a topic before any room is made');
     await page.getByLabel('Topic for the board').fill('Past papers, timed');
+    // The group's details sit on one line and open in a panel over the card, so Home never grows a scroll.
+    const homeScroll = () => page.locator('#modal-overlay').evaluate(overlay => overlay.scrollHeight - overlay.clientHeight);
+    const scrollBefore = await homeScroll();
+    await page.getByText('Change', { exact: true }).click();
+    assert(await homeScroll() === scrollBefore, 'Editing an open group\'s details must not make Home scroll');
     await page.getByLabel('Subject', { exact: true }).first().selectOption('exams');
     assert(await page.locator('#create-camera').inputValue() === 'optional' && await page.locator('#create-vibe').inputValue() === 'quiet', 'A group opened from home should default to optional cameras and quiet');
     await page.getByLabel('Cameras', { exact: true }).first().selectOption('on');
     await page.getByLabel('Talking', { exact: true }).first().selectOption('chatty');
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    assert(await page.locator('#create-summary').innerText() === 'Exam prep · 4 seats · Cameras on · Chatty', 'The summary line should show the chosen details');
     await page.getByRole('button', { name: 'Open a study group', exact: true }).click();
     await page.waitForFunction(() => window.__fixture.tables.open_rooms.length === 1 && !document.getElementById('new-task-input').disabled);
     assert(await page.evaluate(() => { const row = window.__fixture.tables.open_rooms[0]; return row.topic === 'Past papers, timed' && row.subject === 'exams' && window.__fixture.tables.rooms.at(-1).is_locked === false; }), 'Opening a study group from home should create an unlocked room and list it');

@@ -2,6 +2,7 @@ import { completeTask } from '../motion';
 import type { TimerState, Participants, Task, TaskStats, PresenceState } from '../types';
 import { byId } from '../dom';
 import { escapeHTML } from './utils';
+import { AWAY_STATUSES } from './presence';
 
 export const ROUNDS = 4;
 
@@ -27,7 +28,22 @@ export const updateRoomInfo = (roomCode: string, count: number) => {
     els.count.textContent = String(count);
 };
 
+// Hiding the digits leaves the sun as the only clock. Remembered on this device.
+let hideTime = (() => { try { return localStorage.getItem('flow_hide_time') === '1'; } catch { return false; } })();
+let lastTimer: TimerState | null = null;
+export function setTimeHidden(hidden: boolean) {
+    hideTime = hidden;
+    try { localStorage.setItem('flow_hide_time', hidden ? '1' : '0'); } catch { /* Private mode: for this visit only. */ }
+    if (lastTimer) updateTimerUI(lastTimer);
+}
+export const timeHidden = () => hideTime;
+
 export const updateTimerUI = (state: TimerState) => {
+    lastTimer = state;
+    document.body.classList.toggle('hide-time', hideTime);
+    // Transitions only after the first paint, so a saved choice doesn't animate on arrival.
+    if (!document.body.classList.contains('timer-ready')) requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.add('timer-ready')));
+    byId<HTMLElement>('time-visibility').textContent = hideTime ? 'Show time' : 'Hide time';
     const m = Math.floor(state.timeLeft / 60).toString().padStart(2, '0');
     const s = (state.timeLeft % 60).toString().padStart(2, '0');
     const focus = state.mode === 'focus';
@@ -36,7 +52,7 @@ export const updateTimerUI = (state: TimerState) => {
     els.timerToggleBtn.setAttribute('aria-pressed', String(state.isRunning));
     els.timerToggleBtn.classList.toggle('active', state.isRunning);
     byId<HTMLElement>('timer-state-label').textContent = state.isRunning ? (focus ? 'Focus in progress' : 'Break in progress') : (focus ? 'Ready to focus' : 'Ready for a break');
-    document.title = state.isRunning ? `${m}:${s} | Flow` : 'Study room | Flow';
+    document.title = !state.isRunning ? 'Study room | Flow' : hideTime ? `${focus ? 'Focusing' : 'On a break'} | Flow` : `${m}:${s} | Flow`;
     // The sun is the progress bar: it sinks through a focus block and rises through a break.
     const elapsed = state.duration ? 1 - state.timeLeft / state.duration : 0;
     document.body.style.setProperty('--sun-y', String(focus ? elapsed : 1 - elapsed));
@@ -140,6 +156,6 @@ export const updateMyPresenceUI = (state: PresenceState, username: string) => {
     els.myUsername.textContent = username;
     els.myAvatar.textContent = initial(username);
     els.myStatusText.textContent = statusText(state.status);
-    els.myStatusText.previousElementSibling!.className = `dot ${state.status.includes('Break') ? 'yellow' : 'green'}`;
+    els.myStatusText.previousElementSibling!.className = `dot ${AWAY_STATUSES.includes(state.status) ? 'away' : state.status.includes('Break') ? 'yellow' : 'green'}`;
     if (state.focusTime !== undefined) els.myFocusTime.textContent = `Today: ${state.focusTime}m focused`;
 };

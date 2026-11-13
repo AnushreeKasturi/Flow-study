@@ -54,8 +54,12 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
                             <input type="text" id="create-pin-input" class="input" placeholder="4 digits" maxlength="4" inputmode="numeric" autocomplete="off">
                         </div>
                         <div id="create-open" class="hidden">
-                            <label for="create-topic">Topic for the board</label>
-                            <input type="text" id="create-topic" class="input" maxlength="80" placeholder="Organic chemistry revision">
+                            <label for="create-topic" class="visually-hidden">Topic for the board</label>
+                            <input type="text" id="create-topic" class="input" maxlength="80" placeholder="What are you studying?">
+                            <!-- The listing's details fit on one line; changing them opens a panel over the card, so Home never scrolls. -->
+                            <details id="create-details" class="create-details">
+                                <summary><span id="create-summary"></span> <span class="link-btn">Change</span></summary>
+                                <div class="create-details-panel" role="group" aria-label="Group details">
                             <div class="home-row">
                                 <div><label for="create-subject">Subject</label><select id="create-subject" class="input">{SUBJECTS.map(([id, name]) => <option value={id} selected={id === 'other'}>{name}</option>)}</select></div>
                                 <div><label for="create-seats">Seats</label><select id="create-seats" class="input">{[2, 3, 4, 5, 6].map(n => <option value={n} selected={n === 4}>{n}</option>)}</select></div>
@@ -64,6 +68,9 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
                                 <div><label for="create-camera">Cameras</label><select id="create-camera" class="input">{CAMERAS.map(([id, name]) => <option value={id}>{name.replace('Cameras ', '').replace(/^./, letter => letter.toUpperCase())}</option>)}</select></div>
                                 <div><label for="create-vibe">Talking</label><select id="create-vibe" class="input">{VIBES.map(([id, name]) => <option value={id}>{name}</option>)}</select></div>
                             </div>
+                                    <button type="button" id="create-details-done" class="btn btn-primary btn-block">Done</button>
+                                </div>
+                            </details>
                         </div>
                         <button id="host-btn" class="btn btn-primary btn-lg btn-block" disabled>Create a room</button>
                     </section>

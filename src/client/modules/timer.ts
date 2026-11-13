@@ -2,7 +2,7 @@ import type { TimerState, TimerMode, Durations } from '../types';
 import { byId } from '../dom';
 import { updateTimer as socketUpdateTimer, getMyUserId } from './socket';
 import { getSupabase } from './supabase';
-import { finishFocus, confirmFocus, startFocus } from './focus-progress';
+import { finishFocus, confirmFocus, startFocus, resetBlock, blockSeconds } from './focus-progress';
 import { fetchDailyFocusTime } from './presence';
 import { openModal, closeModal, notify } from './feedback';
 import { ROUNDS } from './ui';
@@ -169,7 +169,9 @@ const handleComplete = () => {
     let title, msg;
 
     if (state.mode === 'focus') {
-        saveFocus('focus');
+        // A completed session needs you there for at least half of it; a shorter stretch
+        // (joined late, or stepped away) still counts toward your minutes.
+        saveFocus(blockSeconds() * 2 >= state.duration ? 'focus' : 'focus-partial');
 
         // Every fourth focus block earns the long break.
         state.sessionCount++;
@@ -196,7 +198,10 @@ const handleComplete = () => {
     byId<HTMLButtonElement>('close-timer-alert-btn').onclick = closeModal;
 };
 
+let blockMode = '';
 const renderTimer = () => {
+    // A new block starts when the mode changes or the clock is back at the top.
+    if (state.mode !== blockMode || (!state.isRunning && state.timeLeft === state.duration)) { blockMode = state.mode; resetBlock(); }
     if (updateUI) {
         updateUI(state);
     }

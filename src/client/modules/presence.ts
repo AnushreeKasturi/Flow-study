@@ -1,7 +1,7 @@
 import type { PresenceState } from '../types';
 import { updatePresence as socketUpdatePresence, getMyUserId } from './socket';
 import { getSupabase } from './supabase';
-import { startFocus, pauseFocus, getLiveFocus, confirmFocus } from './focus-progress';
+import { startFocus, pauseFocus, getLiveFocus, confirmFocus, setFocusAway } from './focus-progress';
 
 let currentState: PresenceState = { status: 'Online', nowPlaying: null, currentTask: 'Planning…', focusTime: 0 };
 let roomId: string | null = null;
@@ -43,10 +43,17 @@ export const updatePresence = (updates: Partial<PresenceState>) => {
     renderPresence();
 };
 
+// Stepped away: shown on your tile instead of what the room is doing.
+export const AWAY_STATUSES = ['Stepped away', 'Back for the next block'];
+let baseStatus = 'Online';
+let away: string | null = null;
+const showStatus = () => { if (currentState.status !== (away ?? baseStatus)) updatePresence({ status: away ?? baseStatus }); };
+
 export const startFocusTracking = () => {
     if (focusInterval) return;
     startFocus();
-    updatePresence({ status: 'Deep Focus' });
+    baseStatus = 'Deep Focus';
+    showStatus();
     focusInterval = setInterval(renderPresence, 1000);
 };
 
@@ -54,7 +61,16 @@ export const stopFocusTracking = (status = 'On Break') => {
     pauseFocus();
     if (focusInterval) clearInterval(focusInterval);
     focusInterval = null;
-    updatePresence({ status });
+    baseStatus = status;
+    showStatus();
+};
+
+// null when you're back. Your focus time pauses while you're away; the room's clock doesn't.
+export const setAway = (status: string | null) => {
+    away = status;
+    setFocusAway(!!status);
+    if (!status && focusInterval) startFocus();
+    showStatus();
 };
 
 function broadcastPresence() {

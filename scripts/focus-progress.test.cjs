@@ -36,3 +36,28 @@ test('today only counts the part of a live interval after local midnight', async
     focus.startFocus(before);
     assert.deepEqual(focus.getLiveFocus({ now: before + 90000 }), { totalSeconds: 90, todaySeconds: 60 });
 });
+
+test('stepping away pauses focus time, and the room keeps none of it', async () => {
+    const focus = await load();
+    const start = Date.now();
+    focus.resetBlock(start);
+    focus.startFocus(start);
+    focus.setFocusAway(true, start + 60000);
+    focus.startFocus(start + 90000); // a checkpoint carrying on must not restart the clock while away
+    assert.equal(focus.getLiveFocus({ now: start + 300000 }).totalSeconds, 60);
+    focus.setFocusAway(false);
+    focus.startFocus(start + 300000);
+    assert.equal(focus.getLiveFocus({ now: start + 330000 }).totalSeconds, 90);
+});
+
+test('time in the current block survives saves, and counts only from the block start', async () => {
+    const focus = await load();
+    const start = Date.now();
+    focus.startFocus(start);
+    focus.resetBlock(start + 30000); // a new block starts while already focusing
+    focus.finishFocus(start + 330000); // the five-minute checkpoint
+    focus.startFocus(start + 330000);
+    assert.equal(focus.blockSeconds(start + 630000), 600);
+    focus.resetBlock(start + 630000);
+    assert.equal(focus.blockSeconds(start + 690000), 60);
+});

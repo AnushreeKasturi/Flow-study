@@ -3,15 +3,33 @@ type Segment = { start: number; end: number };
 let segments: Segment[] = [];
 let activeStart: number | null = null;
 const pending = new Map<string, Segment[]>();
+// Stepped away: time stops counting until you're back, whatever the room's clock does.
+let away = false;
+// Time you were present in the room's current focus block, across saves, so a block
+// you were there for most of counts as a session even if you joined late.
+let blockMs = 0;
+let blockFrom = 0;
 
 export function startFocus(now = Date.now()) {
-    if (activeStart === null) activeStart = now;
+    if (activeStart === null && !away) activeStart = now;
 }
 
 export function pauseFocus(now = Date.now()) {
-    if (activeStart !== null && now > activeStart) segments.push({ start: activeStart, end: now });
+    if (activeStart !== null && now > activeStart) {
+        segments.push({ start: activeStart, end: now });
+        blockMs += Math.max(0, now - Math.max(activeStart, blockFrom));
+    }
     activeStart = null;
 }
+
+export function setFocusAway(on: boolean, now = Date.now()) {
+    if (on) pauseFocus(now);
+    away = on;
+}
+
+export function resetBlock(now = Date.now()) { blockMs = 0; blockFrom = now; }
+export const blockSeconds = (now = Date.now()) =>
+    Math.floor((blockMs + (activeStart === null ? 0 : Math.max(0, now - Math.max(activeStart, blockFrom)))) / 1000);
 
 export function getLiveFocus({ persistedIds = [], now = Date.now() }: { persistedIds?: string[]; now?: number } = {}) {
     const saved = new Set(persistedIds);

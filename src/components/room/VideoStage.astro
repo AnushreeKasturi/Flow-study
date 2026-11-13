@@ -20,6 +20,8 @@ import Icon from '../Icon.astro';
         <div class="video-wrapper" id="video-wrapper-local">
             <video id="local-video" autoplay muted playsinline></video>
             <span class="name-tag">You</span>
+            <!-- Stepping away dims your tile and pauses your focus time; the room's sun carries on. -->
+            <button id="toggle-away" class="away-btn" type="button" aria-pressed="false">Be right back</button>
             <div class="dummy-placeholder hidden" id="local-dummy-placeholder">
                 <div class="avatar" id="local-dummy-avatar">?</div>
                 <div class="text">Camera unavailable</div>
@@ -27,11 +29,11 @@ import Icon from '../Icon.astro';
             <details class="reactions-menu">
                 <summary class="icon-btn" aria-label="Reactions and raise hand"><Icon name="smile" /></summary>
                 <div class="reaction-bar">
-                    <button class="icon-btn reaction-btn" data-emoji="👍" aria-label="Thumbs up">👍</button>
-                    <button class="icon-btn reaction-btn" data-emoji="❤️" aria-label="Heart">❤️</button>
-                    <button class="icon-btn reaction-btn" data-emoji="😂" aria-label="Laugh">😂</button>
-                    <button class="icon-btn reaction-btn" data-emoji="🎉" aria-label="Celebrate">🎉</button>
-                    <button id="toggle-hand" class="icon-btn" aria-label="Raise hand" aria-pressed="false" title="Raise hand">✋</button>
+                    <button class="icon-btn reaction-btn" data-emoji="👍" data-kind="thumbsUp" aria-label="Thumbs up"><Icon name="thumbsUp" /></button>
+                    <button class="icon-btn reaction-btn" data-emoji="❤️" data-kind="heart" aria-label="Heart"><Icon name="heart" /></button>
+                    <button class="icon-btn reaction-btn" data-emoji="😂" data-kind="laugh" aria-label="Laugh"><Icon name="laugh" /></button>
+                    <button class="icon-btn reaction-btn" data-emoji="🎉" data-kind="party" aria-label="Celebrate"><Icon name="party" /></button>
+                    <button id="toggle-hand" class="icon-btn" aria-label="Raise hand" aria-pressed="false" title="Raise hand"><Icon name="hand" /></button>
                 </div>
             </details>
             <div class="media-controls">
