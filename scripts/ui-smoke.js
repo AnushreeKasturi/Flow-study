@@ -212,6 +212,9 @@ async (page) => {
     assert(await page.getByRole('button', { name: 'Rain', exact: true }).getAttribute('aria-pressed') === 'false' && await page.getByRole('button', { name: 'Ocean', exact: true }).getAttribute('aria-pressed') === 'true', 'Only one soundscape plays at a time');
     await page.getByRole('button', { name: 'Ocean', exact: true }).click();
     assert(await page.getByRole('button', { name: 'Ocean', exact: true }).getAttribute('aria-pressed') === 'false', 'Clicking the active soundscape stops it');
+    assert(await page.locator('#sound-volume').inputValue() === '40', 'The soundscape volume starts at its default');
+    await page.locator('#sound-volume').fill('65');
+    assert(await page.evaluate(() => localStorage.getItem('flow_sound_volume')) === '65', 'A new soundscape volume should be saved');
     await page.getByRole('tab', { name: 'Tasks', exact: true }).click();
 
     // A message's name comes from who the database says sent it, not from what the message claims.
@@ -766,6 +769,7 @@ async (page) => {
     await page.getByRole('button', { name: /^Take a seat in Organic chemistry/ }).click();
     await visible('#app');
     assert(await page.locator('#header-room-code').innerText() === 'FOCUS6', 'A seat taken from home should lead straight into that room');
+    assert(await page.locator('#sound-volume').inputValue() === '65', 'The soundscape volume should be remembered between visits');
     await page.getByRole('button', { name: 'Leave', exact: true }).click();
     await page.getByRole('button', { name: 'Leave room', exact: true }).click();
     await visible('#join-modal');
@@ -850,8 +854,13 @@ async (page) => {
         await page.goto(origin + path);
         assert(await page.getByRole('link', { name: 'Home', exact: true }).first().getAttribute('href') === '/room.html', path + ' should link to Home');
     }
-    await page.goto(origin + '/room.html');
-    await visible('#join-modal');
+    // A missing or unusable stored volume falls back to the default.
+    for (const stored of ['loud', '150', '-5', '', null]) {
+        await page.evaluate(value => value === null ? localStorage.removeItem('flow_sound_volume') : localStorage.setItem('flow_sound_volume', value), stored);
+        await page.goto(origin + '/room.html');
+        await visible('#join-modal');
+        assert(await page.locator('#sound-volume').inputValue() === '40', 'A stored volume of ' + JSON.stringify(stored) + ' should fall back to the default');
+    }
     // Flow keeps no copy of the account: nothing it stores holds the email or id.
     assert(await page.evaluate(() => Object.keys(localStorage).filter(key => key !== 'fixture-session').every(key => !/alex@example\.com|test-user/.test(localStorage.getItem(key)))), 'The account must not be copied into browser storage');
     await page.getByRole('link', { name: 'Log out', exact: true }).click();
