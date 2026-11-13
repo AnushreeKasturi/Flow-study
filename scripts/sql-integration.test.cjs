@@ -166,6 +166,14 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.equal(run(database, "SELECT count(*) FROM pg_publication_tables WHERE pubname='supabase_realtime' AND tablename IN ('open_rooms','planned_groups');").trim(), '2', 'The board tables publish changes');
 
             // 008: security hardening. A stand-in for Supabase's realtime.send records what would be broadcast.
+            // Stand-ins for Supabase's realtime schema: the messages table its channel rules guard,
+            // and the function that names the channel being joined.
+            run(database, `CREATE SCHEMA IF NOT EXISTS realtime;
+                CREATE TABLE IF NOT EXISTS realtime.messages(topic TEXT, extension TEXT, payload JSONB);
+                ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
+                GRANT USAGE ON SCHEMA realtime TO authenticated, anon;
+                GRANT SELECT, INSERT ON realtime.messages TO authenticated, anon;
+                CREATE OR REPLACE FUNCTION realtime.topic() RETURNS TEXT LANGUAGE SQL STABLE AS $$ SELECT current_setting('realtime.topic', true) $$;`);
             run(database, `CREATE SCHEMA IF NOT EXISTS realtime; CREATE TABLE IF NOT EXISTS realtime.sent(payload JSONB, event TEXT, topic TEXT, private BOOLEAN);
                 CREATE OR REPLACE FUNCTION realtime.send(payload JSONB, event TEXT, topic TEXT, private BOOLEAN DEFAULT true) RETURNS VOID LANGUAGE SQL AS $$ INSERT INTO realtime.sent VALUES (payload, event, topic, private) $$;`);
             const hardening = readFileSync('sql/008_security_hardening.sql', 'utf8');
@@ -253,6 +261,18 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.throws(() => asUser(one, `SELECT public.room_send('${openRoom}', 'chat-message', '{"text":"hello?"}');`), /Command failed/, 'Nothing more can be sent into an ended room');
             assert.throws(() => asUser(two, `SELECT public.transfer_host('${openRoom}', '${one}');`), /Command failed/, 'An ended room cannot change hands');
             assert.equal(asUser(one, `SELECT count(*) FROM public.sessions WHERE room_id = '${openRoom}';`), '1', 'Focus history from an ended room is kept');
+
+            // 011: the channel rules, as a member meets them. (010's version refused every member.)
+            run(database, readFileSync('sql/011_fix_room_channel_access.sql', 'utf8'));
+            const channel = (id, topic, sql) => run(database, `SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub','${id}',false); SELECT set_config('realtime.topic','${topic}',false); ${sql}`).trim().split('\n').at(-1);
+            run(database, `INSERT INTO realtime.messages VALUES ('room:${room}','broadcast','{}'), ('room:${openRoom}','broadcast','{}'), ('board','broadcast','{}');`);
+            assert.equal(channel(two, 'room:' + room, `SELECT count(*) FROM realtime.messages WHERE topic = 'room:${room}';`), '1', 'A member can listen on their room\'s channel');
+            assert.equal(channel(stranger, 'room:' + room, `SELECT count(*) FROM realtime.messages WHERE topic = 'room:${room}';`), '0', 'Someone outside the room cannot');
+            assert.equal(channel(one, 'room:' + openRoom, `SELECT count(*) FROM realtime.messages WHERE topic = 'room:${openRoom}';`), '0', 'Nobody can listen on an ended room');
+            assert.equal(channel(stranger, 'board', "SELECT count(*) FROM realtime.messages WHERE topic = 'board';"), '1', 'Anyone signed in can listen on the board');
+            assert.throws(() => channel(stranger, 'board', "INSERT INTO realtime.messages VALUES ('board','broadcast','{}');"), /Command failed/, 'Nobody can send on the board');
+            channel(two, 'room:' + room, `INSERT INTO realtime.messages VALUES ('room:${room}','presence','{}');`);
+            assert.throws(() => channel(two, 'room:' + room, `INSERT INTO realtime.messages VALUES ('room:${room}','broadcast','{}');`), /Command failed/, 'Members announce presence directly, but broadcast only through room_send');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

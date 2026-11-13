@@ -230,15 +230,15 @@ BEGIN
     DROP POLICY IF EXISTS flow_room_receive ON realtime.messages;
     CREATE POLICY flow_room_receive ON realtime.messages FOR SELECT TO authenticated USING (
       realtime.messages.extension IN ('broadcast', 'presence') AND EXISTS (
-        SELECT 1 FROM public.room_participants p JOIN public.rooms r ON r.id = p.room_id
-        WHERE p.user_id = (SELECT auth.uid()) AND r.ended_at IS NULL AND 'room:' || p.room_id::text = (SELECT realtime.topic())
+        SELECT 1 FROM public.room_participants p
+        WHERE p.user_id = (SELECT auth.uid()) AND 'room:' || p.room_id::text = (SELECT realtime.topic()) AND public.room_is_open(p.room_id)
       )
     );
     DROP POLICY IF EXISTS flow_room_send ON realtime.messages;
     CREATE POLICY flow_room_send ON realtime.messages FOR INSERT TO authenticated WITH CHECK (
       realtime.messages.extension = 'presence' AND EXISTS (
-        SELECT 1 FROM public.room_participants p JOIN public.rooms r ON r.id = p.room_id
-        WHERE p.user_id = (SELECT auth.uid()) AND r.ended_at IS NULL AND 'room:' || p.room_id::text = (SELECT realtime.topic())
+        SELECT 1 FROM public.room_participants p
+        WHERE p.user_id = (SELECT auth.uid()) AND 'room:' || p.room_id::text = (SELECT realtime.topic()) AND public.room_is_open(p.room_id)
       )
     );
   END IF;
