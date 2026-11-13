@@ -113,6 +113,7 @@ Ready to post, in `marketing/images/` (1600 × 900, the shape X and LinkedIn sho
 | Thread 2/ and 3/ | `room.png`, `focus-mode.png` |
 | Thread 4/, the study-groups post | `study-groups.png` |
 | Thread 5/, the "drag the sun" post | `setup-drag-the-sun.png` |
+| A post about getting started | `home.png` (the home screen you land on after signing in) |
 
 Regenerate them with `npm run build && npm run marketing:images` (the GIF needs `ffmpeg`). Set `FLOW_MARKETING_SKY=midnight` or any other sky to change the look.
 
