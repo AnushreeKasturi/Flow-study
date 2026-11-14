@@ -199,7 +199,7 @@ body[data-timer="break"] .breath { display: block; }
 .task-item.completed .task-title { text-decoration: line-through; color: var(--text-3); }
 .task-checkbox { width: 22px; height: 22px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid color-mix(in srgb, var(--text) 45%, transparent); border-radius: 7px; background: transparent; color: var(--bg); cursor: pointer; }
 .task-item.completed .task-checkbox { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
-.task-assignee-select { max-width: 92px; padding: 5px 6px; border: 0; border-radius: 999px; background: var(--field); color: var(--text-2); font-size: .7rem; cursor: pointer; }
+.task-assignee-select { max-width: 10em; padding: 5px 6px; border: 0; border-radius: 999px; background: var(--field); color: var(--text-2); font-size: .7rem; cursor: pointer; }
 .task-delete { width: 28px; height: 28px; border: 0; color: var(--text-3); }
 .task-delete:hover { color: var(--danger); }
 .task-empty-msg { padding: 32px 12px; color: var(--text-3); font-size: .86rem; line-height: 1.6; text-align: center; }

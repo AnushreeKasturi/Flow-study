@@ -234,6 +234,18 @@ async (page) => {
     await page.getByRole('button', { name: 'Leave', exact: true }).click();
     await page.screenshot({ path: 'output/playwright/after-leave-desktop.png' });
     await page.getByRole('button', { name: 'Stay in room', exact: true }).click();
+    // The assignee menu is never narrower than its own options, so "Unassigned" is not cut off.
+    for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+        assert(await page.locator('.task-assignee-select').first().evaluate(select => {
+            const shown = select.getBoundingClientRect().width;
+            select.style.maxWidth = 'none';
+            const natural = select.getBoundingClientRect().width;
+            select.style.maxWidth = '';
+            return select.selectedOptions[0].text === 'Unassigned' && shown >= natural - .5;
+        }), 'The assignee menu should show "Unassigned" in full at ' + width + 'px');
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.locator('.task-assignee-select').selectOption('test-user');
     await page.waitForFunction(() => document.querySelector('.task-item')?.getAttribute('aria-busy') === 'false');
     assert(await page.evaluate(() => window.__fixture.tables.tasks[0].assigned_to) === 'test-user', 'Task assignment should persist');
