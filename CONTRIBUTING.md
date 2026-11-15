@@ -2,6 +2,8 @@
 
 Thanks for wanting to help. Flow is small enough to understand in an afternoon, and this page is everything you need to send a change.
 
+Everyone here follows the [code of conduct](CODE_OF_CONDUCT.md).
+
 ## Run it
 
 You need Node.js 22.23.4 or newer.

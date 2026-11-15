@@ -1,0 +1,19 @@
+name: An idea
+description: Something Flow could do, or do better.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's in the way
+      description: The problem you hit while studying, before any solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: Your idea, if you have one. Sketches welcome.
+  - type: markdown
+    attributes:
+      value: Want to build it yourself? Once the idea is agreed, describe your approach on the issue and comment `/take` (see [CONTRIBUTING.md](https://github.com/ManasDasri/Flow-study/blob/main/CONTRIBUTING.md#picking-up-an-issue)).
