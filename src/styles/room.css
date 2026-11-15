@@ -489,3 +489,8 @@ body[data-timer="break"] .breath { display: block; }
 .preview-switch.active .on { display: inline; }
 .preview-switch:not(.active) { color: var(--danger); }
 .preview-note { min-height: 1.4em; margin: 10px 0 0; color: var(--text-2); font-size: .86rem; }
+
+/* Only whoever hosts runs the timer: the controls dim for everyone else. */
+.timer-runner { min-height: 0; margin: 2px 0 0; color: var(--text-2); font-size: .78rem; text-align: center; }
+.timer-runner:empty { display: none; }
+.timer-controls .icon-btn:disabled, .timer-modes .mode-btn:disabled { opacity: .45; cursor: not-allowed; }

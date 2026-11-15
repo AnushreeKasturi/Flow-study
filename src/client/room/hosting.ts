@@ -13,7 +13,7 @@ import { disconnectSocket, getMyUserId, sendRemoved } from '../modules/socket';
 import { stopSound } from '../modules/soundscape';
 import { setHost } from '../modules/stage';
 import supabase from '../modules/supabase';
-import { saveFocus, timerSnapshot } from '../modules/timer';
+import { saveFocus, timerSnapshot, setRunsTimer } from '../modules/timer';
 import { markListed } from './hide-ip';
 import { here, partners, pendingLeaves, peopleHere } from './state';
 
@@ -67,6 +67,19 @@ function applyHost(state: HostState) {
     Object.assign(here, { hostId: state.hostId, hostAway: state.hostAway, isHost: state.isHost, isActing: state.isActing });
     document.body.classList.toggle('is-host', here.isHost);
     setHost(here.hostId);
+    applyTimerControl();
+}
+
+// The timer belongs to whoever hosts right now. Everyone else sees the controls, dimmed,
+// with a note saying who runs it.
+const TIMER_CONTROLS = '#timer-toggle-btn, #timer-reset-btn, .timer-modes .mode-btn, #setting-focus-duration, #setting-short-break-duration, #setting-long-break-duration, #setting-auto-advance';
+export function applyTimerControl() {
+    const runs = here.isHost || here.isActing;
+    setRunsTimer(runs);
+    document.body.classList.toggle('runs-timer', runs);
+    document.querySelectorAll<HTMLButtonElement | HTMLInputElement>(TIMER_CONTROLS).forEach(control => { control.disabled = !runs; });
+    const host = partners[here.hostId]?.username;
+    byId<HTMLElement>('timer-runner').textContent = runs ? '' : here.hostId ? `${host || 'The host'} runs the timer.` : 'The host runs the timer.';
 }
 
 // Reads who hosts from the database, the only source trusted, and says what changed.

@@ -361,6 +361,23 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.equal(run(database, "SELECT count(*) FROM realtime.sent WHERE event = 'timer-updated';").trim(), '2', 'Both still reach the room');
             assert.equal(asUser(two, `SELECT timer->>'mode' FROM public.rooms WHERE id = '${otherRoom}';`), 'focus', 'People in the room can read it');
             assert.equal(asUser(one, `SELECT count(*) FROM public.rooms WHERE id = '${otherRoom}';`), '0', 'Nobody else can');
+
+            // 018: only whoever hosts right now changes the timer; everything else is unchanged.
+            run(database, readFileSync('sql/018_host_runs_timer.sql', 'utf8'));
+            run(database, readFileSync('sql/018_host_runs_timer.sql', 'utf8'));
+            run(database, `UPDATE public.rooms SET host_away = false, acting_host = NULL, acting_seen = NULL WHERE id = '${otherRoom}';`);
+            const timerFrom = (id, extra = '') => asUser(id, `SELECT public.room_send('${otherRoom}', 'timer-updated', '{"action":"sync","mode":"focus","timeLeft":1500,"isRunning":true,"duration":1500,"version":7${extra}}');`);
+            timerFrom(fresh);
+            assert.equal(run(database, `SELECT (timer->>'version') || ' ' || (timer->>'by') FROM public.rooms WHERE id = '${otherRoom}';`).trim(), `7 ${fresh}`, 'The host changes the timer; its version and author are kept');
+            assert.throws(() => timerFrom(two), /Command failed/, 'Someone else in the room cannot change the timer');
+            asUser(two, `SELECT public.room_send('${otherRoom}', 'chat-message', '{"text":"hi"}');`);
+            run(database, `UPDATE public.rooms SET host_away = true, acting_host = '${two}', acting_seen = now() WHERE id = '${otherRoom}';`);
+            timerFrom(two);
+            assert.throws(() => timerFrom(fresh), /Command failed/, 'While stepped away, the host hands the timer to the stand-in');
+            assert.throws(() => timerFrom(stranger), /Command failed/, 'Nobody else runs it meanwhile');
+            run(database, `UPDATE public.rooms SET acting_seen = now() - interval '2 minutes' WHERE id = '${otherRoom}';`);
+            assert.throws(() => timerFrom(two), /Command failed/, 'A stand-in who has gone quiet no longer runs it');
+            assert.equal(asUser(two, `SELECT public.runs_timer('${otherRoom}');`), 'f');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

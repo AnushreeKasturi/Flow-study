@@ -36,6 +36,9 @@ const RAMP_S = Number(__ENV.RAMP_S || 60);
 const HOLD_S = Number(__ENV.HOLD_S || 180);
 if (!URL || !KEY || !PASSWORD) throw new Error('Set SUPABASE_URL, SUPABASE_KEY and LOAD_PASSWORD (see README.md)');
 if (/mrjtkxwenqswbjplmzko/.test(URL)) throw new Error('That is the production project. Load tests run against flow-loadtest only.');
+// Free-plan limits (200 Realtime connections) are shared by every project in the organisation,
+// production included. Going past them once started a usage grace period; see README.md.
+if (PEOPLE > 150 && __ENV.OVER_QUOTA !== 'yes') throw new Error('Over 150 people can push the whole Supabase organisation past its Realtime limit. Set OVER_QUOTA=yes only on a paid plan or a separate organisation.');
 
 export const options = {
     setupTimeout: '15m',

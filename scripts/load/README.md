@@ -6,6 +6,7 @@ k6 scripts that act like people using Flow, run against a **separate Supabase pr
 |---|---|
 | `flow-rooms.k6.js` | How many people can be in rooms at once. Each virtual user signs in, loads Home, joins a room, and keeps a Realtime connection (room + board channels, presence) with the heartbeat, timer syncs, listing refreshes and focus saves a real tab sends. |
 | `flow-db.k6.js` | How many requests per second the database handles, without Realtime's connection cap in the way. Climbs in steps up to `PEAK` requests per second. |
+| `group-check.cjs` | A real group session, end to end: three real browsers with fake cameras, real Realtime, the real database. A host starts the timer, two people join mid-block, tasks and statuses change, a short block ends with everyone there, and the host steps away. Reports whether every clock agreed and kept running, any false "left" notes, and how long newcomers took to appear. Needs a build of the site pointed at the load-test project. |
 | `seed-accounts.sql` | 400 confirmed test accounts (`load0001@example.test` …). No emails are sent. |
 | `summarise.cjs` | Turns `--summary-export` files from a series of runs into one table. |
 
@@ -54,6 +55,19 @@ Above 200, new connections fail with `websocket: bad handshake`. That's the free
 | 200–225 | 0 | climbs to 2–6 s | 7 s+ |
 
 Up to 150 requests a second the database is flat. Between 150 and 200 it saturates, and requests queue for seconds rather than fail.
+
+**A real group session (`group-check.cjs`), 15 November 2026, after #122 and the host-only timer:**
+
+| What | Result |
+|---|---|
+| Someone joining mid-block appears to the others | 0.7–1.0 s; their video plays at 1.0–1.4 s |
+| A newcomer's clock against the host's | within 1 s, already running |
+| Clocks while someone changes tasks and steps away | agreed within 1–2 s, never stopped or jumped |
+| A block ending with three people there | everyone moved to the break at the same second, and it ran |
+| Host steps away | a stand-in got the timer controls and paused it for everyone |
+| False "left the room" notes, page errors | none |
+
+**Stay inside the plan's limits.** Free-plan limits apply to the whole Supabase organisation, production included. The step to 250 and 300 people above took the organisation to 228 peak Realtime connections (limit 200) and started a usage grace period. Keep load tests at or below 150 people, or run them in a separate organisation.
 
 ## What the numbers mean
 

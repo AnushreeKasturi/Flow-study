@@ -351,10 +351,15 @@ async (page) => {
     // Two people: changing a status is not leaving, and an older timer state never stops a newer one.
     await page.evaluate(() => window.__fixture.handlers['presence:join']({ key: 'zz-mia', newPresences: [{ username: 'Mia', isDummyMedia: true }] }));
     await page.waitForFunction(() => document.getElementById('video-wrapper-zz-mia'));
-    await page.getByRole('button', { name: 'Start timer', exact: true }).click();
-    await page.waitForFunction(() => window.__fixture.calls.some(call => call.action === 'send' && call.value.event === 'timer-updated' && call.value.payload.isRunning === true && Number.isInteger(call.value.payload.version)));
-    const started = await page.evaluate(() => window.__fixture.calls.filter(call => call.action === 'send' && call.value.event === 'timer-updated' && call.value.payload.isRunning === true).at(-1).value.payload);
-    assert(started.version > 0 && typeof started.by === 'string' && started.by.length > 0, 'A timer change carries its version and who made it');
+    // Only the host runs the timer (sql/018). Here we're a guest: the controls are dimmed, and the note says who runs it.
+    assert(await page.locator('#timer-toggle-btn').isDisabled() && (await page.locator('#timer-runner').innerText()).includes('runs the timer'), 'A guest sees who runs the timer, and can\'t change it');
+    const sentBefore = await page.evaluate(() => window.__fixture.calls.filter(call => call.value?.event === 'timer-updated').length);
+    await page.keyboard.press('s');
+    assert(await page.evaluate(() => window.__fixture.calls.filter(call => call.value?.event === 'timer-updated').length) === sentBefore, 'The S shortcut doesn\'t change the timer for a guest either');
+    // The host starts it.
+    const started = { version: 5, by: 'zz-mia' };
+    await page.evaluate(() => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 1500, isRunning: true, version: 5, from: 'zz-mia' } }));
+    await page.waitForFunction(() => document.getElementById('timer-toggle-btn').getAttribute('aria-pressed') === 'true');
     // Mia's status changes, so Supabase re-tracks her: a "join" for someone already here, then her old copy "leaves".
     await page.evaluate(() => {
         const handlers = window.__fixture.handlers, before = [{ username: 'Mia', isDummyMedia: true }], after = [{ username: 'Mia', isDummyMedia: true, status: 'Deep Focus' }];
@@ -376,7 +381,7 @@ async (page) => {
     // A huge jump in version is refused (it would lock the timer against every later change),
     // and a forged author is ignored: `by` comes from the database-stamped sender.
     await page.evaluate(version => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 1500, isRunning: false, version: version + 1000000, from: 'zz-mia' } }), started.version);
-    await page.evaluate(({ version, by }) => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', timeLeft: 600, version, by, from: 'zz-mia' } }), started);
+    await page.evaluate(({ version, by }) => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', timeLeft: 600, version, by, from: 'zz-someone-else' } }), started);
     await page.waitForTimeout(800);
     assert(await page.locator('#timer-toggle-btn').getAttribute('aria-pressed') === 'true' && /^(19|20):/.test(await page.locator('#time-display').innerText()), 'A huge version jump or a forged author changes nothing');
     // A newer change from Mia does stop it.
@@ -437,6 +442,13 @@ async (page) => {
     await page.waitForFunction(() => document.querySelector('.task-item')?.getAttribute('aria-busy') === 'false');
     assert(await page.evaluate(() => window.__fixture.tables.tasks[0].assigned_to) === 'test-user', 'Task assignment should persist');
 
+    // From here this person hosts FOCUS6 (as after a hand-over), so the timer is theirs to run.
+    await page.evaluate(() => {
+        const fixture = window.__fixture;
+        fixture.tables.rooms.push({ id: 'focus6-room', room_code: 'FOCUS6', created_by: fixture.tables.profiles[0].id, host_away: false, acting_host: null });
+        fixture.handlers['broadcast:host-changed']({ payload: { host: fixture.tables.profiles[0].id, name: 'Alex' } });
+    });
+    await page.waitForFunction(() => !document.getElementById('timer-toggle-btn').disabled && document.getElementById('timer-runner').textContent === '');
     await page.getByRole('button', { name: 'Start timer', exact: true }).click();
     await visible('[aria-label="Pause timer"]');
     await page.getByRole('button', { name: 'Pause timer', exact: true }).click();
@@ -924,6 +936,13 @@ async (page) => {
     await page.getByRole('button', { name: 'Delete Task', exact: true }).first().click();
     await page.getByRole('button', { name: 'Delete Task', exact: true }).first().click();
     assert(await page.locator('.task-item').count() === 0, 'Delete should remove the task');
+    // Hosting goes back to someone else, so leaving is a plain leave, as for any guest.
+    await page.evaluate(() => {
+        const fixture = window.__fixture, room = fixture.tables.rooms.find(row => row.room_code === 'FOCUS6');
+        if (room) room.created_by = 'zz-other-host';
+        fixture.handlers['broadcast:host-changed']({ payload: { host: 'zz-other-host', name: 'Riya' } });
+    });
+    await page.waitForFunction(() => document.getElementById('timer-toggle-btn').disabled);
     await page.getByRole('button', { name: 'Leave', exact: true }).click();
 
     const cleanup = await page.evaluate(async () => {
@@ -956,7 +975,8 @@ async (page) => {
     await page.waitForFunction(() => document.body.dataset.timer === 'break', undefined, { timeout: 8000 });
     assert((await page.locator('#timer-alert-msg').innerText()).includes('The break has started.'), 'The end-of-block note says the break has begun');
     await page.locator('#close-timer-alert-btn').click();
-    await page.getByRole('button', { name: 'Pause timer', exact: true }).click();
+    // A guest can't pause the room's timer (only the host runs it); they just leave.
+    assert(await page.locator('#timer-toggle-btn').isDisabled(), 'A guest cannot pause the timer');
     await page.getByRole('button', { name: 'Leave', exact: true }).click();
     await page.getByRole('button', { name: 'Leave room', exact: true }).click();
     await visible('#join-modal');

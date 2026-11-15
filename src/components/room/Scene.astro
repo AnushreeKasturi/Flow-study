@@ -19,6 +19,8 @@ import Icon from '../Icon.astro';
             <button id="focus-mode-toggle" class="icon-btn" title="Toggle Focus Mode" aria-pressed="false"><Icon name="expand" size={16} /></button>
             <button id="open-timer-settings-btn" class="icon-btn" aria-label="Timer settings"><Icon name="settings" size={16} /></button>
         </div>
+        <!-- Only whoever hosts runs the timer (sql/018); everyone else is told who does. -->
+        <p id="timer-runner" class="timer-runner" role="status"></p>
         <div class="timer-modes segmented" aria-label="Session mode">
             <button class="mode-btn active" data-mode="focus" aria-pressed="true">Focus</button>
             <button class="mode-btn" data-mode="shortBreak" aria-pressed="false">Break</button>

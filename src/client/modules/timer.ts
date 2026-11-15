@@ -22,6 +22,12 @@ let state: TimerState = {
     by: ''
 };
 
+// Only whoever hosts right now (the host, or the stand-in while they're away) changes the
+// timer; the database refuses anyone else (sql/018). Everyone else follows it.
+let runs = false;
+export const setRunsTimer = (yes: boolean) => { runs = yes; };
+export const runsTimer = () => runs;
+
 let timerInterval: ReturnType<typeof setInterval> | null = null;
 let deadline = 0;
 let roomId: string | null = null;
@@ -120,11 +126,14 @@ const changed = () => {
 // For the study-groups board: which mode the room is in and, if the clock is running, when it ends.
 export const timerSnapshot = () => ({ timer_mode: state.mode as string, timer_ends_at: state.isRunning ? new Date(deadline).toISOString() : null });
 
+// Brings someone who just arrived in step. Only the person running the timer answers, so a
+// stale copy from anyone else can't reach them.
 export const broadcastCurrentState = () => {
-    broadcastState();
+    if (runs) broadcastState();
 };
 
 export const toggleTimer = (broadcast = true) => {
+    if (broadcast && !runs) return;
     if (broadcast) changed();
     state.isRunning = !state.isRunning;
     if (state.isRunning) {
@@ -137,6 +146,7 @@ export const toggleTimer = (broadcast = true) => {
 };
 
 export const resetTimer = (broadcast = true) => {
+    if (broadcast && !runs) return;
     if (broadcast) changed();
     state.isRunning = false;
     state.duration = MODES[state.mode]();
@@ -147,6 +157,7 @@ export const resetTimer = (broadcast = true) => {
 };
 
 export const setMode = (mode: TimerMode, broadcast = true) => {
+    if (broadcast && !runs) return;
     if (Object.hasOwn(MODES, mode)) {
         if (broadcast) changed();
         state.mode = mode;
@@ -163,7 +174,7 @@ const validDurations = (values: Durations) => (['focus', 'shortBreak', 'longBrea
 
 export const autoAdvance = () => state.autoAdvance !== false;
 export const setTimerSettings = (durations: Durations, broadcast = true, advance = autoAdvance()) => {
-    if (!validDurations(durations)) return;
+    if (!validDurations(durations) || (broadcast && !runs)) return;
     if (broadcast) changed();
     state.durations = durations;
     state.autoAdvance = advance;
@@ -248,15 +259,15 @@ const handleComplete = () => {
         msg = autoAdvance() ? 'The next focus block has started.' : 'Ready for your next focus session?';
         setMode('focus', false);
     }
-    // Every browser in the room reaches the end at the same moment and starts the next block,
-    // each as the same next version: they agree on the content, and the version rule settles
-    // who it's credited to. Nothing is sent in between, so no "paused" can stop anyone.
-    changed();
+    // Every browser in the room reaches the end at the same moment. Nothing is sent in between,
+    // so no "paused" can stop anyone.
+    // Everyone's clock moves on by itself; whoever runs the timer makes it the room's next version.
+    if (runs) changed();
     if (autoAdvance()) {
         state.isRunning = true;
         startLocalTick();
         renderTimer();
-        broadcastState();
+        if (runs) broadcastState();
     }
 
     chime('done');
