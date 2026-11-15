@@ -34,7 +34,10 @@ async function main() {
     // An empty email sends nothing; with the captcha on, it's refused for the missing token first.
     const recover = await (await get(`${config.url}/auth/v1/recover`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: '{"email":""}' })).json();
     if (recover.error_code === 'captcha_failed') check(!!config.captchaSiteKey, 'The captcha is on in Supabase, and the site has its key');
-    if (config.captchaSiteKey) check(csp.includes('https://challenges.cloudflare.com'), 'The Content-Security-Policy lets the captcha load');
+    // Exact source in each directive Turnstile needs (its script, and the iframe it draws), not a substring of the header.
+    const sources = name => (csp.split(';').map(d => d.trim().split(/\s+/)).find(([n]) => n === name) || []).slice(1);
+    const TURNSTILE = 'https://challenges.cloudflare.com';
+    if (config.captchaSiteKey) check(['script-src', 'frame-src'].every(d => sources(d).includes(TURNSTILE)), 'The Content-Security-Policy lets the captcha load');
 
     // The database: the public board is readable, everything else is closed to signed-out visitors.
     const read = (table, columns = '*') => get(`${config.url}/rest/v1/${table}?select=${columns}&limit=1`, { headers });
