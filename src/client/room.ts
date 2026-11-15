@@ -6,7 +6,7 @@ import { byId, on } from './dom';
 import { bindThemePicker } from './theme';
 import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, sendReaction, sendHandRaise, sendBye } from './modules/socket';
 import { initNotifications, pushNote, systemNotify } from './modules/notifications';
-import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack } from './modules/rtc';
+import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack, showLocalStream, isMicOn } from './modules/rtc';
 import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState, saveFocus, restoreTimer, autoAdvance } from './modules/timer';
 import { initTasks, addTask, toggleTask, deleteTask, assignTask, rerenderTasks, setSharedTasks } from './modules/tasks';
 import { initPresence, startFocusTracking, stopFocusTracking, formatFocusTime } from './modules/presence';
@@ -31,6 +31,7 @@ import { awayTimer, isAway, setAwayState } from './room/away';
 import { adoptListing, bindHosting, boardForm, listOnBoard, prepareLeave, refreshBoardSoon, roomEnded, confirmRemoval, syncHost, updateLeaveButton } from './room/hosting';
 import { bindProfile } from './room/profile';
 import { showHome } from './room/home';
+import { preview, previewWanted, setPreviewWanted } from './room/preview';
 
 let handRaised = false;
 let toldLate = false;
@@ -242,7 +243,17 @@ async function joinRoom() {
         pendingTimer = (await supabase.from('rooms').select('timer').eq('room_code', roomCode).maybeSingle()).data?.timer ?? null;
         // A saved display name overrides the email-derived default.
         here.username = (await getMyProfile(user.id))?.display_name || user.email.split('@')[0];
-        await enterRoom(roomUuid, roomCode);
+        // Ready to join? Your camera first, before your presence reaches anyone in the room.
+        const previewed = previewWanted();
+        if (previewed) {
+            if (!await preview(roomCode, here.username)) {
+                Object.assign(here, { id: '', code: '', pin: '', listed: false });
+                openModal('join-modal');
+                return;
+            }
+            showLoader('Opening your room…');
+        }
+        await enterRoom(roomUuid, roomCode, previewed);
     } catch {
         cleanupMedia();
         disconnectSocket();
@@ -264,7 +275,7 @@ let wasFocusing = false;
 // A long block is saved every five minutes as it runs, so a crash loses little.
 setInterval(() => { if (wasFocusing) saveFocus('focus-partial', true); }, 5 * 60 * 1000);
 
-async function enterRoom(roomId: string, roomCode: string) {
+async function enterRoom(roomId: string, roomCode: string, mediaReady = false) {
     closeModal();
     appContainer.classList.remove('hidden');
     reveal(appContainer, 'room');
@@ -280,13 +291,17 @@ async function enterRoom(roomId: string, roomCode: string) {
     const addTaskBtn = byId<HTMLButtonElement>('add-task-btn');
     taskInput.disabled = addTaskBtn.disabled = true;
 
-    // A long wait here is almost always the browser asking for camera access; say so.
-    const asking = setTimeout(() => loaderText('Allow camera and microphone to continue'), 1200);
-    await initMedia(byId<HTMLVideoElement>('local-video'));
-    clearTimeout(asking);
-    loaderText('Opening your room…');
+    if (mediaReady) await showLocalStream(byId<HTMLVideoElement>('local-video')); // started, and set, by the preview
+    else {
+        // A long wait here is almost always the browser asking for camera access; say so.
+        const asking = setTimeout(() => loaderText('Allow camera and microphone to continue'), 1200);
+        await initMedia(byId<HTMLVideoElement>('local-video'));
+        clearTimeout(asking);
+        loaderText('Opening your room…');
+    }
     if (here.leaving) return;
     showLocalCamera(isVideoActive());
+    if (hasAudioTrack()) setToggle(byId<HTMLButtonElement>('toggle-mic'), isMicOn());
     // The camera can work while the microphone is busy or denied. With no
     // track to toggle, disable the control instead of leaving a dead button.
     if (!hasAudioTrack()) {
@@ -530,7 +545,8 @@ function bindRoomControls() {
     on<HTMLButtonElement>('focus-mode-toggle', event => setToggle(event.currentTarget, document.body.classList.toggle('focus-active')));
     UI.UI.timerModes.forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode as TimerMode)));
     const hideIpBox = byId<HTMLInputElement>('setting-hide-ip');
-    on('open-timer-settings-btn', () => { hideIpBox.checked = hidingIp(); byId<HTMLInputElement>('setting-auto-advance').checked = autoAdvance(); });
+    const previewBox = byId<HTMLInputElement>('setting-preview');
+    on('open-timer-settings-btn', () => { hideIpBox.checked = hidingIp(); previewBox.checked = previewWanted(); byId<HTMLInputElement>('setting-auto-advance').checked = autoAdvance(); });
     const notifyBox = byId<HTMLInputElement>('setting-notify');
     notifyBox.checked = localStorage.getItem('flow_notify') === '1';
     on('open-timer-settings-btn', () => openModal('timer-settings-modal'));
@@ -550,6 +566,7 @@ function bindRoomControls() {
         notifyBox.checked = allowed;
         localStorage.setItem('flow_notify', allowed ? '1' : '0');
         // A changed choice applies at once: calls are set up again with the new route.
+        setPreviewWanted(previewBox.checked);
         if (hideIpBox.checked !== hidingIp()) {
             chooseHideIp(hideIpBox.checked);
             notify(hideIpBox.checked ? 'Your IP address is hidden. Reconnecting calls through the relay…' : 'Calls connect directly again. Reconnecting…');

@@ -295,7 +295,24 @@ async (page) => {
     assert(await page.locator('#app').isHidden(), 'Failed join must stay in the lobby');
     await page.evaluate(() => { window.__fixture.rpcError = null; });
 
+    // Ready to join: the camera preview comes first, and nothing reaches the room until you join.
+    await page.evaluate(() => localStorage.setItem('flow_preview', '1'));
+    const channelsBefore = await page.evaluate(() => window.__fixture.channelCount);
     await page.getByRole('button', { name: 'Join room', exact: true }).click();
+    await page.getByRole('heading', { name: 'Ready to join?' }).waitFor();
+    await page.waitForFunction(() => !document.getElementById('preview-join').disabled);
+    assert(await page.locator('#preview-room').innerText() === 'FOCUS6' && await page.evaluate(() => window.__fixture.channelCount) === channelsBefore, 'The preview names the room, and nobody there can see you yet');
+    // This test browser has no camera: the preview says so, and the switch can't be pressed.
+    assert(await page.locator('#preview-cam').isDisabled() && await page.locator('#preview-off-text').innerText() === 'No camera available', 'Without a camera the preview says so plainly');
+    await page.screenshot({ path: 'output/playwright/camera-preview.png' });
+    for (const width of [390, 320]) { await page.setViewportSize({ width, height: 800 }); await fitsViewport(); }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await visible('#join-modal');
+    assert(await page.locator('#app').isHidden() && await page.evaluate(() => window.__fixture.channelCount) === channelsBefore, 'Back returns Home without entering the room');
+    await page.getByRole('button', { name: 'Join room', exact: true }).click();
+    await page.getByRole('button', { name: 'Join now', exact: true }).click();
+    await page.evaluate(() => localStorage.setItem('flow_preview', '0'));
     await page.locator('#new-task-input').waitFor({ state: 'visible' });
     await page.waitForFunction(() => !document.getElementById('new-task-input').disabled);
     // Arriving partway through a block: the sun takes the room's place, and a note says so.

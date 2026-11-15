@@ -106,6 +106,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
         </div>
         <label class="check"><input type="checkbox" id="setting-auto-advance" checked><span>Start the next block automatically<small>When a block ends, the break (or the next focus block) starts for everyone, so nobody has to press start.</small></span></label>
         <label class="check"><input type="checkbox" id="setting-notify"><span>Send me system notifications<small>For finished sessions, new chat messages, and reminders, only while Flow is in a background tab.</small></span></label>
+        <label class="check"><input type="checkbox" id="setting-preview" checked><span>Show a camera preview before joining<small>See yourself, and choose camera and microphone, before anyone in the room can see you.</small></span></label>
         <label class="check"><input type="checkbox" id="setting-hide-ip"><span>Hide my IP address<small>Calls go through a relay server, so others in the room never see your address. Adds a little delay. On by default in groups from the study-groups board.</small></span></label>
         <button id="save-timer-settings-btn" class="btn btn-primary btn-block">Save Changes</button>
     </div>
@@ -132,6 +133,24 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
         <button id="close-timer-alert-btn" class="btn btn-primary btn-block">Continue</button>
     </div>
 
+    <!-- Ready to join: your camera before the room sees you (src/client/room/preview.ts). -->
+    <div id="preview-modal" class="modal preview hidden" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+        <h2 id="preview-title">Ready to join?</h2>
+        <p class="dialog-description">Room <strong id="preview-room"></strong>. Nobody there can see you until you join.</p>
+        <div class="preview-frame">
+            <video id="preview-video" autoplay muted playsinline></video>
+            <div id="preview-off" class="dummy-placeholder hidden"><div class="avatar" id="preview-avatar">?</div><div class="text" id="preview-off-text">Your camera is off</div></div>
+        </div>
+        <div class="preview-switches">
+            <button id="preview-cam" type="button" class="btn preview-switch active" aria-pressed="true"><Icon name="cam" class="on" /><Icon name="camOff" class="off" /><span>Camera on</span></button>
+            <button id="preview-mic" type="button" class="btn preview-switch active" aria-pressed="true"><Icon name="mic" class="on" /><Icon name="micOff" class="off" /><span>Microphone on</span></button>
+        </div>
+        <p id="preview-note" class="preview-note" role="status"></p>
+        <div class="dialog-actions">
+            <button id="preview-back" type="button" class="btn">Back</button>
+            <button id="preview-join" type="button" class="btn btn-primary">Join now</button>
+        </div>
+    </div>
     <div id="leave-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="leave-title">
         <h2 id="leave-title">Leave this session?</h2>
         <p id="leave-text" class="dialog-description">Your camera and microphone will disconnect. You can rejoin with the room code; saved shared tasks stay in the room.</p>

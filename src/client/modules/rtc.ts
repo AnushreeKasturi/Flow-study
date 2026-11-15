@@ -217,6 +217,20 @@ export const toggleAudio = () => {
 };
 
 export const hasAudioTrack = () => !!localStream?.getAudioTracks()[0];
+// A real camera (not the stand-in stream used when there's none or it was refused).
+export const hasCamera = () => !isDummyMedia && !!localStream?.getVideoTracks()[0];
+// Set rather than flip: the camera preview hands its choice to the room.
+export const setCameraOn = (on: boolean) => { const track = localStream?.getVideoTracks()[0]; if (track && !isDummyMedia) track.enabled = on; };
+export const setMicOn = (on: boolean) => { const track = localStream?.getAudioTracks()[0]; if (track) track.enabled = on; };
+export const isMicOn = () => !!localStream?.getAudioTracks()[0]?.enabled;
+// Shows the stream already started (by the preview) in another video element.
+export const showLocalStream = async (videoEl: HTMLVideoElement) => {
+    if (!localStream) return false;
+    videoEl.srcObject = localStream;
+    videoEl.muted = true;
+    await videoEl.play().catch(() => {});
+    return true;
+};
 
 export const toggleVideo = () => {
     const videoTrack = localStream?.getVideoTracks()[0];

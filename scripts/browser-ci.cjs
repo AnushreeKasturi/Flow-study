@@ -43,6 +43,8 @@ const app = require('../server');
             } }]
         });
         await context.route('**/__flow-test/rtc.js*', route => route.fulfill({ body: rtcHarness.outputFiles[0].text, contentType: 'text/javascript' }));
+        // Most tests join rooms directly; the camera preview has its own test, which turns it on.
+        await context.addInitScript(() => { try { if (localStorage.getItem('flow_preview') === null) localStorage.setItem('flow_preview', '0'); } catch { /* about:blank */ } });
         await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
         page = await context.newPage();
         page.setDefaultTimeout(15000);
