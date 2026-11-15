@@ -17,7 +17,9 @@ let state: TimerState = {
     sessionCount: 0,
     durations: { focus: 25 * 60, shortBreak: 5 * 60, longBreak: 15 * 60 },
     // In a group nobody owns the click that starts the break, so by default nobody has to.
-    autoAdvance: true
+    autoAdvance: true,
+    version: 0,
+    by: ''
 };
 
 let timerInterval: ReturnType<typeof setInterval> | null = null;
@@ -46,6 +48,26 @@ export const syncState = (newState: Partial<TimerState>) => {
     if (newState.isRunning !== undefined && typeof newState.isRunning !== 'boolean') return;
     if (newState.sessionCount !== undefined && (!Number.isInteger(newState.sessionCount) || newState.sessionCount < 0 || newState.sessionCount > 10000)) return;
     if (newState.autoAdvance !== undefined && typeof newState.autoAdvance !== 'boolean') return;
+    if (newState.version !== undefined && (!Number.isInteger(newState.version) || newState.version < 0 || newState.version > 1e9)) return;
+    if (newState.by !== undefined && (typeof newState.by !== 'string' || newState.by.length > 64)) return;
+    // Messages can arrive out of order, and everyone in a room sends the state they have to
+    // someone who arrives. Only a newer version is taken; at the same version the same author's
+    // clock may correct a drift. (A state with no version comes from an older page: as before.)
+    if (newState.version !== undefined) {
+        const full = newState.mode !== undefined && newState.isRunning !== undefined;
+        const newer = newState.version > (state.version ?? 0) || (newState.version === state.version && (newState.by ?? '') > (state.by ?? ''));
+        if (!newer || !full) {
+            const same = newState.version === state.version && newState.by === state.by;
+            if (same && state.isRunning && newState.timeLeft !== undefined && Math.abs(newState.timeLeft - state.timeLeft) >= 2) {
+                state.timeLeft = newState.timeLeft;
+                deadline = Date.now() + state.timeLeft * 1000;
+                renderTimer();
+            }
+            return;
+        }
+        state.version = newState.version;
+        state.by = newState.by ?? '';
+    }
     if (newState.autoAdvance !== undefined) state.autoAdvance = newState.autoAdvance;
     // If we receive a sync with the full state, update our local state
     if (newState.durations) state.durations = newState.durations;
@@ -83,6 +105,11 @@ export function restoreTimer(saved: unknown) {
 const broadcastState = () => {
     socketUpdateTimer(roomId, 'sync', state);
 };
+// A change made here: the next version, by us.
+const changed = () => {
+    state.version = (state.version ?? 0) + 1;
+    state.by = getMyUserId() || '';
+};
 
 // For the study-groups board: which mode the room is in and, if the clock is running, when it ends.
 export const timerSnapshot = () => ({ timer_mode: state.mode as string, timer_ends_at: state.isRunning ? new Date(deadline).toISOString() : null });
@@ -92,6 +119,7 @@ export const broadcastCurrentState = () => {
 };
 
 export const toggleTimer = (broadcast = true) => {
+    if (broadcast) changed();
     state.isRunning = !state.isRunning;
     if (state.isRunning) {
         startLocalTick();
@@ -103,6 +131,7 @@ export const toggleTimer = (broadcast = true) => {
 };
 
 export const resetTimer = (broadcast = true) => {
+    if (broadcast) changed();
     state.isRunning = false;
     state.duration = MODES[state.mode]();
     state.timeLeft = state.duration;
@@ -113,6 +142,7 @@ export const resetTimer = (broadcast = true) => {
 
 export const setMode = (mode: TimerMode, broadcast = true) => {
     if (Object.hasOwn(MODES, mode)) {
+        if (broadcast) changed();
         state.mode = mode;
         state.duration = MODES[mode]();
         state.timeLeft = state.duration;
@@ -128,6 +158,7 @@ const validDurations = (values: Durations) => (['focus', 'shortBreak', 'longBrea
 export const autoAdvance = () => state.autoAdvance !== false;
 export const setTimerSettings = (durations: Durations, broadcast = true, advance = autoAdvance()) => {
     if (!validDurations(durations)) return;
+    if (broadcast) changed();
     state.durations = durations;
     state.autoAdvance = advance;
     state.duration = MODES[state.mode]();
@@ -147,9 +178,10 @@ const startLocalTick = () => {
             state.timeLeft = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
             renderTimer();
 
-            // Sync with server every 10 seconds to ensure everyone is exact
-            if (state.timeLeft % 10 === 0) {
-                socketUpdateTimer(roomId, 'sync', { timeLeft: state.timeLeft });
+            // Every 30 s whoever made the current state says where it is, so a drifted
+            // clock (a sleeping laptop) catches up. One sender per room, not everyone.
+            if (state.timeLeft % 30 === 0 && state.by && state.by === getMyUserId()) {
+                socketUpdateTimer(roomId, 'sync', { timeLeft: state.timeLeft, version: state.version, by: state.by });
             }
         } else {
             handleComplete();
@@ -200,7 +232,7 @@ const handleComplete = () => {
         title = 'Focus session complete';
         msg = longBreak ? `That’s ${ROUNDS} rounds. Take a long break; you’ve earned it.` : 'Nice work. Take a short break before the next one.';
         if (autoAdvance()) msg += ' The break has started.';
-        setMode(longBreak ? 'longBreak' : 'shortBreak');
+        setMode(longBreak ? 'longBreak' : 'shortBreak', false);
         document.body.classList.remove('focus-active');
         const focusBtn = byId<HTMLElement>('focus-mode-toggle');
         focusBtn.classList.remove('active');
@@ -208,10 +240,12 @@ const handleComplete = () => {
     } else {
         title = 'Break complete';
         msg = autoAdvance() ? 'The next focus block has started.' : 'Ready for your next focus session?';
-        setMode('focus');
+        setMode('focus', false);
     }
-    // Every browser in the room reaches the end at the same moment and starts the next block;
-    // they all send the same state, so it settles the same way whoever is first.
+    // Every browser in the room reaches the end at the same moment and starts the next block,
+    // each as the same next version: they agree on the content, and the version rule settles
+    // who it's credited to. Nothing is sent in between, so no "paused" can stop anyone.
+    changed();
     if (autoAdvance()) {
         state.isRunning = true;
         startLocalTick();

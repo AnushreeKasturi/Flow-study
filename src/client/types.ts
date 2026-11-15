@@ -5,6 +5,8 @@ export interface TimerState {
     mode: TimerMode; timeLeft: number; isRunning: boolean; duration: number;
     sessionCount: number; durations: Durations;
     autoAdvance?: boolean; // when a block ends, the next one starts by itself
+    version?: number; // counts changes, so an older state never undoes a newer one
+    by?: string; // who made this version (breaks ties between changes made at once)
 }
 export interface Task {
     id: string; room_id: string; title: string; completed: boolean;
@@ -24,7 +26,8 @@ export interface ChatMessage { sender: string; text: string; }
 export type Signal =
     | { type: 'offer'; offer: RTCSessionDescriptionInit }
     | { type: 'answer'; answer: RTCSessionDescriptionInit }
-    | { type: 'candidate'; candidate: RTCIceCandidateInit | null };
+    | { type: 'candidate'; candidate: RTCIceCandidateInit | null }
+    | { type: 'candidates'; candidates: RTCIceCandidateInit[] };
 export interface SignalMessage { from: string; to?: string; signal: Signal; }
 export type RemoteStream = (userId: string, stream: MediaStream) => void;
 export interface SocketHandlers {

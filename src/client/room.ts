@@ -341,13 +341,16 @@ async function enterRoom(roomId: string, roomCode: string) {
     const welcome = (userId: string, data: Participants[string]) => {
         lastHeard[userId] = Date.now();
         // A new face gets a chime; someone returning from a blip does not.
-        if (!partners[userId]) { chime('join'); pushNote(`${data.username || 'Someone'} joined the room.`); }
+        const arriving = !partners[userId];
+        if (arriving) { chime('join'); pushNote(`${data.username || 'Someone'} joined the room.`); }
         cancelLeave(userId);
         partners[userId] = data;
         countPeople();
         updatePartnerUI(userId);
         rerenderTasks(); // the assignee picker lists everyone present
         broadcastCurrentState(); // bring the newcomer's timer in step
+        // Call them now rather than at the next three-second check (the smaller id dials).
+        if (arriving && (getMyUserId() || '') < userId && peerNeedsCall(userId)) callUser(userId, onRemoteStream);
     };
 
     initSocket(roomId, here.username, !isVideoActive(), {

@@ -109,14 +109,18 @@ const connectChannel = () => {
 
     activeChannel.on('presence', { event: 'sync' }, emitRoomState);
 
-    activeChannel.on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        if (key !== myUserId) {
+    // Changing a status (starting the timer, stepping away, raising a hand) re-tracks
+    // presence, which arrives as a "join" for someone already here and then a "leave"
+    // of their old copy. Neither is a real arrival or departure: the sync event updates
+    // their tile. Only a join with no earlier presence, or a leave with none remaining, counts.
+    activeChannel.on('presence', { event: 'join' }, ({ key, currentPresences, newPresences }) => {
+        if (key !== myUserId && !currentPresences?.length) {
             handlers.onUserJoined({ userId: key, ...newPresences[0] });
         }
     });
 
-    activeChannel.on('presence', { event: 'leave' }, ({ key }) => {
-        if (key !== myUserId) {
+    activeChannel.on('presence', { event: 'leave' }, ({ key, currentPresences }) => {
+        if (key !== myUserId && !currentPresences?.length) {
             handlers.onUserLeft(key);
         }
     });
@@ -309,6 +313,10 @@ export const updatePresence = async (_roomId: string | null, status: string, now
     if (!channel) return;
     const state = channel.presenceState<Participant>();
     const myState: Participant = state[myUserId] ? state[myUserId][0] : {};
+    // Task changes call this too, though none of what's sent changed: each re-track is a
+    // presence message to everyone (the free plan allows 20 a second), so skip it.
+    const nextPlaying = nowPlaying !== undefined ? nowPlaying : myState.nowPlaying;
+    if (state[myUserId] && myState.status === status && myState.username === myUsername && (myState.nowPlaying ?? null) === (nextPlaying ?? null)) return;
 
     await trackPresence({
         ...myState,

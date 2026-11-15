@@ -35,6 +35,23 @@ let onRelayUnavailable: (() => void) | undefined;
 export const whenRelayUnavailable = (run: () => void) => { onRelayUnavailable = run; };
 let warnedNoRelay = false;
 
+// Every signal is a database round trip (room_send), and they go out one at a time, so
+// a call's dozen or so candidates used to queue behind each other for a second or more.
+// They're gathered for 100 ms and sent together.
+const outgoingCandidates: Record<string, RTCIceCandidateInit[]> = {};
+const candidateFlush: Record<string, ReturnType<typeof setTimeout>> = {};
+function queueCandidate(userId: string, candidate: RTCIceCandidateInit | null) {
+    if (!candidate) return;
+    (outgoingCandidates[userId] ||= []).push(candidate);
+    if (candidateFlush[userId]) return;
+    candidateFlush[userId] = setTimeout(() => {
+        delete candidateFlush[userId];
+        const batch = outgoingCandidates[userId];
+        delete outgoingCandidates[userId];
+        if (batch?.length) sendSignal(userId, { type: 'candidates', candidates: batch });
+    }, 100);
+}
+
 const serializeCandidate = (candidate: RTCIceCandidate | null) => {
     if (!candidate) return null;
     if (typeof candidate.toJSON === 'function') return candidate.toJSON();
@@ -244,7 +261,7 @@ export const getOrCreatePeerConnection = async (userId: string, onRemoteStream: 
             if (!event.candidate) return;
             // Belt and braces: in relay mode nothing but relay candidates ever leaves this browser.
             if (relayOnly && !/ typ relay/.test(event.candidate.candidate)) return;
-            sendSignal(userId, { type: 'candidate', candidate: serializeCandidate(event.candidate) });
+            queueCandidate(userId, serializeCandidate(event.candidate));
         };
 
         pc.ontrack = (event) => {
@@ -324,13 +341,15 @@ export const handleSignal = async (data: SignalMessage, onRemoteStream: RemoteSt
             if (pc.signalingState !== 'have-local-offer') return;
             await pc.setRemoteDescription(new RTCSessionDescription(signal.answer));
             await flushCandidates(from, pc);
-        } else if (signal.type === 'candidate' && signal.candidate) {
-            candidateCounts[from] = (candidateCounts[from] || 0) + 1;
-            if (candidateCounts[from] > MAX_CANDIDATES_PER_PEER) return;
-            if (pc.remoteDescription) {
-                await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-            } else {
-                candidateQueues[from].push(signal.candidate);
+        } else if (signal.type === 'candidate' || signal.type === 'candidates') {
+            // One candidate (older pages) or a batch of them.
+            const incoming = signal.type === 'candidate' ? [signal.candidate] : Array.isArray(signal.candidates) ? signal.candidates.slice(0, 50) : [];
+            for (const candidate of incoming) {
+                if (!candidate) continue;
+                candidateCounts[from] = (candidateCounts[from] || 0) + 1;
+                if (candidateCounts[from] > MAX_CANDIDATES_PER_PEER) return;
+                if (pc.remoteDescription) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                else candidateQueues[from].push(candidate);
             }
         }
     } catch (err) {

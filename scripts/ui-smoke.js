@@ -331,6 +331,36 @@ async (page) => {
     await page.waitForFunction(() => document.getElementById('video-wrapper-zz-away')?.classList.contains('is-away'));
     await page.evaluate(() => window.__fixture.handlers['broadcast:bye']({ payload: { userId: 'zz-away' } }));
     await page.waitForFunction(() => !document.getElementById('video-wrapper-zz-away'), undefined, { timeout: 10000 });
+    // Two people: changing a status is not leaving, and an older timer state never stops a newer one.
+    await page.evaluate(() => window.__fixture.handlers['presence:join']({ key: 'zz-mia', newPresences: [{ username: 'Mia', isDummyMedia: true }] }));
+    await page.waitForFunction(() => document.getElementById('video-wrapper-zz-mia'));
+    await page.getByRole('button', { name: 'Start timer', exact: true }).click();
+    await page.waitForFunction(() => window.__fixture.calls.some(call => call.action === 'send' && call.value.event === 'timer-updated' && call.value.payload.isRunning === true && Number.isInteger(call.value.payload.version)));
+    const started = await page.evaluate(() => window.__fixture.calls.filter(call => call.action === 'send' && call.value.event === 'timer-updated' && call.value.payload.isRunning === true).at(-1).value.payload);
+    assert(started.version > 0 && typeof started.by === 'string' && started.by.length > 0, 'A timer change carries its version and who made it');
+    // Mia's status changes, so Supabase re-tracks her: a "join" for someone already here, then her old copy "leaves".
+    await page.evaluate(() => {
+        const handlers = window.__fixture.handlers, before = [{ username: 'Mia', isDummyMedia: true }], after = [{ username: 'Mia', isDummyMedia: true, status: 'Deep Focus' }];
+        handlers['presence:join']({ key: 'zz-mia', currentPresences: before, newPresences: after });
+        handlers['presence:leave']({ key: 'zz-mia', currentPresences: after, leftPresences: before });
+    });
+    // Her page answers with the state it had a moment ago: paused, one version behind.
+    await page.evaluate(version => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 1500, isRunning: false, version: version - 1, by: 'zz-mia' } }), started.version);
+    await page.waitForTimeout(1200);
+    assert(await page.locator('#timer-toggle-btn').getAttribute('aria-pressed') === 'true', 'An older timer state must not stop the running timer');
+    assert(!await page.evaluate(() => document.body.textContent.includes('Mia left the room')) && await page.locator('#video-wrapper-zz-mia').count() === 1, 'A status change is not someone leaving');
+    // A time-only correction from the same version: a one-second difference is ignored, a real drift is corrected.
+    const shown = () => page.locator('#time-display').innerText();
+    const before = await shown();
+    await page.evaluate(({ version, by }) => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', timeLeft: 1499, version, by } }), started);
+    assert(Math.abs(Date.parse('1970-01-01T00:' + (await shown())) - Date.parse('1970-01-01T00:' + before)) <= 2000, 'A one-second difference does not make the clock jump');
+    await page.evaluate(({ version, by }) => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', timeLeft: 1200, version, by } }), started);
+    await page.waitForFunction(() => document.getElementById('time-display').textContent.trim().startsWith('20:'));
+    // A newer change from Mia does stop it.
+    await page.evaluate(version => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 1200, isRunning: false, version: version + 1, by: 'zz-mia' } }), started.version);
+    await page.waitForFunction(() => document.getElementById('timer-toggle-btn').getAttribute('aria-pressed') === 'false');
+    await page.evaluate(() => window.__fixture.handlers['broadcast:bye']({ payload: { userId: 'zz-mia' } }));
+    await page.waitForFunction(() => !document.getElementById('video-wrapper-zz-mia'), undefined, { timeout: 10000 });
     assert(await page.locator('#toggle-cam').getAttribute('aria-pressed') === 'false', 'Unavailable camera should display its off state');
     await page.locator('.reactions-menu summary').click();
     for (const name of ['Thumbs up', 'Heart', 'Laugh', 'Celebrate']) await page.getByRole('button', { name, exact: true }).click();
@@ -743,7 +773,8 @@ async (page) => {
                 else queued.push(event.candidate);
             });
             remote.onicecandidate = event => {
-                if (event.candidate) rtc.handleSignal({ from: 'loopback-test', signal: { type: 'candidate', candidate: event.candidate.toJSON() } }, () => {});
+                // Half arrive the old way (one per signal), half as a batch, as from a newer page.
+                if (event.candidate) rtc.handleSignal({ from: 'loopback-test', signal: Math.random() < 0.5 ? { type: 'candidate', candidate: event.candidate.toJSON() } : { type: 'candidates', candidates: [event.candidate.toJSON()] } }, () => {});
             };
             remote.addTransceiver('video', { direction: 'recvonly' });
             remote.addTransceiver('audio', { direction: 'recvonly' });
@@ -760,7 +791,11 @@ async (page) => {
                 local.addEventListener('connectionstatechange', check);
                 check();
             });
-            return { offered, connected: local.connectionState, tracks: received.length, needsCall: rtc.peerNeedsCall('loopback-test'), turnFallbackMs };
+            await new Promise(resolve => setTimeout(resolve, 300)); // the last batch of candidates goes out
+            const sent = window.__fixture.calls.filter(call => call.value?.payload?.to === 'loopback-test').map(call => call.value.payload.signal);
+            const batches = sent.filter(signal => signal.type === 'candidates');
+            return { offered, connected: local.connectionState, tracks: received.length, needsCall: rtc.peerNeedsCall('loopback-test'), turnFallbackMs,
+                batched: batches.length > 0 && !sent.some(signal => signal.type === 'candidate') && batches.reduce((n, b) => n + b.candidates.length, 0) > batches.length - 1 };
         } finally {
             remote?.close();
             rtc.removePeer('loopback-test');
@@ -770,6 +805,7 @@ async (page) => {
         }
     });
     assert(rtcResult.offered && rtcResult.connected === 'connected' && rtcResult.tracks === 2 && !rtcResult.needsCall, 'Local WebRTC must negotiate and deliver audio/video tracks');
+    assert(rtcResult.batched, 'Connection candidates go out in batches, not one database message each');
     assert(rtcResult.turnFallbackMs >= 4500 && rtcResult.turnFallbackMs < 10000, 'A stalled TURN provider must not block connection setup indefinitely');
 
     // 16 simulated participants exercise tile creation and name handling.
