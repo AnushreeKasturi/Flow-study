@@ -605,6 +605,8 @@ function bindRoomControls() {
         requestAnimationFrame(() => inviteInput.select());
     });
     on('invite-empty-btn', () => byId<HTMLButtonElement>('share-link-btn').click());
+    // The first-session checklist can be put away for good.
+    on('skip-guidance', () => { localStorage.setItem('flow_first_session', 'done'); byId<HTMLElement>('room-guidance').classList.add('hidden'); });
     on('header-room-code', async () => {
         try {
             await navigator.clipboard.writeText(here.code);

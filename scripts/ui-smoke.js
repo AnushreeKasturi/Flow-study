@@ -152,6 +152,9 @@ async (page) => {
     await visible('#room-guidance');
     await page.getByRole('button', { name: 'Start timer', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('[data-check="timer"]').classList.contains('done'));
+    // Skip puts the checklist away for good.
+    await page.getByRole('button', { name: 'Skip', exact: true }).click();
+    assert(await page.locator('#room-guidance').isHidden() && await page.evaluate(() => localStorage.getItem('flow_first_session')) === 'done', 'Skip hides the first-session checklist and remembers it');
     await page.getByRole('button', { name: 'Leave', exact: true }).click();
     await page.getByRole('button', { name: 'Step away', exact: true }).click();
     await visible('#join-modal');
