@@ -37,7 +37,7 @@ async function main() {
     // Exact source in each directive Turnstile needs (its script, and the iframe it draws), not a substring of the header.
     const sources = name => (csp.split(';').map(d => d.trim().split(/\s+/)).find(([n]) => n === name) || []).slice(1);
     const TURNSTILE = 'https://challenges.cloudflare.com';
-    if (config.captchaSiteKey) check(['script-src', 'frame-src'].every(d => sources(d).includes(TURNSTILE)), 'The Content-Security-Policy lets the captcha load');
+    if (config.captchaSiteKey) check(['script-src', 'frame-src'].every(d => sources(d).some(source => source === TURNSTILE)), 'The Content-Security-Policy lets the captcha load');
 
     // The database: the public board is readable, everything else is closed to signed-out visitors.
     const read = (table, columns = '*') => get(`${config.url}/rest/v1/${table}?select=${columns}&limit=1`, { headers });
