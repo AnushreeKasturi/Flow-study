@@ -9,6 +9,7 @@ import { showLoader, hideLoader, leaveWithLoader } from './loader';
 import { playSound, stopSound, setSoundVolume, type Sound } from './modules/soundscape';
 import { bindSocialButtons, rememberInvite } from './modules/sign-in';
 import { looksLikeEmail, suggestEmail } from './modules/email-check';
+import { captchaToken, prepCaptcha, isCaptchaError, CAPTCHA_MSG } from './modules/captcha';
 
 // Read the session before building the steps: someone signed in skips the account step.
 const signedIn = await loadUser();
@@ -51,6 +52,8 @@ function show(to: number) {
     document.querySelectorAll('[data-name]').forEach(el => { el.textContent = firstName() ? ', ' + firstName() : ''; });
     setSun(step === 'length' ? sunForMinutes(Number(lengthInput.value)) : SUN_REST[step]);
     if (step !== 'sound') { stopSound(); document.body.classList.remove('sounding'); }
+    // The captcha only loads for someone about to make an account.
+    if (step === 'account') prepCaptcha();
     say('');
     document.querySelector<HTMLElement>(`.step[data-step="${step}"] :is(input, button[aria-pressed="true"])`)?.focus({ preventScroll: true });
     window.scrollTo(0, 0);
@@ -140,7 +143,8 @@ async function createAccount() {
     if (password.length < 8) return say('Use a password with at least 8 characters.');
     rememberInvite();
     // The verification email links to /verify.html, which finishes the sign-up (see emails/).
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + '/verify.html' } });
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + '/verify.html', captchaToken: await captchaToken() } });
+    if (isCaptchaError(error)) return say(CAPTCHA_MSG);
     const taken = /already registered|already exists|user already/i.test(error?.message ?? '') || (data?.user && data.user.identities?.length === 0);
     if (taken) return say('An account with this email already exists. Use “Log in” at the top instead.');
     if (error) return say(error.message);

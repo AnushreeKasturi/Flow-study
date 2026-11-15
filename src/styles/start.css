@@ -37,6 +37,7 @@
 .account-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
 .account-fields label { margin-bottom: 8px; }
 .account-fields .input { padding: 14px; }
+.step .captcha.shown { margin-top: 16px; }
 #start-message { margin-top: 20px; }
 #start-message.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
 

@@ -1,6 +1,22 @@
 // In-browser stand-in for the Supabase SDK. Used by the browser tests and by
 // `npm run dev:demo`, which runs the whole app offline with one fake account.
 // It is never part of a production build.
+
+// Cloudflare Turnstile stand-in: hands out single-use tokens. With sessionStorage
+// 'captcha-fail' set, the check fails, as when Cloudflare is blocked or offline.
+window.turnstile = { issued: [], used: [],
+    render(box, options) { this.options = options; this.issue(); return 'widget'; },
+    reset() { this.issue(); },
+    issue() {
+        setTimeout(() => {
+            if (sessionStorage.getItem('captcha-fail')) return this.options['error-callback']();
+            const token = 'captcha-' + (this.issued.length + 1);
+            this.issued.push(token);
+            this.options.callback(token);
+        }, 10);
+    }
+};
+
 window.supabase = { createClient() {
         const user = { id: 'test-user', email: 'alex@example.com' };
         // ?fresh starts without a saved name, to show first-run setup.
@@ -16,7 +32,15 @@ window.supabase = { createClient() {
                 { id: 'plan-2', host_id: 'kai', host_name: 'Kai', topic: 'Spanish conversation practice', subject: 'languages', camera: 'on', vibe: 'chatty', seats: 4, going: 1, base: 1, starts_at: new Date(Date.now() + 26 * 3600000).toISOString() }
             ] : [],
             planned_group_members: [], reports: [] };
-        const fixture = window.__fixture = { tables, calls: [], delay: 0, fail: null, authFailure: false, collision: false, rpcError: null, channelCount: 0, handlers: {} };
+        const fixture = window.__fixture = { tables, calls: [], tokens: [], captcha: true, captchaReject: false, delay: 0, fail: null, authFailure: false, collision: false, rpcError: null, channelCount: 0, handlers: {} };
+        // The captcha as Supabase checks it once switched on: each request needs a token never used before.
+        function refused(options) {
+            const token = options?.captchaToken, turnstile = window.turnstile;
+            fixture.tokens.push(token);
+            if (!fixture.captcha) return null;
+            if (!fixture.captchaReject && turnstile.issued.includes(token) && !turnstile.used.includes(token)) { turnstile.used.push(token); return null; }
+            return { data: { user: null, session: null }, error: { code: 'captcha_failed', message: 'captcha protection: request disallowed (no captcha_token found)' } };
+        }
         async function authResult() {
             fixture.calls.push({ action: 'auth' });
             await new Promise(resolve => setTimeout(resolve, fixture.delay));
@@ -103,14 +127,16 @@ window.supabase = { createClient() {
                 return { data: fixture.rpcError ? null : name === 'join_open_room' ? 'FOCUS6' : 'test-room', error: fixture.rpcError ? { message: fixture.rpcError } : null };
             },
             auth: {
-                signInWithPassword: authResult,
+                signInWithPassword: async ({ options }) => refused(options) ?? authResult(),
                 // With "Confirm email" on, signing up makes no session until the link is opened.
                 signUp: async (args) => {
+                    const no = refused(args.options);
+                    if (no) return no;
                     if (!fixture.requireConfirm) return authResult();
                     fixture.calls.push({ action: 'signup', redirectTo: args.options?.emailRedirectTo });
                     return { data: { user: { ...user, identities: [{}] }, session: null }, error: null };
                 },
-                resend: async ({ email }) => { fixture.calls.push({ action: 'resend', email }); return { data: {}, error: null }; },
+                resend: async ({ email, options }) => { fixture.calls.push({ action: 'resend', email }); return refused(options) ?? { data: {}, error: null }; },
                 // The link in the email: a good token signs the person in, a used or old one doesn't.
                 verifyOtp: async ({ token_hash, type }) => {
                     fixture.calls.push({ action: 'verify', token_hash, type });
@@ -123,6 +149,8 @@ window.supabase = { createClient() {
                 resetPasswordForEmail: async (email, options) => {
                     fixture.calls.push({ action: 'reset', email, redirectTo: options?.redirectTo });
                     if (fixture.authFailure) throw new Error('Network unavailable');
+                    const no = refused(options);
+                    if (no) return no;
                     return { data: {}, error: fixture.resetError ? { message: fixture.resetError } : null };
                 },
                 updateUser: async (attributes) => {

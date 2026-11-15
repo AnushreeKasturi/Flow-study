@@ -13,6 +13,7 @@ import supabase from './modules/supabase';
 import { completeSignIn } from './modules/sign-in';
 import { markSignedOut } from './modules/session';
 import { looksLikeEmail, suggestEmail } from './modules/email-check';
+import { captchaToken, prepCaptcha, isCaptchaError, CAPTCHA_MSG } from './modules/captcha';
 
 type State = 'sent' | 'confirm' | 'checking' | 'done' | 'failed' | 'forgot' | 'reset-sent' | 'reset' | 'new-pw' | 'changed';
 const status = byId<HTMLElement>('verify-status');
@@ -25,12 +26,13 @@ let cooldown: ReturnType<typeof setInterval> | undefined;
 async function resend(email: string, button: HTMLButtonElement, kind: 'signup' | 'reset' = 'signup') {
     button.disabled = true;
     const back = location.origin + '/verify.html';
+    const token = await captchaToken();
     const { error } = await (kind === 'reset'
-        ? supabase.auth.resetPasswordForEmail(email, { redirectTo: back })
-        : supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: back } })
+        ? supabase.auth.resetPasswordForEmail(email, { redirectTo: back, captchaToken: token })
+        : supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: back, captchaToken: token } })
     ).catch(() => ({ error: { message: 'unreachable' } }));
     if (error) {
-        status.textContent = /rate|seconds|many/i.test(error.message) ? 'A link was sent a moment ago. Give it a minute, then try again.' : 'The email could not be sent just now. Try again in a minute.';
+        status.textContent = isCaptchaError(error) ? CAPTCHA_MSG : /rate|seconds|many/i.test(error.message) ? 'A link was sent a moment ago. Give it a minute, then try again.' : 'The email could not be sent just now. Try again in a minute.';
         button.disabled = false;
         return false;
     }
@@ -98,6 +100,7 @@ if (tokenHash && params.get('type') === 'recovery') {
 else if (params.has('forgot')) {
     try { forgotEmail.value = sessionStorage.getItem('flow_reset_email') ?? ''; } catch { /* typed again instead */ }
     show('forgot');
+    prepCaptcha();
 }
 else if (tokenHash) {
     // The token is single-use: out of the address at once, and used only on a tap.
@@ -106,10 +109,11 @@ else if (tokenHash) {
     show('confirm');
     byId<HTMLButtonElement>('verify-confirm').addEventListener('click', () => confirm(tokenHash, type));
 }
-else if (params.has('error') || params.has('error_description') || !pendingEmail()) show('failed');
+else if (params.has('error') || params.has('error_description') || !pendingEmail()) { show('failed'); prepCaptcha(); }
 else {
     byId<HTMLElement>('verify-email').textContent = pendingEmail()!;
     show('sent');
+    prepCaptcha();
 }
 
 byId<HTMLButtonElement>('verify-resend').addEventListener('click', event => {

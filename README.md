@@ -67,6 +67,7 @@ The Supabase project URL and **public publishable key** live in [`supabase.confi
 | `PORT` | HTTP port; defaults to `3000` |
 | `GROQ_API_KEY` | Optional; enables `/api/ai` for study-assistant questions |
 | `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Optional; override `supabase.config.json` at build time and on the server |
+| `PUBLIC_TURNSTILE_SITE_KEY` | Optional; overrides `captchaSiteKey` in `supabase.config.json` at build time (see the captcha, below) |
 | `TWILIO_ACCOUNT_SID` | Optional; used with the auth token to obtain TURN credentials |
 | `TWILIO_AUTH_TOKEN` | Optional; server-side Twilio credential |
 
@@ -80,6 +81,14 @@ Both auth emails link to Flow's own `/verify.html`, not to Supabase's page. In *
 
 - **Confirm signup:** [`emails/confirm-signup.html`](emails/confirm-signup.html)
 - **Reset password:** [`emails/reset-password.html`](emails/reset-password.html). "Forgot password?" on the login page sends it; its link (`type=recovery`) opens `/verify.html`, which asks for one tap and then a new password.
+
+**The captcha.** Supabase sends every auth email under one project-wide hourly limit, so sign-up, log-in, resending a link, and password reset pass a [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) token (`src/client/modules/captcha.ts`). It is off until a site key is set, and the order matters, because once Supabase checks tokens it refuses every request without one:
+
+1. In Cloudflare → Turnstile, add a widget for your domain (Managed mode). The site key is public; the secret key is not.
+2. Put the site key in `captchaSiteKey` in [`supabase.config.json`](supabase.config.json) (or `PUBLIC_TURNSTILE_SITE_KEY`), and deploy.
+3. Only then, in Supabase → Authentication → Attack Protection, turn on captcha protection with Turnstile and paste the **secret** key.
+
+`npm run check:live` reports the captcha being on in Supabase while the site has no key.
 
 For a **new, empty database**, run these files in order in the Supabase SQL editor:
 
@@ -114,7 +123,7 @@ Generation uses the local Bricolage Grotesque font and the committed [lake artwo
 
 ## Architecture
 
-Astro generates six static pages: the landing page (`/`), setup (`/start.html`), sign-in (`/login.html`), the room (`/room.html`), the study-groups board (`/groups.html`), and docs (`/docs.html`). Strict TypeScript powers the room, Vite bundles and fingerprints everything into `dist/_astro`, and fonts are self-hosted, so the only third-party requests are to Supabase, plus YouTube or Spotify when a player is requested and GitHub for the landing page's star count. No client framework runtime is needed.
+Astro generates six static pages: the landing page (`/`), setup (`/start.html`), sign-in (`/login.html`), the room (`/room.html`), the study-groups board (`/groups.html`), and docs (`/docs.html`). Strict TypeScript powers the room, Vite bundles and fingerprints everything into `dist/_astro`, and fonts are self-hosted, so the only third-party requests are to Supabase, plus YouTube or Spotify when a player is requested, GitHub for the landing page's star count, and Cloudflare Turnstile (the captcha) on the sign-up, log-in, and email pages once a site key is set. No client framework runtime is needed.
 
 | Location | Responsibility |
 | --- | --- |

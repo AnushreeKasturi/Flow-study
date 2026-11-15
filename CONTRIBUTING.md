@@ -63,6 +63,7 @@ Merging to `main` deploys flow-study.me. Some of what the site needs lives outsi
 - *A new `sql/` file:* run it in the Supabase SQL editor **before** merging the code that uses it, in number order. Then add a check for it to `scripts/check-live.cjs` (it currently looks for `rooms.timer`, from 017).
 - *A sign-in provider:* switch it on in Supabase (Authentication → Sign In / Providers) first, then add it to `oauthProviders` in `supabase.config.json`.
 - *Auth emails or redirects:* Supabase → Authentication → URL Configuration must have **Site URL** `https://flow-study.me` (never localhost) and redirect URLs for `/login.html` and `/verify.html`. The templates in `emails/` (Confirm signup, Reset password) are pasted into Authentication → Emails → Templates; paste one again whenever it changes. Without them, Supabase's default emails link to its own page and `/verify.html` can't use them.
+- *The captcha:* put the Turnstile site key in `captchaSiteKey` (`supabase.config.json`) and let it deploy **before** turning on captcha protection in Supabase (Authentication → Attack Protection, with the secret key). The other way round, every sign-up, log-in, and auth email is refused until the deploy lands. To turn it off, reverse the order. See the README.
 - *Password rules:* Authentication → Sign In / Providers → Email keeps **Minimum password length** at 8 (what the site asks for) and **Require current password when updating** off, since a password reset has no current password to give.
 
 **After it deploys**

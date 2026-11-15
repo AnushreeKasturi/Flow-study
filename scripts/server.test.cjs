@@ -107,13 +107,13 @@ test('HTTP boundaries and bounded local concurrency', async t => {
         assert.equal(png.readUInt32BE(20), 630);
     });
     await t.test('pages carry security headers and never ship the offline demo backend', async () => {
-        for (const path of ['/', '/start.html', '/login.html', '/room.html', '/groups.html', '/docs.html']) {
+        for (const path of ['/', '/start.html', '/login.html', '/room.html', '/groups.html', '/docs.html', '/verify.html']) {
             const response = await fetch(origin + path);
             assert.match(response.headers.get('content-security-policy'), /frame-ancestors 'none'/, path);
             assert.equal(response.headers.get('x-content-type-options'), 'nosniff', path);
             assert.equal(response.headers.get('x-powered-by'), null, path);
             const policy = response.headers.get('content-security-policy');
-            assert.match(policy, /script-src 'self';/, path + ': scripts from this site only');
+            assert.match(policy, /script-src 'self' https:\/\/challenges\.cloudflare\.com;/, path + ': scripts from this site, and the captcha (Cloudflare Turnstile) only');
             assert.equal(response.headers.get('x-frame-options'), 'DENY', path);
             const html = await response.text();
             assert.doesNotMatch(html, /__fixture/, path);

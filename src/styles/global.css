@@ -100,6 +100,8 @@ button:disabled { cursor: wait; opacity: .6; }
 svg { flex-shrink: 0; }
 ::selection { background: var(--primary); color: var(--on-primary); }
 label { display: block; font-size: .85rem; color: var(--text-2); }
+/* The captcha (modules/captcha.ts): takes space only when Cloudflare asks for a tap. */
+.captcha.shown { display: flex; justify-content: center; margin-bottom: 14px; }
 .hidden, [hidden] { display: none !important; }
 .muted { color: var(--text-3); }
 

@@ -184,6 +184,8 @@ async (page) => {
     const sentReset = (await resetCalls()).at(-1);
     assert(await page.locator('#reset-to').innerText() === 'alex@example.com' && sentReset.email === 'alex@example.com' && sentReset.redirectTo === origin + '/verify.html', 'The reset says where the link went, and the link comes back to Flow');
     assert(await page.locator('#reset-again').isDisabled() && (await resetStatus()).startsWith('Sent.'), 'Sending again waits a minute');
+    const resetTokens = await page.evaluate(() => window.__fixture.tokens);
+    assert(resetTokens.length === 2 && resetTokens.every(token => token?.startsWith('captcha-')) && resetTokens[0] !== resetTokens[1], 'Each reset request sends a fresh captcha token');
     await page.screenshot({ path: 'output/playwright/reset-sent.png' });
     await page.getByRole('button', { name: 'use another email', exact: true }).click();
     await page.getByRole('heading', { name: 'Reset your password.' }).waitFor();
@@ -254,6 +256,26 @@ async (page) => {
     await page.getByRole('button', { name: 'Log in', exact: true }).click();
     await page.locator('#error-message').waitFor({ state: 'visible' });
     assert(!(await page.locator('#login-btn').isDisabled()), 'Login must recover after network failure');
+    // The captcha (on in the fixture, as in Supabase): every request carries a token of its own,
+    // and a refused or missing check says so and can be tried again.
+    await page.evaluate(() => { window.__fixture.authFailure = false; window.__fixture.captchaReject = true; });
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
+    await page.waitForFunction(() => document.getElementById('error-message').textContent.includes('security check'));
+    assert(await page.locator('#login-btn').isEnabled(), 'A refused captcha can be tried again');
+    const loginTokens = await page.evaluate(() => window.__fixture.tokens);
+    assert(loginTokens.length === 2 && loginTokens.every(token => token?.startsWith('captcha-')) && loginTokens[0] !== loginTokens[1], 'Each log-in attempt sends a fresh captcha token');
+    await page.screenshot({ path: 'output/playwright/captcha-refused.png' });
+    await page.evaluate(() => sessionStorage.setItem('captcha-fail', '1'));
+    await page.reload();
+    await page.getByLabel('Email address').fill('alex@example.com');
+    await page.getByLabel('Password', { exact: true }).fill('test-password');
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
+    await page.waitForFunction(() => document.getElementById('error-message').textContent.includes('security check'));
+    assert(await page.evaluate(() => window.__fixture.tokens.length === 1 && window.__fixture.tokens[0] === undefined), 'A captcha that could not run sends no token, and says so');
+    await page.evaluate(() => sessionStorage.removeItem('captcha-fail'));
+    await page.reload();
+    await page.getByLabel('Email address').fill('alex@example.com');
+    await page.getByLabel('Password', { exact: true }).fill('test-password');
     await page.evaluate(() => { window.__fixture.authFailure = false; window.__fixture.delay = 150; });
     await page.getByLabel('Password', { exact: true }).press('Enter');
     await page.waitForURL(origin + '/room.html');

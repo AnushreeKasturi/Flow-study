@@ -4,6 +4,7 @@ import { markSignedIn } from './modules/session';
 import { leaveWithLoader } from './loader';
 import supabase from './modules/supabase';
 import { bindSocialButtons, finishOAuth, rememberInvite } from './modules/sign-in';
+import { captchaToken, prepCaptcha, isCaptchaError, CAPTCHA_MSG } from './modules/captcha';
 
 // DOM Elements
 const emailInput = byId<HTMLInputElement>('email-input');
@@ -63,7 +64,8 @@ const logIn = async () => {
     authBusy = loginBtn.disabled = true;
     loginBtn.innerText = 'Logging in…';
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: await captchaToken() } });
+        if (isCaptchaError(error)) { showError(CAPTCHA_MSG); return; }
         if (error && /confirm|verif/i.test(error.message)) {
             // Not confirmed yet: offer the inbox page, which can send the link again.
             showError('Confirm your email first: open the link we sent you. ');
@@ -108,6 +110,8 @@ byId<HTMLButtonElement>('toggle-password').addEventListener('click', event => {
     (event.currentTarget as HTMLButtonElement).setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
     (event.currentTarget as HTMLButtonElement).setAttribute('aria-pressed', String(visible));
 });
+
+prepCaptcha();
 
 // GitHub and Google: start from the buttons, and finish here when the provider sends us back.
 bindSocialButtons(showError);
