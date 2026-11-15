@@ -345,19 +345,25 @@ async (page) => {
         handlers['presence:leave']({ key: 'zz-mia', currentPresences: after, leftPresences: before });
     });
     // Her page answers with the state it had a moment ago: paused, one version behind.
-    await page.evaluate(version => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 1500, isRunning: false, version: version - 1, by: 'zz-mia' } }), started.version);
+    await page.evaluate(version => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 1500, isRunning: false, version: version - 1, from: 'zz-mia' } }), started.version);
     await page.waitForTimeout(1200);
     assert(await page.locator('#timer-toggle-btn').getAttribute('aria-pressed') === 'true', 'An older timer state must not stop the running timer');
     assert(!await page.evaluate(() => document.body.textContent.includes('Mia left the room')) && await page.locator('#video-wrapper-zz-mia').count() === 1, 'A status change is not someone leaving');
     // A time-only correction from the same version: a one-second difference is ignored, a real drift is corrected.
     const shown = () => page.locator('#time-display').innerText();
     const before = await shown();
-    await page.evaluate(({ version, by }) => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', timeLeft: 1499, version, by } }), started);
+    await page.evaluate(({ version, by }) => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', timeLeft: 1499, version, from: by } }), started);
     assert(Math.abs(Date.parse('1970-01-01T00:' + (await shown())) - Date.parse('1970-01-01T00:' + before)) <= 2000, 'A one-second difference does not make the clock jump');
-    await page.evaluate(({ version, by }) => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', timeLeft: 1200, version, by } }), started);
+    await page.evaluate(({ version, by }) => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', timeLeft: 1200, version, from: by } }), started);
     await page.waitForFunction(() => document.getElementById('time-display').textContent.trim().startsWith('20:'));
+    // A huge jump in version is refused (it would lock the timer against every later change),
+    // and a forged author is ignored: `by` comes from the database-stamped sender.
+    await page.evaluate(version => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 1500, isRunning: false, version: version + 1000000, from: 'zz-mia' } }), started.version);
+    await page.evaluate(({ version, by }) => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', timeLeft: 600, version, by, from: 'zz-mia' } }), started);
+    await page.waitForTimeout(800);
+    assert(await page.locator('#timer-toggle-btn').getAttribute('aria-pressed') === 'true' && /^(19|20):/.test(await page.locator('#time-display').innerText()), 'A huge version jump or a forged author changes nothing');
     // A newer change from Mia does stop it.
-    await page.evaluate(version => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 1200, isRunning: false, version: version + 1, by: 'zz-mia' } }), started.version);
+    await page.evaluate(version => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1500, timeLeft: 1200, isRunning: false, version: version + 1, from: 'zz-mia' } }), started.version);
     await page.waitForFunction(() => document.getElementById('timer-toggle-btn').getAttribute('aria-pressed') === 'false');
     await page.evaluate(() => window.__fixture.handlers['broadcast:bye']({ payload: { userId: 'zz-mia' } }));
     await page.waitForFunction(() => !document.getElementById('video-wrapper-zz-mia'), undefined, { timeout: 10000 });

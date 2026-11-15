@@ -39,7 +39,7 @@ export const initTimer = (rId: string, uiCallback: (state: TimerState) => void) 
     renderTimer();
 };
 
-export const syncState = (newState: Partial<TimerState>) => {
+export const syncState = (newState: Partial<TimerState> & { from?: unknown }) => {
     if (!newState || typeof newState !== 'object') return;
     if (newState.mode !== undefined && !Object.hasOwn(MODES, newState.mode)) return;
     if (newState.timeLeft !== undefined && (!Number.isInteger(newState.timeLeft) || newState.timeLeft < 0 || newState.timeLeft > 7200)) return;
@@ -48,8 +48,14 @@ export const syncState = (newState: Partial<TimerState>) => {
     if (newState.isRunning !== undefined && typeof newState.isRunning !== 'boolean') return;
     if (newState.sessionCount !== undefined && (!Number.isInteger(newState.sessionCount) || newState.sessionCount < 0 || newState.sessionCount > 10000)) return;
     if (newState.autoAdvance !== undefined && typeof newState.autoAdvance !== 'boolean') return;
-    if (newState.version !== undefined && (!Number.isInteger(newState.version) || newState.version < 0 || newState.version > 1e9)) return;
-    if (newState.by !== undefined && (typeof newState.by !== 'string' || newState.by.length > 64)) return;
+    if (newState.version !== undefined && (!Number.isInteger(newState.version) || newState.version < 0 || newState.version > Number.MAX_SAFE_INTEGER)) return;
+    // A page already in step only moves forward a little at a time, so nobody can send a huge
+    // version that later honest changes could never beat. A page that has just arrived (version 0)
+    // takes the room's version as it is.
+    if (newState.version !== undefined && (state.version ?? 0) > 0 && newState.version > (state.version ?? 0) + 1000) return;
+    // Who made it is who sent it: the database stamps `from` with the signed-in account
+    // (room_send); a `by` written into the message is never trusted.
+    newState.by = typeof newState.from === 'string' ? newState.from.slice(0, 64) : '';
     // Messages can arrive out of order, and everyone in a room sends the state they have to
     // someone who arrives. Only a newer version is taken; at the same version the same author's
     // clock may correct a drift. (A state with no version comes from an older page: as before.)
