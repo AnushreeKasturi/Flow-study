@@ -53,6 +53,7 @@ export interface SocketHandlers {
 }
 export interface ProfileStats {
     savedTotalSeconds: number; savedTodaySeconds: number; weekSeconds: number[]; persistedIds: string[];
+    daySeconds: Record<string, number>; // saved focus per local day (YYYY-MM-DD)
     streak: number; sessionsCompleted: number; tasksCompleted: number;
     totalMinutes: number; todayMinutes: number; liveMinutes: number;
 }
@@ -89,6 +90,7 @@ export interface Database {
             release_host: { Args: { p_room: string }; Returns: undefined };
             room_checkin: { Args: { p_room: string; p_seats_taken: number; p_timer_mode: string | null; p_timer_ends_at: string | null }; Returns: boolean };
             lists_room: { Args: { p_room: string }; Returns: boolean };
+            focus_days: { Args: { p_tz: string }; Returns: { day: string; seconds: number; completed: number }[] };
         };
         Enums: Record<string, never>;
         CompositeTypes: Record<string, never>;

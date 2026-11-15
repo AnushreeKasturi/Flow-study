@@ -123,6 +123,18 @@ window.supabase = { createClient() {
                 if (name === 'release_host') { if (room.acting_host === user.id) room.acting_host = null; return { data: null, error: null }; }
                 if (name === 'room_checkin') return { data: !!room.host_away && room.acting_host === user.id, error: null };
                 if (name === 'lists_room') return { data: tables.open_rooms.some(row => row.host_id === user.id), error: null };
+                // Focus per local day (sql/019), added up like the database does.
+                if (name === 'focus_days') {
+                    const days = {};
+                    for (const row of tables.sessions.filter(row => row.user_id === user.id)) {
+                        const at = new Date(row.completed_at || Date.now());
+                        const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+                        days[day] ??= { day, seconds: 0, completed: 0 };
+                        days[day].seconds += row.duration_seconds;
+                        if (row.mode === 'focus') days[day].completed++;
+                    }
+                    return { data: Object.values(days), error: null };
+                }
                 // join_room answers with a room id; join_open_room with the room's code.
                 return { data: fixture.rpcError ? null : name === 'join_open_room' ? 'FOCUS6' : 'test-room', error: fixture.rpcError ? { message: fixture.rpcError } : null };
             },

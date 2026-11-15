@@ -4,13 +4,38 @@ import { byId, on } from '../dom';
 import { setMarkup } from '../modules/markup';
 import { notify, openModal, closeModal } from '../modules/feedback';
 import { formatFocusTime, updatePresence } from '../modules/presence';
-import { getStats as getProfileStats, saveDisplayName, withLiveFocus } from '../modules/profile';
+import { getStats as getProfileStats, saveDisplayName, withLiveFocus, dayKey } from '../modules/profile';
 import { getMyUserId, updateMyUsername } from '../modules/socket';
 import * as UI from '../modules/ui';
 import { refreshBoard } from './hosting';
 import { here } from './state';
 
 // Seven days of focus as small bars, oldest first; today includes time still in progress.
+// A year of focus, one square per day, like GitHub's contribution graph: weeks run left to
+// right (Sunday on top), and the shade says how long you focused that day. Today includes time
+// still running. Only numbers and dates go into the markup.
+const LEVELS = [0, 1, 30, 60, 120]; // minutes: none, a little, half an hour, an hour, two hours+
+export function heatmap(stats: ProfileStats) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setDate(start.getDate() - 52 * 7 - today.getDay());
+    const month = new Intl.DateTimeFormat(undefined, { month: 'short' });
+    const label = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    let cells = '', months = '', lastMonth = -1, focusedDays = 0, totalMinutes = 0, longest = 0, run = 0;
+    for (let day = new Date(start), index = 0; day <= today; day.setDate(day.getDate() + 1), index++) {
+        const column = Math.floor(index / 7) + 1;
+        const minutes = day.getTime() === today.getTime() ? stats.todayMinutes : Math.floor((stats.daySeconds[dayKey(day)] || 0) / 60);
+        const level = LEVELS.filter(threshold => minutes >= threshold).length - 1;
+        if (day.getDay() === 0 && day.getMonth() !== lastMonth) { lastMonth = day.getMonth(); months += `<span style="grid-column:${column}">${month.format(day)}</span>`; }
+        if (minutes > 0) { focusedDays++; totalMinutes += minutes; run++; longest = Math.max(longest, run); } else run = 0;
+        cells += `<i class="l${level}" style="grid-column:${column};grid-row:${day.getDay() + 2}" title="${label.format(day)}: ${minutes ? formatFocusTime(minutes) : 'no focus'}"></i>`;
+    }
+    const summary = `${formatFocusTime(totalMinutes)} over ${focusedDays} day${focusedDays === 1 ? '' : 's'} in the last year. Longest streak: ${longest} day${longest === 1 ? '' : 's'}.`;
+    return `<figure class="heatmap"><div class="heatmap-grid" role="img" aria-label="Focus each day for the last year. ${summary}">${months}${cells}</div>` +
+        `<figcaption><span>${summary}</span><span class="heatmap-key" aria-hidden="true">Less <i class="l0"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i> More</span></figcaption></figure>`;
+}
+
 export function weekChart(stats: ProfileStats) {
     const minutes = stats.weekSeconds.map((seconds, index) => index === 6 ? stats.todayMinutes : Math.floor(seconds / 60));
     const peak = Math.max(...minutes, 1);
@@ -34,7 +59,7 @@ function renderProfileStats(stats: ProfileStats) {
         ['Completed tasks', stats.tasksCompleted]
     ];
     const markup = `<div class="focus-summary"><div><span>Focused today</span><strong id="profile-today-value">${formatFocusTime(stats.todayMinutes)}</strong><p>${note}</p></div>${week}</div>` +
-        `<dl class="profile-stat-list">${rows.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>`;
+        `<dl class="profile-stat-list">${rows.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>` + heatmap(stats);
     const container = byId<HTMLElement>('profile-stats');
     if (container.innerHTML !== markup) setMarkup(container, markup);
 }

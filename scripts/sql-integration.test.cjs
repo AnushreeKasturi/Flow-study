@@ -378,6 +378,19 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             run(database, `UPDATE public.rooms SET acting_seen = now() - interval '2 minutes' WHERE id = '${otherRoom}';`);
             assert.throws(() => timerFrom(two), /Command failed/, 'A stand-in who has gone quiet no longer runs it');
             assert.equal(asUser(two, `SELECT public.runs_timer('${otherRoom}');`), 'f');
+
+            // 019: focus per day, added up in the database, in the person's timezone, only their own.
+            run(database, readFileSync('sql/019_focus_days.sql', 'utf8'));
+            run(database, readFileSync('sql/019_focus_days.sql', 'utf8'));
+            run(database, `DELETE FROM public.sessions WHERE user_id = '${two}';
+                INSERT INTO public.sessions(room_id,user_id,mode,duration_seconds,completed_at) VALUES
+                ('${room}','${two}','focus',1500,'2026-03-01 10:00+00'), ('${room}','${two}','focus-partial',300,'2026-03-01 23:30+00'),
+                ('${room}','${two}','focus',1500,'2026-03-02 08:00+00'), ('${room}','${one}','focus',999,'2026-03-01 10:00+00');`);
+            const days = tz => asUser(two, `SELECT string_agg(day || ':' || seconds || ':' || completed, ' ' ORDER BY day) FROM public.focus_days('${tz}');`);
+            assert.equal(days('UTC'), '2026-03-01:1800:1 2026-03-02:1500:1', 'Per day, only my own sessions; completed counts only finished blocks');
+            assert.equal(days('Asia/Kolkata'), '2026-03-01:1500:1 2026-03-02:1800:1', 'Days follow my timezone (23:30 UTC is the next morning in India)');
+            assert.equal(days('Not/AZone'), '2026-03-01:1800:1 2026-03-02:1500:1', 'An unknown timezone falls back to UTC');
+            assert.throws(() => run(database, "SET ROLE anon; SELECT * FROM public.focus_days('UTC');"), /Command failed/, 'Signed-out visitors cannot call it');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

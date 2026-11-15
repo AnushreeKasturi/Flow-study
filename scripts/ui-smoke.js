@@ -286,7 +286,7 @@ async (page) => {
     await page.screenshot({ path: 'output/playwright/after-lobby-desktop.png' });
     await page.getByRole('button', { name: 'Join room', exact: true }).click();
     await visible('#lobby-error');
-    assert(await page.evaluate(() => window.__fixture.calls.filter(call => call.action === 'rpc').length) === 0, 'Invalid room code must not call the backend');
+    assert(await page.evaluate(() => window.__fixture.calls.filter(call => call.action === 'rpc' && call.name.startsWith('join')).length) === 0, 'Invalid room code must not call the backend');
     await page.getByLabel('Room code', { exact: true }).fill('FOCUS6');
     await page.evaluate(() => { window.__fixture.rpcError = 'Incorrect PIN'; });
     await page.getByRole('button', { name: 'Join room', exact: true }).click();
@@ -593,9 +593,24 @@ async (page) => {
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     assert((await page.locator('#chat-messages').innerText()).includes('Ready for the next session.'), 'Chat should render messages');
     await page.getByRole('tab', { name: 'Tasks', exact: true }).click();
+    // Two earlier days of focus, for the year heatmap.
+    await page.evaluate(() => {
+        const fixture = window.__fixture, id = fixture.tables.profiles[0].id, day = n => new Date(Date.now() - n * 864e5).toISOString();
+        fixture.tables.sessions.push({ id: 'heat-1', user_id: id, mode: 'focus', duration_seconds: 5400, completed_at: day(3) }, { id: 'heat-2', user_id: id, mode: 'focus-partial', duration_seconds: 600, completed_at: day(10) });
+    });
     await page.getByRole('button', { name: 'Edit your profile', exact: true }).focus();
     await page.keyboard.press('Enter');
     await visible('#profile-modal');
+    // A year of focus, one square a day: 53 weeks, darker for longer days.
+    await page.locator('#profile-modal .heatmap-grid').waitFor();
+    const heat = await page.evaluate(() => {
+        const grid = document.querySelector('#profile-modal .heatmap-grid'), cells = [...grid.querySelectorAll('i')];
+        const threeDaysAgo = new Date(Date.now() - 3 * 864e5);
+        const label = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(threeDaysAgo);
+        return { cells: cells.length, expected: 52 * 7 + new Date().getDay() + 1, longDay: cells.find(cell => cell.title.startsWith(label + ':'))?.className, summary: grid.getAttribute('aria-label') };
+    });
+    assert(heat.cells === heat.expected && heat.longDay === 'l3' && heat.summary.includes('Longest streak'), 'The profile shows a year of focus, one square a day, shaded by time: ' + JSON.stringify(heat));
+    await page.screenshot({ path: 'output/playwright/profile-heatmap.png' });
     await page.getByRole('button', { name: 'Close profile', exact: true }).click();
     // Dialogs trap focus and restore it on Escape.
     await page.getByRole('button', { name: 'Timer settings', exact: true }).click();

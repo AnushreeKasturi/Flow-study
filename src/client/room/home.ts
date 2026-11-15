@@ -8,7 +8,7 @@ import { formatFocusTime } from '../modules/presence';
 import { getMyProfile, getStats as getProfileStats, saveDisplayName } from '../modules/profile';
 import * as UI from '../modules/ui';
 import { setFromBoard } from './hide-ip';
-import { weekChart } from './profile';
+import { weekChart, heatmap } from './profile';
 import { here } from './state';
 
 export interface HomeActions {
@@ -53,7 +53,7 @@ export async function showHome(user: { id: string; email: string }, actions: Hom
         // Numbers and locale weekday names only; nothing here comes from another user.
         setMarkup(byId<HTMLElement>('home-stats'),
             `<div class="home-today"><div><span>Focused today</span><strong>${formatFocusTime(stats.todayMinutes)}</strong></div>${weekChart(stats)}</div>` +
-            `<dl class="home-figures"><div><dt>Streak</dt><dd>${stats.streak} day${stats.streak === 1 ? '' : 's'}</dd></div><div><dt>All time</dt><dd>${formatFocusTime(stats.totalMinutes)}</dd></div><div><dt>Sessions</dt><dd>${stats.sessionsCompleted}</dd></div></dl>`);
+            `<dl class="home-figures"><div><dt>Streak</dt><dd>${stats.streak} day${stats.streak === 1 ? '' : 's'}</dd></div><div><dt>All time</dt><dd>${formatFocusTime(stats.totalMinutes)}</dd></div><div><dt>Sessions</dt><dd>${stats.sessionsCompleted}</dd></div></dl>` + heatmap(stats));
     }).catch(() => {});
 
     // Open groups on Home stay current: the board's ping refreshes them within a second.

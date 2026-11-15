@@ -497,3 +497,18 @@ body[data-timer="break"] .breath { display: block; }
 .timer-runner { min-height: 0; margin: 2px 0 0; color: var(--text-2); font-size: .78rem; text-align: center; }
 .timer-runner:empty { display: none; }
 .timer-controls .icon-btn:disabled, .timer-modes .mode-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* A year of focus, like GitHub's contribution graph. The newest weeks sit on the right; when
+   there isn't room for all 53, the oldest are the ones cut off. */
+.modal.profile { width: min(760px, 100%); }
+.heatmap { margin: 0; }
+.heatmap-grid { display: grid; grid-template-columns: repeat(53, 10px); grid-template-rows: 14px repeat(7, 10px); gap: 3px; justify-content: end; overflow: hidden;; -webkit-mask-image: linear-gradient(to right, transparent, #000 28px); mask-image: linear-gradient(to right, transparent, #000 28px); }
+.heatmap-grid span { grid-row: 1; font-size: .66rem; color: var(--text-3); white-space: nowrap; }
+.heatmap i { display: block; width: 10px; height: 10px; border-radius: 2px; background: color-mix(in srgb, var(--text) 9%, transparent); }
+.heatmap .l1 { background: color-mix(in srgb, var(--primary) 30%, color-mix(in srgb, var(--text) 9%, var(--surface))); }
+.heatmap .l2 { background: color-mix(in srgb, var(--primary) 55%, color-mix(in srgb, var(--text) 9%, var(--surface))); }
+.heatmap .l3 { background: color-mix(in srgb, var(--primary) 80%, color-mix(in srgb, var(--text) 9%, var(--surface))); }
+.heatmap .l4 { background: var(--primary); }
+.heatmap figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin-top: 8px; font-size: .74rem; color: var(--text-3); }
+.heatmap-key { display: inline-flex; align-items: center; gap: 3px; }
+.profile-stat-list + .heatmap { margin-top: 20px; }
