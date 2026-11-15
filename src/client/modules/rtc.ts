@@ -189,6 +189,7 @@ export const initMedia = async (videoEl: HTMLVideoElement) => {
             localStream?.getTracks().forEach(track => track.stop());
             return false;
         }
+        watchCamera(localStream.getVideoTracks()[0]);
         videoEl.srcObject = localStream;
         videoEl.muted = true;
         await videoEl.play().catch((err) => console.error('Autoplay failed:', err));
@@ -204,6 +205,45 @@ export const initMedia = async (videoEl: HTMLVideoElement) => {
         return true;
     }
 };
+
+// A camera can stop under a live call: the laptop sleeps, another app takes it, a USB
+// camera drops. The browser ends the track, or leaves it live but muted (no frames), without
+// a word, so the tile went black while the button still said "on". A fresh camera is picked
+// up and swapped into every call. A short mute (a camera switching settings) is left alone.
+let onCameraLost: (() => void) | undefined;
+export const whenCameraLost = (run: () => void) => { onCameraLost = run; };
+const MUTED_TOO_LONG_MS = 4000;
+const watchCamera = (track?: MediaStreamTrack) => {
+    if (!track) return;
+    let mutedTimer: ReturnType<typeof setTimeout> | undefined;
+    track.addEventListener('ended', () => { recoverCamera(); }, { once: true });
+    track.addEventListener('mute', () => { clearTimeout(mutedTimer); mutedTimer = setTimeout(recoverCamera, MUTED_TOO_LONG_MS); });
+    track.addEventListener('unmute', () => clearTimeout(mutedTimer));
+};
+let recovering: Promise<void> | null = null;
+export const recoverCamera = () => recovering ??= (async () => {
+    const old = localStream?.getVideoTracks()[0];
+    if (!localStream || isDummyMedia || !old || (old.readyState !== 'ended' && !old.muted)) return;
+    const stream = localStream, generation = mediaGeneration;
+    try {
+        const [track] = (await navigator.mediaDevices.getUserMedia({ video: true })).getVideoTracks();
+        if (generation !== mediaGeneration) { track.stop(); return; }
+        track.enabled = old.enabled;
+        stream.removeTrack(old);
+        stream.addTrack(track);
+        old.stop(); // a muted one still holds the camera
+        watchCamera(track);
+        await Promise.all(Object.values(peers).map(pc => pc.getSenders().find(sender => sender.track === old)?.replaceTrack(track)));
+        document.querySelectorAll('video').forEach(video => {
+            if (video.srcObject === stream) { video.srcObject = stream; video.play().catch(() => {}); }
+        });
+    } catch (err) {
+        console.warn('Camera could not be restarted', err);
+        if (old.enabled) { old.enabled = false; onCameraLost?.(); }
+    }
+})().finally(() => { recovering = null; });
+// The camera may still be busy when it ends (another app, the lid just opened); try again on return.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) recoverCamera(); });
 
 // Returns the new enabled state, or null when there's no mic to toggle at
 // all (e.g. getUserMedia fell back to video-only) — distinct from a

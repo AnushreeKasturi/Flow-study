@@ -861,6 +861,54 @@ async (page) => {
     assert(rtcResult.batched, 'Connection candidates go out in batches, not one database message each');
     assert(rtcResult.turnFallbackMs >= 4500 && rtcResult.turnFallbackMs < 10000, 'A stalled TURN provider must not block connection setup indefinitely');
 
+    // A camera that stops mid-call (sleep, another app) is replaced in the tile and in every call.
+    const cameraResult = await page.evaluate(async () => {
+        const rtc = await import('/__flow-test/rtc.js');
+        const original = navigator.mediaDevices.getUserMedia;
+        const NativePeer = window.RTCPeerConnection;
+        window.RTCPeerConnection = class extends NativePeer { constructor() { super({ iceServers: [] }); } };
+        const camera = () => { const canvas = document.createElement('canvas'); canvas.getContext('2d').fillRect(0, 0, 1, 1); return canvas.captureStream(5); };
+        navigator.mediaDevices.getUserMedia = async () => camera();
+        const video = document.createElement('video');
+        try {
+            await rtc.initMedia(video);
+            const pc = await rtc.getOrCreatePeerConnection('camera-test', () => {});
+            const old = video.srcObject.getVideoTracks()[0];
+            old.stop();
+            old.dispatchEvent(new Event('ended')); // stop() alone doesn't fire it; the OS taking the camera does
+            await rtc.recoverCamera();
+            const fresh = video.srcObject.getVideoTracks()[0];
+            const sent = pc.getSenders().find(sender => sender.track?.kind === 'video').track;
+            const replaced = fresh !== old && fresh.readyState === 'live' && sent === fresh && rtc.isVideoActive();
+            // Live but muted (no frames, as after sleep) for too long: replaced as well. A blip is not.
+            const blip = fresh;
+            Object.defineProperty(blip, 'muted', { configurable: true, value: true });
+            blip.dispatchEvent(new Event('mute'));
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const keptThroughBlip = video.srcObject.getVideoTracks()[0] === blip;
+            for (let waited = 0; waited < 5000 && video.srcObject.getVideoTracks()[0] === blip; waited += 100) await new Promise(resolve => setTimeout(resolve, 100));
+            const unmuted = video.srcObject.getVideoTracks()[0];
+            const replacedMuted = keptThroughBlip && unmuted !== blip && !unmuted.muted && blip.readyState === 'ended'
+                && pc.getSenders().find(sender => sender.track?.kind === 'video').track === unmuted;
+            // When no camera can be had, it says so instead of showing a black tile marked "on".
+            let lost = false;
+            rtc.whenCameraLost(() => { lost = true; });
+            navigator.mediaDevices.getUserMedia = async () => { throw new Error('Camera in use'); };
+            unmuted.stop();
+            unmuted.dispatchEvent(new Event('ended'));
+            await rtc.recoverCamera();
+            return { replaced, replacedMuted, lost, offAfterLoss: !rtc.isVideoActive() };
+        } finally {
+            rtc.removePeer('camera-test');
+            video.srcObject?.getTracks().forEach(track => track.stop());
+            navigator.mediaDevices.getUserMedia = original;
+            window.RTCPeerConnection = NativePeer;
+        }
+    });
+    assert(cameraResult.replaced, 'A camera that stops mid-call must be replaced in the tile and the call');
+    assert(cameraResult.replacedMuted, 'A camera muted for seconds must be replaced, and a short mute left alone');
+    assert(cameraResult.lost && cameraResult.offAfterLoss, 'A camera that cannot be restarted must show as off');
+
     // 16 simulated participants exercise tile creation and name handling.
     await page.evaluate(() => {
         for (let i = 0; i < 16; i++) window.__fixture.handlers['presence:join']({ key: 'zz-test-' + i, newPresences: [{ username: '<img src=x> Partner ' + i, isDummyMedia: true }] });

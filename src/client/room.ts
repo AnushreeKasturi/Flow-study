@@ -6,7 +6,7 @@ import { byId, on } from './dom';
 import { bindThemePicker } from './theme';
 import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, sendReaction, sendHandRaise, sendBye } from './modules/socket';
 import { initNotifications, pushNote, systemNotify } from './modules/notifications';
-import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack, showLocalStream, isMicOn } from './modules/rtc';
+import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack, showLocalStream, isMicOn, recoverCamera, whenCameraLost } from './modules/rtc';
 import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState, saveFocus, restoreTimer, autoAdvance } from './modules/timer';
 import { initTasks, addTask, toggleTask, deleteTask, assignTask, rerenderTasks, setSharedTasks } from './modules/tasks';
 import { initPresence, startFocusTracking, stopFocusTracking, formatFocusTime } from './modules/presence';
@@ -520,10 +520,15 @@ function bindRoomControls() {
         if (enabled === null) { notify('No microphone is available. Check your browser permissions, then rejoin.', 'error'); return; }
         setToggle(event.currentTarget, enabled);
     });
-    on('toggle-cam', () => {
-        const enabled = toggleVideo();
-        showLocalCamera(enabled);
-        updateCameraState(enabled);
+    on('toggle-cam', async () => {
+        if (toggleVideo()) await recoverCamera(); // turning it on is also the way to retry a camera that stopped
+        showLocalCamera(isVideoActive());
+        updateCameraState(isVideoActive());
+    });
+    whenCameraLost(() => {
+        showLocalCamera(false);
+        updateCameraState(false);
+        notify('Your camera stopped. If another app is using it, close that app, then turn your camera back on.', 'error');
     });
     document.querySelectorAll<HTMLButtonElement>('.reaction-btn').forEach(button => button.addEventListener('click', () => {
         const emoji = button.dataset.emoji!;
