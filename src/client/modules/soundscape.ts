@@ -4,7 +4,7 @@
 export const SOUNDS = [
     ['rain', 'Rain', 'Steady rain with a low rumble behind it.'],
     ['ocean', 'Ocean', 'Waves that swell and pull back every few seconds.'],
-    ['fire', 'Fireplace', 'A warm low burn with small crackles.'],
+    ['fire', 'Fireplace', 'Flickering flames with crackles and the odd pop.'],
     ['wind', 'Wind', 'Soft gusts that rise and fall.'],
     ['night', 'Night', 'Crickets over a quiet, still evening.'],
     ['deep', 'Deep hum', 'A smooth low drone, like a far-off engine.']
@@ -63,55 +63,79 @@ function build(ctx: AudioContext, kind: Sound, out: AudioNode) {
         lfo.start();
         running.push(lfo);
     };
-    // A short burst of noise with a fast decay: a raindrop, a crackle, a cricket pulse.
-    const burst = (colour: 'white' | 'pink', frequency: number, q: number, level: number, length: number) => {
+    // A parameter wandering to a new random level now and then, so it moves like weather or
+    // flame rather than a smooth, regular wave.
+    const wander = (target: AudioParam, base: number, depth: number, perSecond: number) => {
+        target.value = base;
+        scatter(perSecond, at => target.setTargetAtTime(base + (Math.random() * 2 - 1) * depth, at, .3 / perSecond));
+    };
+    // Short sounds at random moments, about `perSecond` of them. They're scheduled on the audio
+    // clock up to 1.5 s ahead, so they stay even when the browser slows timers in a background tab.
+    const scatter = (perSecond: number, play: (at: number) => void) => {
+        let next = ctx.currentTime + .05;
+        const fill = () => {
+            for (next = Math.max(next, ctx.currentTime); next < ctx.currentTime + 1.5; next += -Math.log(1 - Math.random()) / perSecond) play(next);
+        };
+        fill();
+        timers.push(setInterval(fill, 250));
+    };
+    // A burst of noise with a sharp start and a fast decay, through a band-pass: a 3 ms burst
+    // is a crackle, 20 ms a raindrop, 45 ms at a narrow band a cricket pulse.
+    const burst = (at: number, seconds: number, level: number, frequency: number, q: number) => {
+        const length = Math.max(16, Math.round(ctx.sampleRate * seconds));
+        const buffer = ctx.createBuffer(1, length, ctx.sampleRate), data = buffer.getChannelData(0);
+        for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-6 * i / length);
         const node = ctx.createBufferSource();
-        node.buffer = noise(ctx, colour);
-        const envelope = gain(0);
-        const now = ctx.currentTime;
-        envelope.gain.setValueAtTime(level, now);
-        envelope.gain.exponentialRampToValueAtTime(.0001, now + length);
-        node.connect(filter('bandpass', frequency, q)).connect(envelope).connect(out);
-        node.start(now, Math.random() * 7, length + .02);
+        node.buffer = buffer;
+        node.connect(filter('bandpass', frequency, q)).connect(gain(level)).connect(out);
+        node.start(at);
     };
 
     if (kind === 'rain') {
-        const body = gain(.55);
+        const body = gain(.8);
         source('pink').connect(filter('highpass', 700)).connect(filter('lowpass', 7500)).connect(body).connect(out);
-        sway(body.gain, .13, .12); // the shower thickens and thins
-        source('brown').connect(filter('lowpass', 260)).connect(gain(.5)).connect(out);
-        timers.push(setInterval(() => { if (Math.random() < .7) burst('white', 3000 + Math.random() * 4000, 6, .05 + Math.random() * .08, .05); }, 90));
+        wander(body.gain, .8, .17, .4); // the shower thickens and thins
+        source('brown').connect(filter('lowpass', 260)).connect(gain(.12)).connect(out);
+        scatter(14, at => burst(at, .012 + Math.random() * .02, .3 + Math.random() * .4, 2500 + Math.random() * 4500, 1.5));
     } else if (kind === 'ocean') {
         const swell = gain(.4);
         source('brown').connect(filter('lowpass', 520)).connect(swell).connect(out);
-        sway(swell.gain, .085, .34); // one wave roughly every twelve seconds
-        const foam = gain(.08);
+        sway(swell.gain, .085, .3); // one wave roughly every twelve seconds
+        const foam = gain(.2);
         const wash = filter('bandpass', 1400, .5);
         source('pink').connect(wash).connect(foam).connect(out);
-        sway(foam.gain, .085, .07);
+        sway(foam.gain, .085, .16);
         sway(wash.frequency, .085, 600); // the hiss brightens as each wave breaks
     } else if (kind === 'fire') {
-        const burn = gain(.5);
-        source('brown').connect(filter('lowpass', 240)).connect(burn).connect(out);
-        sway(burn.gain, .21, .1);
-        source('pink').connect(filter('bandpass', 900, .6)).connect(gain(.05)).connect(out);
-        timers.push(setInterval(() => { if (Math.random() < .35) burst('white', 1800 + Math.random() * 3500, 3, .12 + Math.random() * .3, .03 + Math.random() * .06); }, 70));
+        // The flames: a rushing, mostly mid-range roar that flickers.
+        const roar = gain(.5);
+        source('pink').connect(filter('highpass', 180)).connect(filter('lowpass', 2400)).connect(roar).connect(out);
+        wander(roar.gain, .5, .22, 5);
+        // Only a little low warmth, and a faint sizzle on top.
+        source('brown').connect(filter('lowpass', 150)).connect(gain(.08)).connect(out);
+        const sizzle = gain(.05);
+        source('white').connect(filter('highpass', 5000)).connect(sizzle).connect(out);
+        wander(sizzle.gain, .05, .03, 6);
+        // Crackles: tiny sharp snaps, often in quick clusters.
+        scatter(7, at => {
+            const count = Math.random() < .35 ? 2 + Math.floor(Math.random() * 4) : 1;
+            for (let k = 0, t = at; k < count; k++, t += .004 + Math.random() * .03) burst(t, .002 + Math.random() * .004, .5 + Math.random() * .8, 2000 + Math.random() * 5000, .7);
+        });
+        // Pops: now and then a louder, lower snap from a knot in the wood.
+        scatter(.3, at => burst(at, .012 + Math.random() * .01, 1 + Math.random() * .5, 700 + Math.random() * 600, .9));
     } else if (kind === 'wind') {
-        const gust = gain(.3);
+        const gust = gain(.55);
         const howl = filter('bandpass', 520, 1.4);
         source('pink').connect(howl).connect(gust).connect(out);
-        sway(howl.frequency, .06, 260);
-        sway(gust.gain, .11, .2);
-        source('brown').connect(filter('lowpass', 180)).connect(gain(.3)).connect(out);
+        wander(howl.frequency, 520, 260, .3);
+        wander(gust.gain, .55, .3, .35);
+        source('brown').connect(filter('lowpass', 180)).connect(gain(.2)).connect(out);
     } else if (kind === 'night') {
-        source('brown').connect(filter('lowpass', 200)).connect(gain(.22)).connect(out);
-        source('pink').connect(filter('highpass', 3000)).connect(gain(.012)).connect(out);
+        source('brown').connect(filter('lowpass', 200)).connect(gain(.1)).connect(out);
+        source('pink').connect(filter('highpass', 3000)).connect(gain(.03)).connect(out);
         // Two crickets at slightly different pitches, each chirping in bursts of three pulses.
         for (const pitch of [4300, 4800]) {
-            timers.push(setInterval(() => {
-                if (Math.random() < .45) return;
-                for (let pulse = 0; pulse < 3; pulse++) setTimeout(() => burst('white', pitch, 40, .16, .045), pulse * 62);
-            }, 620 + Math.random() * 300));
+            scatter(.9, at => { for (let pulse = 0; pulse < 3; pulse++) burst(at + pulse * .062, .045, 1, pitch, 40); });
         }
     } else {
         const hum = gain(.6);
