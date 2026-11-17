@@ -19,7 +19,7 @@ export interface PresenceState {
 }
 export interface Participant {
     userId?: string; username?: string; status?: string; nowPlaying?: string | null;
-    isDummyMedia?: boolean; handRaised?: boolean; presence?: PresenceState;
+    isDummyMedia?: boolean; handRaised?: boolean; micOff?: boolean; presence?: PresenceState;
 }
 export type Participants = Record<string, Participant>;
 export interface ChatMessage { sender: string; text: string; }

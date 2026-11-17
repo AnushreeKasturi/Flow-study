@@ -4,7 +4,7 @@ import { showLoader, hideLoader, leaveWithLoader, loaderText } from './loader';
 import type { Participants, TimerMode } from './types';
 import { byId, on } from './dom';
 import { bindThemePicker } from './theme';
-import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, sendReaction, sendHandRaise, sendBye } from './modules/socket';
+import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, updateMicState, sendReaction, sendHandRaise, sendBye } from './modules/socket';
 import { initNotifications, pushNote, systemNotify } from './modules/notifications';
 import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack, showLocalStream, isMicOn, recoverCamera, whenCameraLost } from './modules/rtc';
 import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState, saveFocus, restoreTimer, autoAdvance } from './modules/timer';
@@ -17,7 +17,7 @@ import supabase from './modules/supabase';
 import { initAudio, loadRoomAudio } from './modules/audio';
 import { notify, openModal, closeModal, initDialogs } from './modules/feedback';
 import { loadUser, currentUser, markSignedOut } from './modules/session';
-import { ensureTile, attachStream, removeTile, markLeft, setCameraOff, showReaction, setHandRaised } from './modules/stage';
+import { ensureTile, attachStream, removeTile, markLeft, setCameraOff, setMicOff, showReaction, setHandRaised } from './modules/stage';
 import { playSound, stopSound, setSoundVolume, isSound, type Sound } from './modules/soundscape';
 import { chime } from './modules/chime';
 import { initReminders, timerReached } from './modules/reminders';
@@ -368,7 +368,7 @@ async function enterRoom(roomId: string, roomCode: string, mediaReady = false) {
         if (arriving && (getMyUserId() || '') < userId && peerNeedsCall(userId)) callUser(userId, onRemoteStream);
     };
 
-    initSocket(roomId, here.username, !isVideoActive(), {
+    initSocket(roomId, here.username, { isDummyMedia: !isVideoActive(), micOff: !isMicOn() }, {
         onConnectionStatus: connectionStatus,
         onRoomState: state => {
             const users = state.participants || {};
@@ -510,6 +510,7 @@ function updatePartnerUI(userId: string) {
     // A raised hand rides on presence, so it survives a channel reconnect.
     setHandRaised(userId, !!partner.handRaised);
     setCameraOff(userId, !!partner.isDummyMedia);
+    setMicOff(userId, !!partner.micOff);
 }
 
 // ── Wiring ─────────────────────────────────────────────────────────────────
@@ -519,6 +520,7 @@ function bindRoomControls() {
         const enabled = toggleAudio();
         if (enabled === null) { notify('No microphone is available. Check your browser permissions, then rejoin.', 'error'); return; }
         setToggle(event.currentTarget, enabled);
+        updateMicState(enabled);
     });
     on('toggle-cam', async () => {
         if (toggleVideo()) await recoverCamera(); // turning it on is also the way to retry a camera that stopped

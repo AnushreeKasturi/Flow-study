@@ -411,7 +411,9 @@ async (page) => {
     assert(!await page.locator('.reactions-menu').evaluate(menu => menu.open), 'Escape closes the reaction tray');
     await page.getByRole('button', { name: 'Toggle microphone', exact: true }).click();
     assert(await page.locator('#toggle-mic').getAttribute('aria-pressed') === 'false', 'Mic should toggle off');
+    assert(await page.evaluate(() => window.__fixture.tracked.micOff === true), 'Muting tells the room, so your tile shows it');
     await page.getByRole('button', { name: 'Toggle microphone', exact: true }).click();
+    assert(await page.evaluate(() => window.__fixture.tracked.micOff === false), 'Unmuting tells the room too');
     await page.getByRole('button', { name: 'Toggle camera', exact: true }).click();
     await page.getByLabel('New shared task').fill('Review chapter 4');
     await page.getByRole('button', { name: 'Add task', exact: true }).click();
@@ -924,6 +926,27 @@ async (page) => {
     });
     assert(await page.locator('.video-wrapper').count() === 17, 'Participant joins must create one tile each');
     assert(await page.locator('#video-grid img').count() === 0, 'Participant names must stay inert');
+    // A muted partner shows a crossed-out mic by their name, and it goes when they unmute.
+    const join = presence => page.evaluate(p => window.__fixture.handlers['presence:join']({ key: 'zz-test-1', newPresences: [p] }), presence);
+    await join({ username: 'Partner 1', isDummyMedia: true, micOff: true });
+    assert(await page.locator('#name-tag-zz-test-1 .mic-off[aria-label="Muted"] svg').count() === 1, 'A muted partner shows the muted mic on their tile');
+    await join({ username: 'Partner 1', isDummyMedia: true, micOff: false });
+    assert(await page.locator('#name-tag-zz-test-1 .mic-off').count() === 0, 'The muted mic goes when they unmute');
+    // Pinning: the pinned tile takes the stage, the rest become small tiles; only one at a time.
+    const pinOf = id => page.locator(`#video-wrapper-${id} .tile-pin`);
+    await pinOf('zz-test-3').click();
+    await pinOf('zz-test-5').click();
+    const pinned = await page.evaluate(async () => {
+        await new Promise(requestAnimationFrame); // let the (near-instant, in tests) transitions land
+        const big = document.getElementById('video-wrapper-zz-test-5'), small = document.getElementById('video-wrapper-zz-test-3');
+        return { only: document.querySelectorAll('.video-wrapper.pinned').length === 1 && big.classList.contains('pinned'), first: big.getBoundingClientRect().top < document.getElementById('video-wrapper-local').getBoundingClientRect().top,
+            bigger: big.getBoundingClientRect().width > 3 * small.getBoundingClientRect().width, label: big.querySelector('.tile-pin').textContent };
+    });
+    assert(pinned.only && pinned.first && pinned.bigger && pinned.label === 'Unpin', 'A pinned tile is the one big tile, first on the stage: ' + JSON.stringify(pinned));
+    await page.screenshot({ path: 'output/playwright/pinned-tile.png' });
+    await pinOf('zz-test-5').click();
+    assert(await page.locator('#video-grid.has-pin, .video-wrapper.pinned').count() === 0, 'Unpinning returns the usual grid');
+    await pinOf('zz-test-7').click(); // they leave below; the pin must go with them
     await page.context().setOffline(true);
     await visible('#network-banner');
     await page.context().setOffline(false);
@@ -936,6 +959,8 @@ async (page) => {
         return count;
     });
     await page.waitForFunction(previous => window.__fixture.channelCount >= previous + 2 && document.getElementById('connection-status').textContent === 'Connected', channelCount);
+    // A reconnect re-sends your camera as it is now, not as it was when you joined.
+    assert(await page.evaluate(() => window.__fixture.tracked.isDummyMedia === (document.getElementById('toggle-cam').getAttribute('aria-pressed') !== 'true')), 'A reconnect must carry your current camera state');
 
     // Presence leave/rejoin preserves the returning tile through the grace period.
     await page.clock.install();
@@ -947,6 +972,7 @@ async (page) => {
     assert(await page.locator('#video-wrapper-zz-test-0.left').count() === 0, 'A returning partner must not be shown as gone');
     await page.clock.fastForward(18001);
     assert(await page.locator('.video-wrapper').count() === 2, 'Only genuinely departed participants should be removed');
+    assert(await page.locator('#video-grid.has-pin').count() === 0, 'A pinned partner who leaves takes the pin with them');
     // An explicit goodbye needs no presence event at all: the tile says so and clears within seconds.
     await page.evaluate(() => window.__fixture.handlers['broadcast:bye']({ payload: { userId: 'zz-test-0' } }));
     assert(await page.locator('#video-wrapper-zz-test-0.left .left-note').count() === 1 && await page.locator('#count').innerText() === '1', 'A goodbye should show on the tile and drop the count at once');

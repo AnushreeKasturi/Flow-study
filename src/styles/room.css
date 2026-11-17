@@ -166,6 +166,16 @@ body[data-timer="break"] .breath { display: block; }
 .tile-remove { display: none; position: absolute; top: 10px; right: 10px; z-index: 22; padding: 5px 11px; border: 0; border-radius: 999px; background: #000a; color: #fff; font-size: .74rem; font-weight: 600; cursor: pointer; }
 .tile-remove:hover { background: var(--danger); color: #000; }
 .is-host .video-wrapper:is(:hover, :focus-within) .tile-remove { display: block; }
+.tile-pin { position: absolute; right: 10px; bottom: 10px; z-index: 22; padding: 5px 11px; border: 0; border-radius: 999px; background: #000a; color: #fff; font-size: .74rem; font-weight: 600; cursor: pointer; opacity: 0; transition: opacity .15s; }
+.tile-pin:hover { background: #000d; }
+.video-wrapper:is(:hover, :focus-within) .tile-pin, .tile-pin[aria-pressed="true"] { opacity: 1; }
+@media (hover: none) { .tile-pin { opacity: 1; } }
+.mic-off { display: inline-grid; place-items: center; color: #ff8a8a; }
+.mic-off svg { width: 14px; height: 14px; }
+/* A pinned tile takes the stage; everyone else sits in a row of small tiles below it. */
+.video-grid.has-pin { grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr)); align-content: start; }
+.video-grid.has-pin .video-wrapper.pinned { grid-column: 1 / -1; order: -1; aspect-ratio: 16 / 9; max-height: 62vh; }
+.focus-active .video-grid.has-pin .video-wrapper.pinned { width: 100%; }
 /* Reactions are thrown into the tile and bounce about until they settle (stage.ts moves them). */
 .floating-reaction { position: absolute; left: 0; top: 0; z-index: 15; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: var(--reaction); color: #1d1a16; box-shadow: 0 6px 18px #0006, inset 0 -3px 0 #0002; opacity: 0; pointer-events: none; will-change: transform, opacity; }
 .floating-reaction svg { width: 22px; height: 22px; }

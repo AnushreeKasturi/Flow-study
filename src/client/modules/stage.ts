@@ -36,7 +36,11 @@ export function ensureTile(userId: string, partner?: Participant) {
     const remove = Object.assign(document.createElement('button'), { className: 'tile-remove', type: 'button', textContent: 'Remove' });
     remove.setAttribute('aria-label', `Remove ${name} from the room`);
     remove.addEventListener('click', () => document.dispatchEvent(new CustomEvent('flow-remove', { detail: userId })));
-    wrapper.append(video, tag, placeholder, remove);
+    const pin = Object.assign(document.createElement('button'), { className: 'tile-pin', type: 'button', textContent: 'Pin' });
+    pin.setAttribute('aria-pressed', 'false');
+    pin.setAttribute('aria-label', `Pin ${name} to see them bigger`);
+    pin.addEventListener('click', () => pinTile(pinnedId === userId ? null : userId));
+    wrapper.append(video, tag, placeholder, remove, pin);
     videoGrid.appendChild(wrapper);
     if (partner) labelTile(userId, partner);
     markHost(wrapper);
@@ -48,6 +52,7 @@ function labelTile(userId: string, partner: Participant) {
     const tag = document.getElementById(`name-tag-${userId}`)!;
     const status = String(partner.presence?.status || partner.status || 'Online').replace(/^[🟢🟡]\s*/u, '');
     tag.querySelector('b')!.textContent = partner.username || 'Partner';
+    tag.parentElement?.querySelector('.tile-pin')?.setAttribute('aria-label', `Pin ${partner.username || 'Partner'} to see them bigger`);
     tag.querySelector('small')!.textContent = status === 'Online' ? '' : status;
     const away = AWAY_STATUSES.includes(status);
     tag.querySelector('i')!.className = `dot ${away ? 'away' : status.includes('Break') ? 'yellow' : 'green'}`;
@@ -98,7 +103,39 @@ export function markLeft(userId: string, left: boolean, name = 'Your partner') {
     wrapper.appendChild(note);
 }
 
-export const removeTile = (userId: string) => document.getElementById(`video-wrapper-${userId}`)?.remove();
+export const removeTile = (userId: string) => {
+    if (pinnedId === userId) pinTile(null);
+    document.getElementById(`video-wrapper-${userId}`)?.remove();
+};
+
+// Pinning is your own view only: the pinned tile takes the stage and everyone else
+// becomes a row of small tiles below it. Pin it again, or pin someone else, to change it.
+let pinnedId: string | null = null;
+export function pinTile(userId: string | null) {
+    pinnedId = userId;
+    document.querySelectorAll<HTMLElement>('#video-grid .video-wrapper').forEach(wrapper => {
+        const pinned = !!userId && wrapper.id === `video-wrapper-${userId}`;
+        wrapper.classList.toggle('pinned', pinned);
+        const button = wrapper.querySelector<HTMLButtonElement>('.tile-pin');
+        if (!button) return;
+        button.textContent = pinned ? 'Unpin' : 'Pin';
+        button.setAttribute('aria-pressed', String(pinned));
+    });
+    videoGrid.classList.toggle('has-pin', !!userId);
+}
+
+// A crossed-out mic beside the name when someone mutes. Same icon as your own mic button.
+export function setMicOff(userId: string, off: boolean) {
+    const tag = document.getElementById(`name-tag-${userId}`);
+    const badge = tag?.querySelector('.mic-off');
+    if (off && tag && !badge) {
+        const icon = Object.assign(document.createElement('span'), { className: 'mic-off', title: 'Muted' });
+        icon.setAttribute('role', 'img');
+        icon.setAttribute('aria-label', 'Muted');
+        icon.append(byId('toggle-mic').querySelector('svg.off')!.cloneNode(true));
+        tag.insertBefore(icon, tag.querySelector('small'));
+    } else if (!off) badge?.remove();
+}
 export const setCameraOff = (userId: string, off: boolean) => document.getElementById(`dummy-${userId}`)?.classList.toggle('hidden', !off);
 
 // Reactions are thrown into the tile from a side, bounce off its edges and each

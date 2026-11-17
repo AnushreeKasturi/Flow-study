@@ -12,8 +12,8 @@ let currentRoomId: string | null = null;
 let myUserId = '';
 let myUsername = '';
 let currentHandlers: SocketHandlers | null = null;
-let currentIsDummyMedia = false;
-let currentHandRaised = false;
+// What this browser has told the room about itself. Kept here so a reconnect sends it again.
+let mine = { isDummyMedia: false, handRaised: false, micOff: false };
 let connectionGeneration = 0;
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 const HEARTBEAT_INTERVAL_MS = 20000;
@@ -26,12 +26,11 @@ const HEARTBEAT_INTERVAL_MS = 20000;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_DELAY_MS = 30000;
 
-export const initSocket = (roomId: string, username: string, isDummyMedia: boolean, handlers: SocketHandlers) => {
+export const initSocket = (roomId: string, username: string, media: { isDummyMedia: boolean; micOff: boolean }, handlers: SocketHandlers) => {
     currentRoomId = roomId;
     myUsername = username;
     currentHandlers = handlers;
-    currentIsDummyMedia = isDummyMedia;
-    currentHandRaised = false;
+    mine = { ...media, handRaised: false };
     reconnectAttempts = 0;
     myUserId = currentUser()?.id || crypto.randomUUID();
 
@@ -213,8 +212,7 @@ const connectChannel = () => {
                     username: myUsername,
                     status: 'Online',
                     nowPlaying: null,
-                    isDummyMedia: currentIsDummyMedia,
-                    handRaised: currentHandRaised
+                    ...mine
                 });
                 if (myGeneration !== connectionGeneration) return;
                 fetchTasks(roomId, handlers.onRoomTasksUpdate, handlers.onTasksError);
@@ -222,7 +220,7 @@ const connectChannel = () => {
 
                 const sendHeartbeat = () => {
                     if (myGeneration !== connectionGeneration) return;
-                    sendToRoom('presence-heartbeat', { userId: myUserId, username: myUsername, isDummyMedia: currentIsDummyMedia });
+                    sendToRoom('presence-heartbeat', { userId: myUserId, username: myUsername, isDummyMedia: mine.isDummyMedia });
                 };
                 sendHeartbeat();
                 heartbeatInterval = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
@@ -326,16 +324,15 @@ export const updatePresence = async (_roomId: string | null, status: string, now
     });
 };
 
-export const updateCameraState = async (isVideoActive: boolean) => {
+const updateMine = async (fields: Partial<typeof mine>) => {
+    Object.assign(mine, fields);
     if (!channel) return;
     const state = channel.presenceState<Participant>();
-    const myState = state[myUserId] ? state[myUserId][0] : {};
-
-    await trackPresence({
-        ...myState,
-        isDummyMedia: !isVideoActive
-    });
+    await trackPresence({ ...(state[myUserId]?.[0] || {}), ...fields });
 };
+export const updateCameraState = (isVideoActive: boolean) => updateMine({ isDummyMedia: !isVideoActive });
+// The others see a muted mic on your tile. Rides on presence, like a raised hand.
+export const updateMicState = (on: boolean) => updateMine({ micOff: !on });
 
 export const sendBye = () => sendToRoom('bye', { userId: myUserId });
 export const sendRemoved = (userId: string) => sendToRoom('removed', { userId });
@@ -346,16 +343,7 @@ export const sendReaction = (emoji: string) => { sendToRoom('reaction', { userId
 // needs to survive a channel reconnect (presence re-syncs fully on every
 // reconnect; a plain broadcast sent during a reconnect gap would just be
 // lost, silently dropping the request).
-export const sendHandRaise = async (raised: boolean) => {
-    currentHandRaised = raised;
-    if (!channel) return;
-    const state = channel.presenceState<Participant>();
-    const myState = state[myUserId] ? state[myUserId][0] : {};
-    await trackPresence({
-        ...myState,
-        handRaised: raised
-    });
-};
+export const sendHandRaise = (raised: boolean) => updateMine({ handRaised: raised });
 
 export const broadcastAudio = (provider: AudioProvider, url: string) =>
     provider === 'youtube' ? sendToRoom('youtube-sync', { url }) : sendToRoom('audio-sync', { provider, url });
