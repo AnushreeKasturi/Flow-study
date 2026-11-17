@@ -920,6 +920,67 @@ async (page) => {
     assert(cameraResult.replacedMuted, 'A camera muted for seconds must be replaced, and a short mute left alone');
     assert(cameraResult.lost && cameraResult.offAfterLoss, 'A camera that cannot be restarted must show as off');
 
+    // Someone drops off without a word (Wi-Fi off) and rejoins: the other side still holds the
+    // old call. The new page's call must replace it, and video must flow again within seconds.
+    await page.unroute('**/api/turn-credentials');
+    await page.route('**/api/turn-credentials', route => route.fulfill({ status: 503, body: '' }));
+    const rejoin = await page.evaluate(async () => {
+        const danny = await import('/__flow-test/rtc.js?danny'), me = await import('/__flow-test/rtc.js?me'), meAgain = await import('/__flow-test/rtc.js?me-again');
+        const NativePeer = window.RTCPeerConnection, calls = window.__fixture.calls, push = calls.push;
+        window.RTCPeerConnection = class extends NativePeer { constructor() { super({ iceServers: [] }); } };
+        // Each page sees the other as one user id: Danny is 'danny', I'm 'me' (whichever page I'm on).
+        let mine = me, cutOff = false, dropAll = false;
+        calls.push = entry => {
+            const { to, signal } = entry.value.payload;
+            if (dropAll) return 0;
+            setTimeout(() => {
+                if (to === 'me' && !cutOff) mine.handleSignal({ from: 'danny', signal }, gotMine);
+                if (to === 'danny') danny.handleSignal({ from: 'me', signal }, gotDanny);
+            }, 20);
+            return 0;
+        };
+        let mineStream, dannyStream;
+        const gotMine = (_id, stream) => { mineStream = stream; }, gotDanny = (_id, stream) => { dannyStream = stream; };
+        const live = (getStream, connected) => new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('No video after a rejoin')), 8000);
+            const check = () => { if (connected() && getStream()?.getVideoTracks().some(t => t.readyState === 'live')) { clearTimeout(timeout); resolve(); } else setTimeout(check, 100); };
+            check();
+        });
+        const videos = [];
+        try {
+            for (const page of [danny, me, meAgain]) { const v = document.createElement('video'); videos.push(v); await page.initMedia(v); }
+            await me.callUser('danny', gotMine);
+            await live(() => mineStream, () => me.isPeerConnected('danny'));
+            const firstConnected = true;
+            // Wi-Fi off: my old page goes silent. Danny's side still thinks the call is up.
+            cutOff = true;
+            me.removePeer('danny');
+            const dannyOld = await danny.getOrCreatePeerConnection('me', gotDanny);
+            // I rejoin on a fresh page and call.
+            mine = meAgain; mineStream = null; cutOff = false;
+            await meAgain.callUser('danny', gotMine);
+            await live(() => mineStream, () => meAgain.isPeerConnected('danny') && danny.isPeerConnected('me'));
+            const replaced = (await danny.getOrCreatePeerConnection('me', gotDanny)) !== dannyOld;
+            // A call whose offer is lost never connects; after 15 seconds it counts as needing a new call.
+            meAgain.removePeer('danny'); danny.removePeer('me');
+            dropAll = true;
+            await meAgain.callUser('danny', gotMine);
+            const stuckNow = meAgain.peerNeedsCall('danny');
+            const realNow = Date.now;
+            Date.now = () => realNow() + 16000;
+            const stuckLater = meAgain.peerNeedsCall('danny');
+            Date.now = realNow;
+            return { firstConnected, replaced, stuckNow, stuckLater };
+        } finally {
+            calls.push = push;
+            for (const page of [danny, me, meAgain]) { page.removePeer('danny'); page.removePeer('me'); page.cleanupDummyStream(); }
+            videos.forEach(v => v.srcObject?.getTracks().forEach(t => t.stop()));
+            window.RTCPeerConnection = NativePeer;
+        }
+    });
+    assert(rejoin.firstConnected && rejoin.replaced, 'After a silent drop and rejoin, the old call is replaced and video flows: ' + JSON.stringify(rejoin));
+    assert(!rejoin.stuckNow && rejoin.stuckLater, 'A call whose offer was lost is retried after 15 seconds: ' + JSON.stringify(rejoin));
+
     // 16 simulated participants exercise tile creation and name handling.
     await page.evaluate(() => {
         for (let i = 0; i < 16; i++) window.__fixture.handlers['presence:join']({ key: 'zz-test-' + i, newPresences: [{ username: '<img src=x> Partner ' + i, isDummyMedia: true }] });

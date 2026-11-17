@@ -1,4 +1,4 @@
-import type { SignalMessage, RemoteStream } from '../types';
+import type { Signal, SignalMessage, RemoteStream } from '../types';
 import { sendSignal, getMyUserId } from './socket';
 import { api } from './api';
 
@@ -13,6 +13,13 @@ const MAX_CANDIDATES_PER_PEER = 200;
 const candidateCounts: Record<string, number> = {};
 const pendingPeers: Partial<Record<string, Promise<RTCPeerConnection>>> = {};
 const remoteStreams: Record<string, MediaStream> = {};
+// Every connection gets an id, sent with each of its messages. Someone who rejoins, or whose
+// side rebuilt the call after a network drop, sends a new one: the connection kept for their
+// old one can't take its messages (each is tied to the keys it started with), so it's replaced.
+const myConn: Record<string, string> = {};
+const theirConn: Record<string, string> = {};
+const startedAt: Record<string, number> = {};
+const sendTagged = (userId: string, message: Signal) => sendSignal(userId, { ...message, conn: myConn[userId] });
 
 const DEFAULT_ICE: RTCConfiguration = {
     iceServers: [
@@ -48,7 +55,7 @@ function queueCandidate(userId: string, candidate: RTCIceCandidateInit | null) {
         delete candidateFlush[userId];
         const batch = outgoingCandidates[userId];
         delete outgoingCandidates[userId];
-        if (batch?.length) sendSignal(userId, { type: 'candidates', candidates: batch });
+        if (batch?.length) sendTagged(userId, { type: 'candidates', candidates: batch });
     }, 100);
 }
 
@@ -95,6 +102,7 @@ export const isPeerConnected = (userId: string) => peers[userId]?.connectionStat
 // flicker this is meant to fix. Only treat it as broken once it's been
 // stuck for a while.
 const DISCONNECT_GRACE_MS = 6000;
+const NEGOTIATION_TIMEOUT_MS = 15000;
 const disconnectedSince: Record<string, number> = {};
 
 export const peerNeedsCall = (userId: string) => {
@@ -102,6 +110,8 @@ export const peerNeedsCall = (userId: string) => {
     if (!pc) return true;
     const state = pc.connectionState;
     if (state === 'failed' || state === 'closed') return true;
+    // Never connected: an offer or answer was lost (the network dropped mid-call), so start again.
+    if ((state === 'new' || state === 'connecting') && Date.now() - (startedAt[userId] || Date.now()) > NEGOTIATION_TIMEOUT_MS) return true;
     return state === 'disconnected' && Date.now() - (disconnectedSince[userId] || Date.now()) > DISCONNECT_GRACE_MS;
 };
 
@@ -302,6 +312,8 @@ export const getOrCreatePeerConnection = async (userId: string, onRemoteStream: 
         if (hasRelay) warnedNoRelay = false;
         const pc = new RTCPeerConnection({ ...iceConfig, iceTransportPolicy: relayOnly ? 'relay' : 'all' });
         peers[userId] = pc;
+        myConn[userId] = crypto.randomUUID();
+        startedAt[userId] = Date.now();
         candidateQueues[userId] = candidateQueues[userId] || [];
         makingOffer[userId] = false;
 
@@ -373,7 +385,15 @@ export const handleSignal = async (data: SignalMessage, onRemoteStream: RemoteSt
     if (!from || !signal) return;
 
     try {
+        if (signal.conn && theirConn[from] && signal.conn !== theirConn[from]) {
+            // Their side has a new connection. An offer starts the new call here; anything else
+            // belongs to a call this side never joined, so drop it and ring their new one.
+            removePeer(from);
+            if (signal.type === 'answer') { callUser(from, onRemoteStream); return; }
+            if (signal.type !== 'offer') return;
+        }
         const pc = await getOrCreatePeerConnection(from, onRemoteStream);
+        if (signal.conn) theirConn[from] = signal.conn;
         if (!candidateQueues[from]) candidateQueues[from] = [];
         if (signal.type === 'offer') {
             const offerCollision = makingOffer[from] || pc.signalingState !== 'stable';
@@ -389,7 +409,7 @@ export const handleSignal = async (data: SignalMessage, onRemoteStream: RemoteSt
             await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            sendSignal(from, { type: 'answer', answer: { type: answer.type, sdp: answer.sdp } });
+            sendTagged(from, { type: 'answer', answer: { type: answer.type, sdp: answer.sdp } });
             await flushCandidates(from, pc);
         } else if (signal.type === 'answer') {
             if (pc.signalingState !== 'have-local-offer') return;
@@ -413,6 +433,7 @@ export const handleSignal = async (data: SignalMessage, onRemoteStream: RemoteSt
 
 export const callUser = async (userId: string, onRemoteStream: RemoteStream) => {
     try {
+        if (peers[userId] && peerNeedsCall(userId)) removePeer(userId); // a dead or stuck call is replaced, not renegotiated
         const pc = await getOrCreatePeerConnection(userId, onRemoteStream);
         if (pc.signalingState !== 'stable') return;
         if (pc.connectionState === 'connected' || pc.connectionState === 'connecting') return;
@@ -420,7 +441,7 @@ export const callUser = async (userId: string, onRemoteStream: RemoteStream) => 
         makingOffer[userId] = true;
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        sendSignal(userId, { type: 'offer', offer: { type: offer.type, sdp: offer.sdp } });
+        sendTagged(userId, { type: 'offer', offer: { type: offer.type, sdp: offer.sdp } });
     } catch (err) {
         console.error('Failed to initiate call:', err);
     } finally {
@@ -441,4 +462,7 @@ export const removePeer = (userId: string) => {
     delete pendingPeers[userId];
     delete remoteStreams[userId];
     delete disconnectedSince[userId];
+    delete myConn[userId];
+    delete theirConn[userId];
+    delete startedAt[userId];
 };

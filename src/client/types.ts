@@ -23,11 +23,13 @@ export interface Participant {
 }
 export type Participants = Record<string, Participant>;
 export interface ChatMessage { sender: string; text: string; }
-export type Signal =
+// conn names the sending connection; see rtc.ts. Older pages leave it out.
+export type Signal = { conn?: string } & (
     | { type: 'offer'; offer: RTCSessionDescriptionInit }
     | { type: 'answer'; answer: RTCSessionDescriptionInit }
     | { type: 'candidate'; candidate: RTCIceCandidateInit | null }
-    | { type: 'candidates'; candidates: RTCIceCandidateInit[] };
+    | { type: 'candidates'; candidates: RTCIceCandidateInit[] }
+);
 export interface SignalMessage { from: string; to?: string; signal: Signal; }
 export type RemoteStream = (userId: string, stream: MediaStream) => void;
 export interface SocketHandlers {
