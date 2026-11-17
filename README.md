@@ -26,7 +26,7 @@ A shared study room for focused work. Bring your group, set a timer, and work th
 - **Arrivals and departures:** a soft chime, and a tile that says who left before it clears. Departures are detected three ways (presence, an explicit goodbye, and silence with no live call), so a closed laptop doesn't leave a ghost.
 - **Room audio:** share YouTube or Spotify links through the official embedded players. Everyone controls their own playback, and no player loads until someone asks for one.
 - **Your focus:** today's total, a streak, and a seven-day chart. Pauses do not count. All focus time is saved, including blocks you pause or leave part-way (and a checkpoint every five minutes); only blocks that run to the end count as completed sessions.
-- **Ten skies:** Forest, Midnight, Warm, Aqua, Amethyst, Desert, Aurora, Storm, Dawn, and Daylight. Sky, ground, and sun all take their colours from the one you choose.
+- **Fifteen skies:** Forest, Midnight, Warm, Aqua, Amethyst, Desert, Aurora, Storm, Sakura, Ember, Dawn, Daylight, Glacier, Mist, and Meadow. Sky, ground, and sun all take their colours from the one you choose.
 - **Keyboard shortcuts:** `S` timer, `F` focus mode, `M` microphone, `V` camera, `?` for the list.
 - **Optional notifications:** a system notification when a session ends while Flow is in a background tab.
 - **Interactive setup (`/start.html`):** name, sky, focus length (drag the sun), and a soundscape preview, then the account. The choices carry into the first room, which shows a short first-session checklist. An invite link survives sign-in.

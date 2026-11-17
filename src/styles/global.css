@@ -6,7 +6,7 @@
 @property --sun { syntax: '<color>'; inherits: true; initial-value: #f4dc8f; }
 @property --bg { syntax: '<color>'; inherits: true; initial-value: #0a1a15; }
 
-/* Ten skies. Each names its sky, its ground (--bg), its sun, and the ink that sits on them. */
+/* Fifteen skies. Each names its sky, its ground (--bg), its sun, and the ink that sits on them. */
 :root,
 [data-theme="forest"] {
     color-scheme: dark;
@@ -58,6 +58,18 @@
     --primary: #dfe7ee; --on-primary: #141a21; --accent: #9fc3dc;
     --text: #eef2f5; --text-2: #c0cad3; --text-3: #93a1ae;
 }
+[data-theme="sakura"] {
+    --sky-top: #2a1530; --sky-bottom: #e48aa8; --sun: #ffe3ec;
+    --bg: #1d0f1a; --surface: #281523; --card: #2f192a; --field: #22111e; --hover: #45243c; --line: #55304a;
+    --primary: #ffc2d6; --on-primary: #281523; --accent: #f7d79a;
+    --text: #fdeef3; --text-2: #dcc0cc; --text-3: #b394a4;
+}
+[data-theme="ember"] {
+    --sky-top: #1a0a0a; --sky-bottom: #b5432a; --sun: #ffc46b;
+    --bg: #170c0a; --surface: #22120f; --card: #291612; --field: #1d0f0c; --hover: #3d211a; --line: #4d2b22;
+    --primary: #ffb26b; --on-primary: #22120f; --accent: #ff8a6b;
+    --text: #fbefe8; --text-2: #dcc3b8; --text-3: #b2978b;
+}
 [data-theme="dawn"] {
     color-scheme: light;
     --sky-top: #8fa3d9; --sky-bottom: #ffc9a8; --sun: #fff0c2;
@@ -73,6 +85,30 @@
     --primary: #1f4f7a; --on-primary: #ffffff; --accent: #b84f15;
     --ok: #2c7548; --danger: #a33636;
     --text: #18222b; --text-2: #3e4a55; --text-3: #5a6672;
+}
+[data-theme="glacier"] {
+    color-scheme: light;
+    --sky-top: #9fc6e8; --sky-bottom: #eef6fb; --sun: #ffc85c;
+    --bg: #eef3f6; --surface: #f7fafc; --card: #ffffff; --field: #e2eaef; --hover: #d6e0e7; --line: #c3d0d9;
+    --primary: #1d5a85; --on-primary: #ffffff; --accent: #2a6f7d;
+    --ok: #2c7548; --danger: #a33636;
+    --text: #14212b; --text-2: #3a4a56; --text-3: #566672;
+}
+[data-theme="mist"] {
+    color-scheme: light;
+    --sky-top: #b8c4bd; --sky-bottom: #eef0ea; --sun: #f0a85a;
+    --bg: #eff1ec; --surface: #f7f8f4; --card: #ffffff; --field: #e3e7df; --hover: #d7dcd2; --line: #c4cbbf;
+    --primary: #3d5a4a; --on-primary: #ffffff; --accent: #8a5a2b;
+    --ok: #2c7548; --danger: #a33636;
+    --text: #1b231e; --text-2: #3f4a43; --text-3: #5b665f;
+}
+[data-theme="meadow"] {
+    color-scheme: light;
+    --sky-top: #8fcbe0; --sky-bottom: #f4ecc4; --sun: #ffb347;
+    --bg: #f4f1e1; --surface: #fbf9ee; --card: #ffffff; --field: #ebe7d0; --hover: #e0dbbf; --line: #cfc8a6;
+    --primary: #3f6b1f; --on-primary: #ffffff; --accent: #a34a15;
+    --ok: #2c7548; --danger: #a33636;
+    --text: #1c2414; --text-2: #414a35; --text-3: #5d6650;
 }
 
 :root {

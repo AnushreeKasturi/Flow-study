@@ -64,7 +64,7 @@ It's free, runs in the browser, and every line is on GitHub.
 
 > You set your focus length in Flow by dragging the sun. Higher sun, longer block. It sets when your time is up. flow-study.me
 
-> Ten skies to study under: forest dusk, midnight, desert, aurora, storm, dawn and more. The room takes all its colour from the one you pick. flow-study.me
+> Fifteen skies to study under: forest dusk, midnight, sakura, ember, aurora, glacier, meadow and more. The room takes all its colour from the one you pick. flow-study.me
 
 > Flow's soundscapes aren't audio files. Rain, ocean, wind, a fireplace: each one is synthesized in your browser from filtered noise. The code is about 150 lines. github.com/ManasDasri/Flow-study
 

@@ -657,7 +657,7 @@ async (page) => {
     await page.getByRole('button', { name: 'Done', exact: true }).click();
 
     // All appearance themes maintain readable body text.
-    for (const theme of ['forest', 'midnight', 'warm', 'aqua', 'amethyst', 'desert', 'aurora', 'storm', 'dawn', 'daylight']) {
+    for (const theme of ['forest', 'midnight', 'warm', 'aqua', 'amethyst', 'desert', 'aurora', 'storm', 'sakura', 'ember', 'dawn', 'daylight', 'glacier', 'mist', 'meadow']) {
         await page.getByLabel('Room atmosphere').selectOption(theme);
         // Skies cross-fade, so wait for the ground colour to settle before measuring.
         await page.waitForFunction(() => {

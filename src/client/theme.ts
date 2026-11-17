@@ -1,7 +1,8 @@
 // The saved atmosphere is applied before first paint by the inline script in Head.astro.
 export const SKIES = [
     ['forest', 'Forest'], ['midnight', 'Midnight'], ['warm', 'Warm'], ['aqua', 'Aqua'], ['amethyst', 'Amethyst'],
-    ['desert', 'Desert'], ['aurora', 'Aurora'], ['storm', 'Storm'], ['dawn', 'Dawn'], ['daylight', 'Daylight']
+    ['desert', 'Desert'], ['aurora', 'Aurora'], ['storm', 'Storm'], ['sakura', 'Sakura'], ['ember', 'Ember'],
+    ['dawn', 'Dawn'], ['daylight', 'Daylight'], ['glacier', 'Glacier'], ['mist', 'Mist'], ['meadow', 'Meadow']
 ] as const;
 export type Theme = typeof SKIES[number][0];
 const THEMES: readonly string[] = SKIES.map(([id]) => id);
