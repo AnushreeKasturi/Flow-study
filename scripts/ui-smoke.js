@@ -981,6 +981,61 @@ async (page) => {
     assert(rejoin.firstConnected && rejoin.replaced, 'After a silent drop and rejoin, the old call is replaced and video flows: ' + JSON.stringify(rejoin));
     assert(!rejoin.stuckNow && rejoin.stuckLater, 'A call whose offer was lost is retried after 15 seconds: ' + JSON.stringify(rejoin));
 
+    // A network change (another Wi-Fi): the call moves over with an ICE restart and keeps its video,
+    // without a new call. And a call nothing arrives on is dead, whatever state it reports.
+    const network = await page.evaluate(async () => {
+        const danny = await import('/__flow-test/rtc.js?net-danny'), me = await import('/__flow-test/rtc.js?net-me');
+        const NativePeer = window.RTCPeerConnection, calls = window.__fixture.calls, push = calls.push;
+        window.RTCPeerConnection = class extends NativePeer { constructor() { super({ iceServers: [] }); } };
+        calls.push = entry => {
+            const { to, signal } = entry.value.payload;
+            setTimeout(() => (to === 'me' ? me : danny).handleSignal({ from: to === 'me' ? 'danny' : 'me', signal }, to === 'me' ? got : () => {}), 20);
+            return 0;
+        };
+        let stream;
+        const got = (_id, s) => { stream = s; };
+        const until = (ok, what) => new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error(what)), 8000);
+            const check = () => { if (ok()) { clearTimeout(timeout); resolve(); } else setTimeout(check, 100); };
+            check();
+        });
+        const ufrag = pc => /a=ice-ufrag:(\S+)/.exec(pc.remoteDescription?.sdp || '')?.[1];
+        const videos = [];
+        const realNow = Date.now;
+        try {
+            for (const side of [danny, me]) { const v = document.createElement('video'); videos.push(v); await side.initMedia(v); }
+            await me.callUser('danny', got);
+            await until(() => me.isPeerConnected('danny') && stream?.getVideoTracks().some(t => t.readyState === 'live'), 'No first call');
+            const mine = await me.getOrCreatePeerConnection('danny', got), theirs = await danny.getOrCreatePeerConnection('me', () => {});
+            const before = ufrag(theirs);
+            me.restartCalls();
+            await until(() => ufrag(theirs) !== before && me.isPeerConnected('danny') && danny.isPeerConnected('me'), 'The restart did not reconnect');
+            const restarted = (await me.getOrCreatePeerConnection('danny', got)) === mine && stream.getVideoTracks().some(t => t.readyState === 'live');
+            // Traffic arriving: healthy. A tab that wasn't sampled for a minute is not "silent".
+            await me.sampleCalls(); await new Promise(r => setTimeout(r, 1500)); await me.sampleCalls();
+            const healthy = !me.peerNeedsCall('danny');
+            Date.now = () => realNow() + 60000;
+            const unsampledOk = !me.peerNeedsCall('danny');
+            Date.now = realNow;
+            // Nothing arriving for over ten seconds while it still says "connected": needs a new call.
+            mine.getStats = async () => new Map([['t', { type: 'transport', bytesReceived: 42 }]]);
+            await me.sampleCalls();
+            Date.now = () => realNow() + 11000;
+            await me.sampleCalls();
+            const silentDead = me.isPeerConnected('danny') && me.peerNeedsCall('danny');
+            return { restarted, healthy, unsampledOk, silentDead };
+        } finally {
+            Date.now = realNow;
+            calls.push = push;
+            for (const side of [danny, me]) { side.removePeer('danny'); side.removePeer('me'); side.cleanupDummyStream(); }
+            videos.forEach(v => v.srcObject?.getTracks().forEach(t => t.stop()));
+            window.RTCPeerConnection = NativePeer;
+        }
+    });
+    assert(network.restarted, 'A network change restarts the same call, and its video keeps flowing: ' + JSON.stringify(network));
+    assert(network.healthy && network.unsampledOk, 'A call with traffic arriving is left alone, even after a long gap between checks: ' + JSON.stringify(network));
+    assert(network.silentDead, 'A call nothing arrives on for ten seconds is replaced, even if it says connected: ' + JSON.stringify(network));
+
     // 16 simulated participants exercise tile creation and name handling.
     await page.evaluate(() => {
         for (let i = 0; i < 16; i++) window.__fixture.handlers['presence:join']({ key: 'zz-test-' + i, newPresences: [{ username: '<img src=x> Partner ' + i, isDummyMedia: true }] });

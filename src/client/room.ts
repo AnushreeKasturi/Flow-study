@@ -6,7 +6,7 @@ import { byId, on } from './dom';
 import { bindThemePicker } from './theme';
 import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, updateMicState, sendReaction, sendHandRaise, sendBye } from './modules/socket';
 import { initNotifications, pushNote, systemNotify } from './modules/notifications';
-import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack, showLocalStream, isMicOn, recoverCamera, whenCameraLost } from './modules/rtc';
+import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack, showLocalStream, isMicOn, recoverCamera, whenCameraLost, sampleCalls, restartCalls } from './modules/rtc';
 import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState, saveFocus, restoreTimer, autoAdvance } from './modules/timer';
 import { initTasks, addTask, toggleTask, deleteTask, assignTask, rerenderTasks, setSharedTasks } from './modules/tasks';
 import { initPresence, startFocusTracking, stopFocusTracking, formatFocusTime } from './modules/presence';
@@ -86,7 +86,12 @@ function showLobbyError(message: string, action?: { label: string; run: () => vo
     }
     lobbyError.classList.remove('hidden');
 }
+// Our link to the room coming back after a drop usually means the network changed under us
+// (another Wi-Fi, a sleeping laptop), so the calls are moved over too, not left on the old one.
+let wasSubscribed = false, droppedSince = false;
 function connectionStatus(status: string) {
+    if (status === 'SUBSCRIBED') { if (wasSubscribed && droppedSince) restartCalls(); wasSubscribed = true; droppedSince = false; }
+    else droppedSince = true;
     const el = byId<HTMLElement>('connection-status');
     const offline = !navigator.onLine;
     el.textContent = offline ? 'Offline' : status === 'SUBSCRIBED' ? 'Connected' : 'Reconnecting…';
@@ -429,8 +434,10 @@ async function enterRoom(roomId: string, roomCode: string, mediaReady = false) {
         }
     });
 
-    // Self-healing calls: every few seconds, re-dial anyone we should be connected to but aren't.
-    setInterval(() => {
+    // Self-healing calls: every few seconds, re-dial anyone we should be connected to but aren't,
+    // judged by whether anything is actually arriving from them (sampleCalls), not just by state.
+    setInterval(async () => {
+        await sampleCalls();
         Object.keys(partners).forEach(userId => {
             if (userId === getMyUserId() || !peerNeedsCall(userId)) return;
             // A peer stuck in 'failed' still exists, so renegotiating would reuse the broken connection.
@@ -770,7 +777,9 @@ async function start() {
     });
 
     window.addEventListener('offline', () => connectionStatus('OFFLINE'));
-    window.addEventListener('online', () => connectionStatus('CONNECTING'));
+    window.addEventListener('online', () => { connectionStatus('CONNECTING'); restartCalls(); });
+    // A switch between networks can happen without ever going offline (Chrome reports it here).
+    (navigator as Navigator & { connection?: EventTarget }).connection?.addEventListener('change', () => restartCalls());
     connectionStatus('CONNECTING');
     // Drop from presence at once when the tab closes or reloads.
     window.addEventListener('pagehide', () => {

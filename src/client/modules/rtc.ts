@@ -97,13 +97,21 @@ export const hasPeer = (userId: string) => !!peers[userId];
 // True only while media is actually flowing to this person.
 export const isPeerConnected = (userId: string) => peers[userId]?.connectionState === 'connected';
 
-// 'disconnected' is a normal transient ICE blip that usually self-recovers
-// in a second or two — tearing down on it immediately just recreates the
-// flicker this is meant to fix. Only treat it as broken once it's been
-// stuck for a while.
-const DISCONNECT_GRACE_MS = 6000;
 const NEGOTIATION_TIMEOUT_MS = 15000;
-const disconnectedSince: Record<string, number> = {};
+// Whether anything is arriving, not what the connection says about itself: a live call always
+// carries some traffic (connection checks, receiver reports) even with the other camera off and
+// mic muted. A call that has been silent this long is dead whatever its state claims, as after a
+// Wi-Fi switch or a lost restart. Measured between samples, so a throttled tab can't fake silence.
+const SILENT_MS = 10000;
+const lastBytes: Record<string, number> = {}, lastHeardFrom: Record<string, number> = {}, lastSampled: Record<string, number> = {};
+export const sampleCalls = () => Promise.all(Object.entries(peers).map(async ([userId, pc]) => {
+    let bytes = 0;
+    try { (await pc.getStats()).forEach(report => { if (report.type === 'transport') bytes += report.bytesReceived || 0; }); } catch { return; }
+    if (peers[userId] !== pc) return;
+    const now = Date.now();
+    if (bytes !== lastBytes[userId]) { lastBytes[userId] = bytes; lastHeardFrom[userId] = now; }
+    lastSampled[userId] = now;
+}));
 
 export const peerNeedsCall = (userId: string) => {
     const pc = peers[userId];
@@ -112,8 +120,19 @@ export const peerNeedsCall = (userId: string) => {
     if (state === 'failed' || state === 'closed') return true;
     // Never connected: an offer or answer was lost (the network dropped mid-call), so start again.
     if ((state === 'new' || state === 'connecting') && Date.now() - (startedAt[userId] || Date.now()) > NEGOTIATION_TIMEOUT_MS) return true;
-    return state === 'disconnected' && Date.now() - (disconnectedSince[userId] || Date.now()) > DISCONNECT_GRACE_MS;
+    return (lastSampled[userId] ?? 0) - (lastHeardFrom[userId] ?? startedAt[userId] ?? 0) > SILENT_MS;
 };
+
+// A new network (another Wi-Fi, a phone hotspot, a VPN) leaves every call on the old address.
+// An ICE restart moves the same call over, usually within a second or two, without a new tile.
+// Either side may send it; the offer-collision rules in handleSignal sort out both at once.
+export const restartCall = (userId: string) => {
+    const pc = peers[userId];
+    if (!pc || pc.connectionState === 'closed') return;
+    pc.restartIce();
+    if (pc.signalingState === 'stable') sendOffer(userId, pc);
+};
+export const restartCalls = () => Object.keys(peers).forEach(restartCall);
 
 export let isDummyMedia = false;
 
@@ -313,7 +332,8 @@ export const getOrCreatePeerConnection = async (userId: string, onRemoteStream: 
         const pc = new RTCPeerConnection({ ...iceConfig, iceTransportPolicy: relayOnly ? 'relay' : 'all' });
         peers[userId] = pc;
         myConn[userId] = crypto.randomUUID();
-        startedAt[userId] = Date.now();
+        startedAt[userId] = lastHeardFrom[userId] = Date.now();
+        delete lastBytes[userId]; delete lastSampled[userId];
         candidateQueues[userId] = candidateQueues[userId] || [];
         makingOffer[userId] = false;
 
@@ -346,11 +366,9 @@ export const getOrCreatePeerConnection = async (userId: string, onRemoteStream: 
 
         pc.onconnectionstatechange = () => {
             console.log(`[WebRTC] ${userId}: ${pc.connectionState}`);
-            if (pc.connectionState === 'disconnected') {
-                if (!disconnectedSince[userId]) disconnectedSince[userId] = Date.now();
-            } else {
-                delete disconnectedSince[userId];
-            }
+            // Don't wait to see if it comes back by itself: a restart is cheap, and the room
+            // replaces the whole call if nothing arrives for a few seconds anyway.
+            if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') restartCall(userId);
         };
 
         return pc;
@@ -437,17 +455,23 @@ export const callUser = async (userId: string, onRemoteStream: RemoteStream) => 
         const pc = await getOrCreatePeerConnection(userId, onRemoteStream);
         if (pc.signalingState !== 'stable') return;
         if (pc.connectionState === 'connected' || pc.connectionState === 'connecting') return;
-
+        await sendOffer(userId, pc);
+    } catch (err) {
+        console.error('Failed to initiate call:', err);
+    }
+};
+async function sendOffer(userId: string, pc: RTCPeerConnection) {
+    try {
         makingOffer[userId] = true;
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         sendTagged(userId, { type: 'offer', offer: { type: offer.type, sdp: offer.sdp } });
     } catch (err) {
-        console.error('Failed to initiate call:', err);
+        console.error('Failed to send an offer:', err);
     } finally {
         makingOffer[userId] = false;
     }
-};
+}
 
 export const removePeer = (userId: string) => {
     if (peers[userId]) {
@@ -461,7 +485,7 @@ export const removePeer = (userId: string) => {
     delete candidateCounts[userId];
     delete pendingPeers[userId];
     delete remoteStreams[userId];
-    delete disconnectedSince[userId];
+    delete lastBytes[userId]; delete lastHeardFrom[userId]; delete lastSampled[userId];
     delete myConn[userId];
     delete theirConn[userId];
     delete startedAt[userId];
