@@ -502,9 +502,16 @@ body[data-timer="break"] .breath { display: block; }
    there isn't room for all 53, the oldest are the ones cut off. */
 .modal.profile { width: min(760px, 100%); }
 .heatmap { margin: 0; }
-.heatmap-grid { display: grid; grid-template-columns: repeat(53, 10px); grid-template-rows: 14px repeat(7, 10px); gap: 3px; justify-content: end; overflow: hidden;; -webkit-mask-image: linear-gradient(to right, transparent, #000 28px); mask-image: linear-gradient(to right, transparent, #000 28px); }
+.heatmap-grid { display: grid; grid-template-columns: repeat(26, minmax(0, 10px)); grid-template-rows: 14px; grid-auto-rows: auto; gap: 3px; }
 .heatmap-grid span { grid-row: 1; font-size: .66rem; color: var(--text-3); white-space: nowrap; }
-.heatmap i { display: block; width: 10px; height: 10px; border-radius: 2px; background: color-mix(in srgb, var(--text) 9%, transparent); }
+.heatmap i { position: relative; display: block; width: 10px; height: 10px; border-radius: 2px; background: color-mix(in srgb, var(--text) 9%, transparent); }
+.heatmap-grid i { width: 100%; height: auto; aspect-ratio: 1; }
+.heatmap-grid i::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 5px); left: 50%; translate: -50%; z-index: 5; padding: 4px 9px; border-radius: 999px; background: var(--text); color: var(--bg); font-size: .72rem; font-style: normal; font-weight: 500; white-space: nowrap; opacity: 0; pointer-events: none; }
+.heatmap-grid i.tip-start::after { left: 0; translate: none; }
+.heatmap-grid i.tip-end::after { left: auto; right: 0; translate: none; }
+@media (hover: hover) { .heatmap-grid i:hover { outline: 1px solid var(--text-2); } .heatmap-grid i:hover::after { opacity: 1; } }
+.heatmap-grid i.tip-open { outline: 1px solid var(--text-2); }
+.heatmap-grid i.tip-open::after { opacity: 1; }
 .heatmap .l1 { background: color-mix(in srgb, var(--primary) 30%, color-mix(in srgb, var(--text) 9%, var(--surface))); }
 .heatmap .l2 { background: color-mix(in srgb, var(--primary) 55%, color-mix(in srgb, var(--text) 9%, var(--surface))); }
 .heatmap .l3 { background: color-mix(in srgb, var(--primary) 80%, color-mix(in srgb, var(--text) 9%, var(--surface))); }

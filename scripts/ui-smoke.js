@@ -593,7 +593,7 @@ async (page) => {
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     assert((await page.locator('#chat-messages').innerText()).includes('Ready for the next session.'), 'Chat should render messages');
     await page.getByRole('tab', { name: 'Tasks', exact: true }).click();
-    // Two earlier days of focus, for the year heatmap.
+    // Two earlier days of focus, for the heatmap.
     await page.evaluate(() => {
         const fixture = window.__fixture, id = fixture.tables.profiles[0].id, day = n => new Date(Date.now() - n * 864e5).toISOString();
         fixture.tables.sessions.push({ id: 'heat-1', user_id: id, mode: 'focus', duration_seconds: 5400, completed_at: day(3) }, { id: 'heat-2', user_id: id, mode: 'focus-partial', duration_seconds: 600, completed_at: day(10) });
@@ -601,15 +601,24 @@ async (page) => {
     await page.getByRole('button', { name: 'Edit your profile', exact: true }).focus();
     await page.keyboard.press('Enter');
     await visible('#profile-modal');
-    // A year of focus, one square a day: 53 weeks, darker for longer days.
+    // Six months of focus, one square a day: 26 weeks, darker for longer days, with the time on hover.
     await page.locator('#profile-modal .heatmap-grid').waitFor();
     const heat = await page.evaluate(() => {
         const grid = document.querySelector('#profile-modal .heatmap-grid'), cells = [...grid.querySelectorAll('i')];
         const threeDaysAgo = new Date(Date.now() - 3 * 864e5);
-        const label = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(threeDaysAgo);
-        return { cells: cells.length, expected: 52 * 7 + new Date().getDay() + 1, longDay: cells.find(cell => cell.title.startsWith(label + ':'))?.className, summary: grid.getAttribute('aria-label') };
+        const label = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).format(threeDaysAgo);
+        const longDay = cells.find(cell => cell.dataset.tip.startsWith(label + ' ·'));
+        return { cells: cells.length, expected: 25 * 7 + new Date().getDay() + 1, longDay: longDay?.className.split(' ')[0], tip: longDay?.dataset.tip, summary: grid.getAttribute('aria-label'), fits: grid.scrollWidth <= grid.clientWidth };
     });
-    assert(heat.cells === heat.expected && heat.longDay === 'l3' && heat.summary.includes('Longest streak'), 'The profile shows a year of focus, one square a day, shaded by time: ' + JSON.stringify(heat));
+    assert(heat.cells === heat.expected && heat.longDay === 'l3' && heat.tip.endsWith('1h 30m focused') && heat.fits && heat.summary.includes('6 months'), 'The profile shows six months of focus, one square a day, shaded by time: ' + JSON.stringify(heat));
+    const tipCell = page.locator(`#profile-modal .heatmap-grid i[data-tip$="1h 30m focused"]`);
+    await tipCell.hover();
+    await page.waitForFunction(cell => getComputedStyle(cell, '::after').opacity === '1', await tipCell.elementHandle());
+    // A tap shows it too (phones have no hover), and a tap elsewhere hides it.
+    await tipCell.click();
+    assert(await tipCell.evaluate(cell => cell.classList.contains('tip-open')), 'Tapping a heatmap square should show its time');
+    await page.locator('#profile-modal .heatmap figcaption').click();
+    assert(await page.locator('#profile-modal .heatmap-grid i.tip-open').count() === 0, 'Tapping elsewhere should hide the heatmap tip');
     await page.screenshot({ path: 'output/playwright/profile-heatmap.png' });
     await page.getByRole('button', { name: 'Close profile', exact: true }).click();
     // Dialogs trap focus and restore it on Escape.

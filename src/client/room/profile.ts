@@ -11,28 +11,41 @@ import { refreshBoard } from './hosting';
 import { here } from './state';
 
 // Seven days of focus as small bars, oldest first; today includes time still in progress.
-// A year of focus, one square per day, like GitHub's contribution graph: weeks run left to
+// Six months of focus, one square per day, like GitHub's contribution graph: weeks run left to
 // right (Sunday on top), and the shade says how long you focused that day. Today includes time
 // still running. Only numbers and dates go into the markup.
 const LEVELS = [0, 1, 30, 60, 120]; // minutes: none, a little, half an hour, an hour, two hours+
+const WEEKS = 26;
+// Phones have no hover: a tap shows a square's tip, and a tap anywhere else hides it.
+document.addEventListener('click', event => {
+    const cell = event.target instanceof Element ? event.target.closest('.heatmap-grid i') : null;
+    document.querySelectorAll('.heatmap-grid i.tip-open').forEach(open => { if (open !== cell) open.classList.remove('tip-open'); });
+    cell?.classList.toggle('tip-open');
+});
 export function heatmap(stats: ProfileStats) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const start = new Date(today);
-    start.setDate(start.getDate() - 52 * 7 - today.getDay());
+    start.setDate(start.getDate() - (WEEKS - 1) * 7 - today.getDay());
     const month = new Intl.DateTimeFormat(undefined, { month: 'short' });
-    const label = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    const label = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
     let cells = '', months = '', lastMonth = -1, focusedDays = 0, totalMinutes = 0, longest = 0, run = 0;
     for (let day = new Date(start), index = 0; day <= today; day.setDate(day.getDate() + 1), index++) {
         const column = Math.floor(index / 7) + 1;
         const minutes = day.getTime() === today.getTime() ? stats.todayMinutes : Math.floor((stats.daySeconds[dayKey(day)] || 0) / 60);
         const level = LEVELS.filter(threshold => minutes >= threshold).length - 1;
-        if (day.getDay() === 0 && day.getMonth() !== lastMonth) { lastMonth = day.getMonth(); months += `<span style="grid-column:${column}">${month.format(day)}</span>`; }
+        if (day.getDay() === 0 && day.getMonth() !== lastMonth) {
+            lastMonth = day.getMonth();
+            // A month with only its last week or two on the left edge would collide with the next one's name.
+            if (column > 1 || day.getDate() <= 14) months += `<span style="grid-column:${column}">${month.format(day)}</span>`;
+        }
         if (minutes > 0) { focusedDays++; totalMinutes += minutes; run++; longest = Math.max(longest, run); } else run = 0;
-        cells += `<i class="l${level}" style="grid-column:${column};grid-row:${day.getDay() + 2}" title="${label.format(day)}: ${minutes ? formatFocusTime(minutes) : 'no focus'}"></i>`;
+        // The tip opens to the right near the left edge and to the left near the right, so it stays on screen.
+        const edge = column <= 5 ? ' tip-start' : column > WEEKS - 5 ? ' tip-end' : '';
+        cells += `<i class="l${level}${edge}" style="grid-column:${column};grid-row:${day.getDay() + 2}" data-tip="${label.format(day)} · ${minutes ? formatFocusTime(minutes) + ' focused' : 'No focus'}"></i>`;
     }
-    const summary = `${formatFocusTime(totalMinutes)} over ${focusedDays} day${focusedDays === 1 ? '' : 's'} in the last year. Longest streak: ${longest} day${longest === 1 ? '' : 's'}.`;
-    return `<figure class="heatmap"><div class="heatmap-grid" role="img" aria-label="Focus each day for the last year. ${summary}">${months}${cells}</div>` +
+    const summary = `${formatFocusTime(totalMinutes)} over ${focusedDays} day${focusedDays === 1 ? '' : 's'} in the last 6 months. Longest streak: ${longest} day${longest === 1 ? '' : 's'}.`;
+    return `<figure class="heatmap"><div class="heatmap-grid" role="img" aria-label="Focus each day for the last 6 months. ${summary}">${months}${cells}</div>` +
         `<figcaption><span>${summary}</span><span class="heatmap-key" aria-hidden="true">Less <i class="l0"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i> More</span></figcaption></figure>`;
 }
 
