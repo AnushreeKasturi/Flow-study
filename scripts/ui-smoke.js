@@ -997,8 +997,9 @@ async (page) => {
     const pinOf = id => page.locator(`#video-wrapper-${id} .tile-pin`);
     await pinOf('zz-test-3').click();
     await pinOf('zz-test-5').click();
+    // Tests run with reduced motion, whose 0.01ms transitions still take a frame or two to land on a slow machine.
+    await page.waitForFunction(() => document.getElementById('video-wrapper-zz-test-5').getBoundingClientRect().top < document.getElementById('video-wrapper-local').getBoundingClientRect().top, undefined, { timeout: 3000 }).catch(() => {});
     const pinned = await page.evaluate(async () => {
-        await new Promise(requestAnimationFrame); // let the (near-instant, in tests) transitions land
         const big = document.getElementById('video-wrapper-zz-test-5'), small = document.getElementById('video-wrapper-zz-test-3');
         return { only: document.querySelectorAll('.video-wrapper.pinned').length === 1 && big.classList.contains('pinned'), first: big.getBoundingClientRect().top < document.getElementById('video-wrapper-local').getBoundingClientRect().top,
             bigger: big.getBoundingClientRect().width > 3 * small.getBoundingClientRect().width, label: big.querySelector('.tile-pin').textContent };
@@ -1200,7 +1201,9 @@ async (page) => {
     const enterNewRoom = async () => {
         await page.locator('input[name="audience"][value="private"]').check();
         await page.getByRole('button', { name: 'Create a room', exact: true }).click();
-        await page.waitForFunction(() => !document.getElementById('new-task-input').disabled && document.body.classList.contains('is-host'));
+        // On a fresh lobby page the task box starts enabled and the host flag is set on click, before joining
+        // begins, so those alone can pass too early. The room's presence handler only exists once it's in.
+        await page.waitForFunction(() => typeof window.__fixture.handlers['presence:join'] === 'function' && !document.getElementById('new-task-input').disabled && document.body.classList.contains('is-host'));
         await page.evaluate(() => window.__fixture.handlers['presence:join']({ key: 'zz-next', newPresences: [{ username: 'Riya', isDummyMedia: true }] }));
     };
     await enterNewRoom();

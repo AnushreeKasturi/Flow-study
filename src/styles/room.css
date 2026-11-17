@@ -194,6 +194,32 @@ body[data-timer="break"] .breath { display: block; }
 .reaction-bar { position: absolute; bottom: 48px; left: 0; display: flex; gap: 4px; padding: 6px; border-radius: 999px; background: var(--card); box-shadow: 0 8px 24px #0006; }
 .reaction-bar .icon-btn { width: 34px; height: 34px; background: transparent; font-size: 15px; }
 .media-controls { position: absolute; bottom: 10px; right: 10px; z-index: 20; display: flex; gap: 8px; }
+/* Small tiles (focus mode, the row under a pinned tile): smaller controls, your own name tag
+   dropped (it's your tile), and with a mouse the controls show only while you point at the
+   tile, unless you're away or your mic or camera is off, so they don't sit on your face. */
+.video-wrapper { container: tile / inline-size; }
+@container tile (max-width: 260px) {
+    .name-tag { top: 6px; left: 6px; gap: 5px; padding: 3px 8px; font-size: .68rem; }
+    .name-tag small, #video-wrapper-local .name-tag { display: none; }
+    .away-btn { top: 6px; right: 6px; max-width: calc(100% - 12px); height: 24px; padding: 0 9px; overflow: hidden; font-size: .7rem; text-overflow: ellipsis; }
+    .reactions-menu { bottom: 6px; left: 6px; }
+    .media-controls { bottom: 6px; right: 6px; gap: 4px; }
+    .icon-btn { width: 30px; height: 30px; }
+    .icon-btn svg { width: 16px; height: 16px; }
+    .reaction-bar { bottom: 36px; }
+    .tile-pin, .tile-remove { padding: 3px 8px; font-size: .68rem; }
+    .tile-pin { right: 6px; bottom: 6px; }
+    .tile-remove { top: 6px; right: 6px; }
+    .hand-raised-badge { top: 6px; right: 6px; width: 26px; height: 26px; }
+    .hand-raised-badge svg { width: 15px; height: 15px; }
+    #video-wrapper-local .hand-raised-badge { top: 36px; }
+}
+@media (hover: hover) {
+    @container tile (max-width: 260px) {
+        :is(.away-btn[aria-pressed="false"], .reactions-menu:not([open]), .media-controls:not(:has([aria-pressed="false"]))) { opacity: 0; transition: opacity .15s; }
+        .video-wrapper:is(:hover, :focus-within) :is(.away-btn, .reactions-menu, .media-controls) { opacity: 1; }
+    }
+}
 
 /* ── Tools: tasks, chat, sound ── */
 .right-sidebar { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; border-radius: var(--radius-md); background: var(--surface); box-shadow: 0 30px 60px -30px #0008; }

@@ -74,6 +74,22 @@ async page => {
             const exit = document.getElementById('focus-mode-toggle').getBoundingClientRect();
             return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight && exit.bottom <= innerHeight && !document.querySelector('.right-sidebar').getClientRects().length;
         }, undefined, { polling: 50 });
+        // The small tile in focus mode: every control on it fits, none sits on another.
+        await page.locator('#video-wrapper-local').hover();
+        const crowded = await page.evaluate(() => {
+            const tile = document.getElementById('video-wrapper-local'), frame = tile.getBoundingClientRect();
+            const shown = [...tile.querySelectorAll('.name-tag, .away-btn, .reactions-menu summary, #toggle-mic, #toggle-cam')]
+                .filter(el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden')
+                .map(el => ({ id: el.id || el.className, box: el.getBoundingClientRect() }));
+            const overlaps = [];
+            shown.forEach((a, i) => shown.slice(i + 1).forEach(b => {
+                if (a.box.left < b.box.right - 1 && b.box.left < a.box.right - 1 && a.box.top < b.box.bottom - 1 && b.box.top < a.box.bottom - 1) overlaps.push(a.id + ' / ' + b.id);
+            }));
+            const outside = shown.filter(({ box }) => box.left < frame.left - 1 || box.right > frame.right + 1 || box.top < frame.top - 1 || box.bottom > frame.bottom + 1).map(({ id }) => id);
+            return { tileWidth: Math.round(frame.width), overlaps, outside };
+        });
+        assert(!crowded.overlaps.length && !crowded.outside.length, width + 'x' + height + ': controls on the small focus-mode tile overlap or spill out ' + JSON.stringify(crowded));
+        if (width === 1440 && height === 900) await page.locator('#video-wrapper-local').screenshot({ path: 'output/playwright/small-tile-hover.png' });
         if (width === 1440 && height === 900) await page.screenshot({ path: 'output/playwright/fullscreen-amethyst.png' });
         await page.getByRole('button', { name: 'Toggle Focus Mode', exact: true }).click();
         await page.waitForFunction(() => !document.body.classList.contains('focus-active'));
