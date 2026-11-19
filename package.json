@@ -11,6 +11,7 @@
     "start": "node server.js",
     "dev": "astro dev",
     "test:db": "node --test scripts/sql-integration.test.cjs",
+    "pretest:browser": "npm run build",
     "test:browser": "node scripts/browser-ci.cjs",
     "check:live": "node scripts/check-live.cjs",
     "preview:social": "node scripts/generate-social-preview.cjs",
