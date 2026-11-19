@@ -173,6 +173,7 @@ export const setMode = (mode: TimerMode, broadcast = true) => {
 const validDurations = (values: Durations) => (['focus', 'shortBreak', 'longBreak'] as const).every(key => Number.isInteger(values[key]) && values[key] >= 60 && values[key] <= (key === 'focus' ? 7200 : 3600));
 
 export const autoAdvance = () => state.autoAdvance !== false;
+export const timerDurations = () => state.durations;
 export const setTimerSettings = (durations: Durations, broadcast = true, advance = autoAdvance()) => {
     if (!validDurations(durations) || (broadcast && !runs)) return;
     if (broadcast) changed();

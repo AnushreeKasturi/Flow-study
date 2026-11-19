@@ -7,7 +7,7 @@ import { bindThemePicker } from './theme';
 import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, updateMicState, sendReaction, sendHandRaise, sendBye } from './modules/socket';
 import { initNotifications, pushNote, systemNotify } from './modules/notifications';
 import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack, showLocalStream, isMicOn, recoverCamera, whenCameraLost, sampleCalls, restartCalls } from './modules/rtc';
-import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState, saveFocus, restoreTimer, autoAdvance } from './modules/timer';
+import { initTimer, toggleTimer, resetTimer, setMode, syncState, setTimerSettings, broadcastCurrentState, saveFocus, restoreTimer, autoAdvance, timerDurations } from './modules/timer';
 import { initTasks, addTask, toggleTask, deleteTask, assignTask, rerenderTasks, setSharedTasks } from './modules/tasks';
 import { initPresence, startFocusTracking, stopFocusTracking, formatFocusTime } from './modules/presence';
 import { initChat, handleIncomingMessage } from './modules/chat';
@@ -201,7 +201,6 @@ async function createRoom(open?: Omit<GroupDetails, 'host_name'> & { planId?: st
     const minutes = Number(localStorage.getItem('flow_focus_minutes'));
     if (here.code === createdCode && minutes >= 10 && minutes <= 90 && minutes !== 25) {
         setTimerSettings({ focus: minutes * 60, shortBreak: 5 * 60, longBreak: 15 * 60 });
-        byId<HTMLInputElement>('setting-focus-duration').value = String(minutes);
     }
 }
 
@@ -560,7 +559,14 @@ function bindRoomControls() {
     UI.UI.timerModes.forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode as TimerMode)));
     const hideIpBox = byId<HTMLInputElement>('setting-hide-ip');
     const previewBox = byId<HTMLInputElement>('setting-preview');
-    on('open-timer-settings-btn', () => { hideIpBox.checked = hidingIp(); previewBox.checked = previewWanted(); byId<HTMLInputElement>('setting-auto-advance').checked = autoAdvance(); });
+    on('open-timer-settings-btn', () => {
+        hideIpBox.checked = hidingIp(); previewBox.checked = previewWanted(); byId<HTMLInputElement>('setting-auto-advance').checked = autoAdvance();
+        // The room's lengths, which someone else may have changed since this page loaded.
+        const lengths = timerDurations();
+        byId<HTMLInputElement>('setting-focus-duration').value = String(Math.round(lengths.focus / 60));
+        byId<HTMLInputElement>('setting-short-break-duration').value = String(Math.round(lengths.shortBreak / 60));
+        byId<HTMLInputElement>('setting-long-break-duration').value = String(Math.round(lengths.longBreak / 60));
+    });
     const notifyBox = byId<HTMLInputElement>('setting-notify');
     notifyBox.checked = localStorage.getItem('flow_notify') === '1';
     on('open-timer-settings-btn', () => openModal('timer-settings-modal'));

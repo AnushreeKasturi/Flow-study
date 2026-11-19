@@ -471,6 +471,13 @@ async (page) => {
     await page.getByLabel('Focus (minutes)', { exact: true }).fill('30');
     await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
     assert(await page.locator('#time-display').innerText() === '30:00', 'Timer settings should apply');
+    // Someone else changes the lengths: opening the dialog shows theirs, not the page's old ones.
+    await page.evaluate(() => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 3000, timeLeft: 3000, isRunning: false, durations: { focus: 3000, shortBreak: 600, longBreak: 1200 } } }));
+    await page.getByRole('button', { name: 'Timer settings', exact: true }).click();
+    const lengths = await Promise.all(['Focus (minutes)', 'Short break (minutes)', 'Long break (minutes)'].map(label => page.getByLabel(label, { exact: true }).inputValue()));
+    assert(lengths.join() === '50,10,20', `The dialog should show the room's current lengths, got ${lengths}`);
+    await page.locator('#close-timer-settings-btn').click();
+    await page.evaluate(() => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', mode: 'focus', duration: 1800, timeLeft: 1800, isRunning: false, durations: { focus: 1800, shortBreak: 300, longBreak: 900 } } }));
     // Shortcuts act on the room but never while a control has focus or a dialog is open.
     await page.locator('.stage-header h1').click();
     await page.keyboard.press('s');
