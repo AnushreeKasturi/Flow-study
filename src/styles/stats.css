@@ -1,5 +1,6 @@
 /* The owner's stats page (src/pages/stats.astro). */
 .stats .chips { margin-top: 32px; }
+.stats section .chips { margin-top: 16px; }
 .stats section { margin-top: 44px; }
 .stats h2 { font-size: 1.8rem; }
 .stats .count { margin-left: 6px; color: var(--text-3); font-size: 1rem; }
@@ -32,3 +33,10 @@
 .list li span, .list li strong { position: relative; overflow-wrap: anywhere; }
 .list li strong { font-variant-numeric: tabular-nums; }
 .list li.empty { color: var(--text-3); }
+
+.people-wrap { margin-top: 16px; overflow-x: auto; border-radius: var(--radius-md); background: var(--surface); }
+.people { width: 100%; border-collapse: collapse; font-size: .86rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.people th, .people td { padding: 10px 14px; border-bottom: 1px solid var(--line); text-align: left; }
+.people th { color: var(--text-2); font-weight: 500; }
+.people tr:last-child td { border-bottom: 0; }
+.people td.no { color: var(--text-3); }

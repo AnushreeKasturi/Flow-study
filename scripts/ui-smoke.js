@@ -1341,6 +1341,14 @@ async (page) => {
 
     // Home: who you are, and one place to start a private room, open a listed one, join by code, or sit in a group.
     assert(await page.locator('#join-title').innerText() === 'Hi, Alex.', 'Home should greet the signed-in person by name');
+    assert(await page.locator('#stats-link').isHidden(), 'Only the owner sees the link to /stats');
+    await page.evaluate(() => localStorage.setItem('fixture-admin', '1'));
+    await page.goto(origin + '/room.html');
+    await visible('#stats-link');
+    assert(await page.locator('#stats-link').getAttribute('href') === '/stats.html');
+    await page.evaluate(() => localStorage.removeItem('fixture-admin'));
+    await page.goto(origin + '/room.html');
+    await visible('#join-modal');
     await page.getByRole('button', { name: 'Change name', exact: true }).click();
     await page.getByLabel('Your display name').fill('Alex R');
     await page.getByLabel('Your display name').press('Enter');

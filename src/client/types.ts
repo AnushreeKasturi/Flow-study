@@ -93,7 +93,9 @@ export interface Database {
             room_checkin: { Args: { p_room: string; p_seats_taken: number; p_timer_mode: string | null; p_timer_ends_at: string | null }; Returns: boolean };
             lists_room: { Args: { p_room: string }; Returns: boolean };
             focus_days: { Args: { p_tz: string }; Returns: { day: string; seconds: number; completed: number }[] };
+            is_admin: { Args: Record<string, never>; Returns: boolean };
             exclude_visitor: { Args: { p_visitor: string }; Returns: undefined };
+            platform_accounts: { Args: Record<string, never>; Returns: { email: string | null; provider: string; joined: string; verified: boolean; last_sign_in: string | null; focus_hours: number; study_days: number; last_studied: string | null }[] };
             platform_stats: { Args: { p_days: number }; Returns: Record<string, unknown> };
         };
         Enums: Record<string, never>;

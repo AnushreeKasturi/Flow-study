@@ -40,6 +40,15 @@ import '../styles/stats.css';
                     <table id="stats-table"></table>
                 </details>
             </section>
+            <section aria-labelledby="people-heading">
+                <h2 id="people-heading">Every account <span id="people-count" class="count"></span></h2>
+                <div class="chips" role="group" aria-label="Show">
+                    <button type="button" data-verified="" aria-pressed="true">All</button>
+                    <button type="button" data-verified="yes" aria-pressed="false">Verified</button>
+                    <button type="button" data-verified="no" aria-pressed="false">Not verified</button>
+                </div>
+                <div class="people-wrap"><table id="stats-people" class="people"></table></div>
+            </section>
             <section aria-labelledby="where-heading">
                 <h2 id="where-heading">Where they come from</h2>
                 <div id="stats-lists" class="lists"></div>

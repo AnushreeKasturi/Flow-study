@@ -113,6 +113,35 @@ function render(stats: Stats) {
     lists(stats);
 }
 
+type Account = { email: string | null; provider: string; joined: string; verified: boolean; last_sign_in: string | null; focus_hours: number; study_days: number; last_studied: string | null };
+let accounts: Account[] = [];
+const when = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+const ago = (at: string | null) => at ? when.format(new Date(at)) : '–';
+
+function people(filter: string) {
+    const rows = accounts.filter(row => !filter || row.verified === (filter === 'yes'));
+    byId('people-count').textContent = number.format(rows.length);
+    const head = el('tr');
+    ['Email', 'Signed up with', 'Joined', 'Verified', 'Last signed in', 'Focus hours', 'Days studied', 'Last studied'].forEach(text => head.append(el('th', '', text)));
+    byId('stats-people').replaceChildren(head, ...rows.map(row => {
+        const tr = el('tr');
+        tr.append(el('td', '', row.email ?? '–'), el('td', '', row.provider), el('td', '', ago(row.joined)), el('td', row.verified ? 'yes' : 'no', row.verified ? 'Yes' : 'No'),
+            el('td', '', ago(row.last_sign_in)), el('td', '', number.format(row.focus_hours)), el('td', '', number.format(row.study_days)), el('td', '', ago(row.last_studied)));
+        return tr;
+    }));
+}
+
+async function loadAccounts() {
+    const { data } = await getSupabase().rpc('platform_accounts');
+    accounts = (data ?? []) as Account[];
+    const buttons = document.querySelectorAll<HTMLButtonElement>('[data-verified]');
+    buttons.forEach(button => button.addEventListener('click', () => {
+        buttons.forEach(other => other.setAttribute('aria-pressed', String(other === button)));
+        people(button.dataset.verified ?? '');
+    }));
+    people('');
+}
+
 async function load(days: number) {
     message.textContent = 'Loading…';
     const { data, error } = await getSupabase().rpc('platform_stats', { p_days: days });
@@ -141,4 +170,5 @@ async function load(days: number) {
         void load(Number(button.dataset.days));
     }));
     await load(30);
+    if (!byId('stats-body').hidden) await loadAccounts();
 })();

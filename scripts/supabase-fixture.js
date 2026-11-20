@@ -124,7 +124,13 @@ window.supabase = { createClient() {
                 if (name === 'room_checkin') return { data: !!room.host_away && room.acting_host === user.id, error: null };
                 if (name === 'lists_room') return { data: tables.open_rooms.some(row => row.host_id === user.id), error: null };
                 // The owner's stats (sql/020): sample numbers, or the refusal everyone else gets when fixture.admin is false.
+                if (name === 'is_admin') return { data: localStorage.getItem('fixture-admin') === '1', error: null };
                 if (name === 'exclude_visitor') return { data: null, error: fixture.admin === false ? { message: 'Not allowed' } : null };
+                if (name === 'platform_accounts') return fixture.admin === false ? { data: null, error: { message: 'Not allowed' } } : { data: [
+                    { email: 'sam@example.com', provider: 'email', joined: '2026-11-18T09:00:00Z', verified: true, last_sign_in: '2026-11-19T20:00:00Z', focus_hours: 12.5, study_days: 6, last_studied: '2026-11-19T21:00:00Z' },
+                    { email: 'jo@example.com', provider: 'google', joined: '2026-11-10T09:00:00Z', verified: true, last_sign_in: '2026-11-12T08:00:00Z', focus_hours: 1.2, study_days: 1, last_studied: '2026-11-12T09:00:00Z' },
+                    { email: 'new@example.com', provider: 'email', joined: '2026-11-19T22:00:00Z', verified: false, last_sign_in: null, focus_hours: 0, study_days: 0, last_studied: null }
+                ], error: null };
                 if (name === 'platform_stats') {
                     if (fixture.admin === false) return { data: null, error: { message: 'Not allowed' } };
                     const days = args.p_days;

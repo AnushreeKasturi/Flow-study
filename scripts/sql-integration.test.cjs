@@ -421,6 +421,17 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.equal(stats.accounts.total, Number(run(database, 'SELECT count(*) FROM auth.users;').trim()) - 1);
             assert.equal(stats.daily.length, 30);
             assert.equal(JSON.parse(asUser(two, 'SELECT public.platform_stats(9999);')).days, 365, 'The period is capped');
+
+            // 021: every account for the owner, with how much each studies; the owner left out.
+            run(database, `ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email TEXT, ADD COLUMN IF NOT EXISTS raw_app_meta_data JSONB;
+                UPDATE auth.users SET email = 'one@example.com', raw_app_meta_data = '{"provider":"google"}' WHERE id = '${one}';`);
+            run(database, readFileSync('sql/021_platform_accounts.sql', 'utf8'));
+            run(database, readFileSync('sql/021_platform_accounts.sql', 'utf8'));
+            assert.throws(() => asUser(one, 'SELECT * FROM public.platform_accounts();'), /Command failed/, 'Only the owner lists accounts');
+            assert.throws(() => run(database, 'SET ROLE anon; SELECT * FROM public.platform_accounts();'), /Command failed/);
+            const listed = asUser(two, `SELECT email || ' ' || provider || ' ' || verified || ' ' || focus_hours FROM public.platform_accounts() WHERE email IS NOT NULL;`);
+            assert.deepEqual(listed, `one@example.com google true ${run(database, `SELECT round(coalesce(sum(duration_seconds),0)/3600.0,1) FROM public.sessions WHERE user_id = '${one}' AND mode LIKE 'focus%';`).trim()}`, 'Email, sign-in method, verified, focus hours');
+            assert.equal(asUser(two, `SELECT count(*) FROM public.platform_accounts() WHERE email IS NULL AND verified;`), '0', 'The owner is not listed');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

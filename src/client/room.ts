@@ -25,6 +25,7 @@ import { unlistRoom, cancelPlan } from './modules/board';
 import { getStats as getTaskStats } from './modules/tasks';
 import type { GroupDetails } from './types';
 import { initShortcuts } from './modules/shortcuts';
+import { visitorId } from './visits';
 import { here, partners, pendingLeaves, lastHeard, peopleHere } from './room/state';
 import { applyHideIp, checkListed, chooseHideIp, hidingIp, setFromBoard } from './room/hide-ip';
 import { awayTimer, isAway, setAwayState } from './room/away';
@@ -800,6 +801,13 @@ async function start() {
 
     await firstRunName(user.id);
     setRoomBusy(false);
+    // Only Flow's owner (sql/020) sees the link to /stats; the page itself refuses everyone else too.
+    // The owner's own browsers are left out of the visit count wherever they sign in.
+    supabase.rpc('is_admin').then(({ data }) => {
+        byId('stats-link').hidden = data !== true;
+        const visitor = data === true && visitorId();
+        if (visitor) supabase.rpc('exclude_visitor', { p_visitor: visitor }).then(undefined, () => {});
+    }, () => {});
     showHome(user, { join: code => { roomCodeInput.value = code; pinInput.value = ''; return joinRoom(); }, create: createRoom, showError: showLobbyError });
 
     // Arriving from the study-groups board: either to host a new group, or with a seat already taken.
