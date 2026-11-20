@@ -194,8 +194,10 @@ export async function confirmRemoval() {
 
 
 
-// The board panel in the invite dialog, and the remove-someone dialog.
+// The room settings dialog (the board listing), and the remove-someone dialog.
 export function bindHosting() {
+    on('room-settings-btn', () => openModal('room-settings-modal'));
+    on('close-room-settings-btn', closeModal);
     byId<HTMLFormElement>('board-form').addEventListener('submit', async event => {
         event.preventDefault();
         const button = byId<HTMLButtonElement>('board-list-btn');

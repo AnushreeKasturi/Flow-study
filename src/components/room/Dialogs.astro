@@ -175,8 +175,13 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
             <input id="invite-link-input" class="input" readonly>
             <button id="copy-invite-btn" class="btn btn-primary"><Icon name="copy" size={16} /><span>Copy link</span></button>
         </div>
+        <div class="dialog-actions"><button id="close-invite-btn" class="btn">Done</button></div>
+    </div>
+
+    <div id="room-settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="room-settings-title">
+        <h2 id="room-settings-title">Room settings</h2>
         <form id="board-form" class="board-form">
-            <h3>Or open it to the study-groups board</h3>
+            <h3>Study-groups board</h3>
             <p id="board-status" class="panel-description" role="status">Anyone signed in can find it and take a seat. Rooms with a PIN can’t be listed.</p>
             <label for="board-topic">What are you studying?</label>
             <input type="text" id="board-topic" class="input" minlength="3" maxlength="80" required placeholder="Organic chemistry revision">
@@ -193,7 +198,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
             </div>
             <label id="board-closed-row" class="check hidden"><input type="checkbox" id="board-closed"><span>Stop new people joining<small>The listing stays up and shows as closed. People already here are not affected.</small></span></label>
         </form>
-        <div class="dialog-actions"><button id="close-invite-btn" class="btn">Done</button></div>
+        <div class="dialog-actions"><button id="close-room-settings-btn" class="btn">Done</button></div>
     </div>
 
     <div id="remove-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="remove-title">

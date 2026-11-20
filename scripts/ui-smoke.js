@@ -1227,7 +1227,7 @@ async (page) => {
     await page.waitForURL(url => url.pathname === '/room.html');
     await page.waitForFunction(() => window.__fixture.tables.open_rooms.length === 1 && !document.getElementById('new-task-input').disabled);
     assert(await page.evaluate(() => { const row = window.__fixture.tables.open_rooms[0]; return row.seats === 4 && row.seats_taken === 1 && row.host_id === 'test-user' && row.subject === 'maths' && row.camera === 'off' && row.timer_mode === 'focus' && row.closed === false; }) && await page.evaluate(() => window.__fixture.calls.filter(call => call.table === 'open_rooms' && call.payload).every(call => !('last_seen' in call.payload))), 'A hosted room should be listed with its details, and never send its own last-seen time');
-    await page.getByRole('button', { name: 'Invite', exact: true }).click();
+    await page.getByRole('button', { name: 'Room settings', exact: true }).click();
     await visible('#board-unlist-btn');
     await page.getByLabel('Stop new people joining').check();
     await page.waitForFunction(() => window.__fixture.tables.open_rooms[0].closed === true);
@@ -1455,10 +1455,26 @@ async (page) => {
     await page.getByRole('button', { name: 'Find me a seat', exact: true }).click();
     await page.waitForURL(url => url.pathname === '/room.html' && url.searchParams.get('room') === 'FOCUS6');
     await visible('#app');
-    // A link alone must never put someone in a room: it fills in the code and waits for a click.
+    // With "Ready to join?" turned off, a link alone never puts someone in a room: it fills in the code and waits for a click.
     await page.goto(origin + '/room.html?room=FOCUS6&join=1');
     await visible('#join-modal');
-    assert(await page.locator('#app').isHidden() && await page.locator('#room-code-input').inputValue() === 'FOCUS6', 'A URL must not auto-join a room');
+    assert(await page.locator('#app').isHidden() && await page.locator('#room-code-input').inputValue() === 'FOCUS6', 'Without the preview, a URL must not auto-join a room');
+    // With it on (the default), the link goes straight to the room's preview; Back leaves you on the invite.
+    await page.evaluate(() => localStorage.setItem('flow_preview', '1'));
+    await page.goto(origin + '/room.html?room=FOCUS6');
+    await visible('#preview-modal');
+    assert(await page.evaluate(() => !window.__fixture.calls.some(call => call.name === 'join_room')), 'Opening an invite link must not join the room before Join now');
+    assert(await page.locator('#app').isHidden() && await page.locator('#preview-room').innerText() === 'FOCUS6', 'An invite link opens its room\u2019s preview');
+    await page.locator('#preview-back').click();
+    await visible('#join-modal');
+    assert(await page.locator('#join-heading').innerText() === 'You\u2019re invited', 'Back from the preview shows the invite');
+    await page.locator('#preview-modal.hidden').waitFor({ state: 'attached' });
+    await page.goto(origin + '/room.html?room=FOCUS6');
+    await visible('#preview-modal');
+    await page.waitForFunction(() => !document.getElementById('preview-join').disabled);
+    await page.locator('#preview-join').click();
+    await visible('#app');
+    await page.evaluate(() => localStorage.setItem('flow_preview', '0'));
     // Signed out, the board is readable but nothing on it can be used.
     await page.evaluate(() => { localStorage.removeItem('flow_signed_in'); localStorage.removeItem('fixture-session'); });
     await page.goto(origin + '/groups.html?board');

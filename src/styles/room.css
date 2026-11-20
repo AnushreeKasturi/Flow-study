@@ -304,7 +304,9 @@ body[data-timer="break"] .breath { display: block; }
 .shortcut-list dd { color: var(--text-2); }
 
 /* Listing a room on the board, inside the invite dialog. */
-.board-form { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+.board-form { margin-top: 16px; }
+/* Listing a room is the host's; nobody else gets the button. */
+body:not(.is-host) #room-settings-btn { display: none; }
 .board-form h3 { font-size: 1.15rem; }
 .board-form .panel-description { margin: 6px 0 14px; }
 .board-form > label { margin-bottom: 8px; }
