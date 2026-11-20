@@ -104,6 +104,41 @@ test('hosted analytics omit invitation parameters, load only their own scripts, 
     }
 });
 
+test('visits send only the page name, the linking site, and a random browser id, on the hosted site only', async () => {
+    const source = compile('src/client/visits.ts')
+        .replace(/import defaults from .*;/, "const defaults = { url: 'https://db.example', publishableKey: 'key' };")
+        .replaceAll('import.meta.env', '({})');
+    const { recordVisit } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+    const sent = [];
+    const store = new Map();
+    const realFetch = globalThis.fetch;
+    const setGlobals = (hostname, referrer) => Object.assign(globalThis, {
+        location: { hostname, pathname: '/room.html' },
+        document: { referrer },
+        localStorage: { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value) },
+        matchMedia: () => ({ matches: true }),
+        fetch: async (url, options) => { sent.push({ url, ...JSON.parse(options.body) }); }
+    });
+    try {
+        setGlobals('localhost', '');
+        recordVisit();
+        assert.equal(sent.length, 0, 'Local copies send nothing');
+        setGlobals('flow-study.me', 'https://www.google.com/search?q=private');
+        recordVisit();
+        setGlobals('flow-study.me', 'https://flow-study.me/');
+        recordVisit();
+        assert.equal(sent.length, 2);
+        assert.equal(sent[0].url, 'https://db.example/rest/v1/rpc/record_visit');
+        assert.deepEqual({ ...sent[0], url: undefined, p_visitor: undefined }, { url: undefined, p_visitor: undefined, p_page: 'room', p_source: 'google.com', p_device: 'touch', p_signed_in: false }, 'Only the linking site, never its address');
+        assert.equal(sent[1].p_source, null, 'Moving around Flow is not a source');
+        assert.match(sent[0].p_visitor, /^[0-9a-f-]{36}$/);
+        assert.equal(sent[1].p_visitor, sent[0].p_visitor, 'The same browser keeps its id');
+    } finally {
+        for (const key of ['location', 'document', 'localStorage', 'matchMedia']) delete globalThis[key];
+        globalThis.fetch = realFetch;
+    }
+});
+
 test('reminder commands are understood without the assistant', async () => {
     const source = compile('src/client/modules/reminder-parse.ts');
     const { parseRemind, describeWhen } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));

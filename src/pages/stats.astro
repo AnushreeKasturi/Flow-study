@@ -1,0 +1,50 @@
+---
+import Page from '../layouts/Page.astro';
+import Sky from '../components/Sky.astro';
+import '../styles/pages.css';
+import '../styles/stats.css';
+---
+<!-- The owner's view of how Flow is used (sql/020). Everyone else gets a short refusal. -->
+<Page title="Stats | Flow" bodyClass="plain-page" page="stats">
+    <meta slot="head" name="robots" content="noindex">
+    <Sky />
+    <header class="plain-nav">
+        <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
+        <nav aria-label="Main"><a href="/room.html">Home</a></nav>
+    </header>
+    <main class="plain-main stats">
+        <h1>Stats.</h1>
+        <p class="lead">Everyone but you. Visits count each browser once a day; your own browsers stop counting once they open this page.</p>
+        <div class="chips" role="group" aria-label="Period">
+            {[7, 30, 90, 365].map(days => <button type="button" data-days={days} aria-pressed={days === 30 ? 'true' : 'false'}>{days === 365 ? 'Year' : days + ' days'}</button>)}
+        </div>
+        <p id="stats-message" class="board-message" role="status">Loading…</p>
+        <div id="stats-body" hidden>
+            <section aria-labelledby="accounts-heading">
+                <h2 id="accounts-heading">Accounts</h2>
+                <dl id="stats-accounts" class="tiles"></dl>
+            </section>
+            <section aria-labelledby="visitors-heading">
+                <h2 id="visitors-heading">Visitors</h2>
+                <dl id="stats-visitors" class="tiles"></dl>
+            </section>
+            <section aria-labelledby="study-heading">
+                <h2 id="study-heading">Studying</h2>
+                <dl id="stats-study" class="tiles"></dl>
+            </section>
+            <section aria-labelledby="daily-heading">
+                <h2 id="daily-heading">Day by day <span class="count">UTC</span></h2>
+                <div id="stats-daily" class="daily"></div>
+                <details class="daily-table">
+                    <summary>As a table</summary>
+                    <table id="stats-table"></table>
+                </details>
+            </section>
+            <section aria-labelledby="where-heading">
+                <h2 id="where-heading">Where they come from</h2>
+                <div id="stats-lists" class="lists"></div>
+            </section>
+        </div>
+    </main>
+    <script>import '../client/stats';</script>
+</Page>

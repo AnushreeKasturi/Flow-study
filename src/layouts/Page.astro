@@ -21,9 +21,11 @@ const demo = import.meta.env.DEV && process.env.FLOW_DEMO ? readFileSync('script
         <script>
             import '../client/report-errors';
             import '../client/analytics';
+            import { recordVisit } from '../client/visits';
             import { releaseWhenLoaded } from '../client/loader';
             import { homeLinks } from '../client/nav';
             import { syncThemeColor } from '../client/theme';
+            recordVisit();
             homeLinks();
             syncThemeColor();
             releaseWhenLoaded();

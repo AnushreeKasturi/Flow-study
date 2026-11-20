@@ -123,6 +123,20 @@ window.supabase = { createClient() {
                 if (name === 'release_host') { if (room.acting_host === user.id) room.acting_host = null; return { data: null, error: null }; }
                 if (name === 'room_checkin') return { data: !!room.host_away && room.acting_host === user.id, error: null };
                 if (name === 'lists_room') return { data: tables.open_rooms.some(row => row.host_id === user.id), error: null };
+                // The owner's stats (sql/020): sample numbers, or the refusal everyone else gets when fixture.admin is false.
+                if (name === 'exclude_visitor') return { data: null, error: fixture.admin === false ? { message: 'Not allowed' } : null };
+                if (name === 'platform_stats') {
+                    if (fixture.admin === false) return { data: null, error: { message: 'Not allowed' } };
+                    const days = args.p_days;
+                    const daily = Array.from({ length: days }, (_, i) => ({ day: new Date(Date.now() - (days - 1 - i) * 864e5).toISOString().slice(0, 10), visitors: 20 + (i * 7) % 31, signups: i % 4, studiers: 3 + i % 6, focus_hours: (i % 9) + 0.5 }));
+                    return { data: { days, daily,
+                        accounts: { total: 214, verified: 188, new: 31, new_verified: 27, signed_in: 96 },
+                        visitors: { today: 42, week: 233, period: 812, all_time: 2410, page_views: 1904, returning: 140 },
+                        study: { studiers: 64, studiers_all_time: 151, regulars: 22, focus_hours: 318.5, focus_hours_all_time: 1490.2, sessions: 702, average_minutes: 21.4, rooms: 88, rooms_all_time: 402, tasks: 530, tasks_done: 361, groups_open_now: 3, groups_planned: 5 },
+                        pages: [{ name: 'index', visitors: 700 }, { name: 'room', visitors: 410 }, { name: 'login', visitors: 300 }, { name: 'groups', visitors: 120 }],
+                        sources: [{ name: 'direct', visitors: 520 }, { name: 'google.com', visitors: 180 }, { name: 'reddit.com', visitors: 71 }],
+                        devices: [{ name: 'desktop', visitors: 590 }, { name: 'touch', visitors: 222 }] }, error: null };
+                }
                 // Focus per local day (sql/019), added up like the database does.
                 if (name === 'focus_days') {
                     const days = {};

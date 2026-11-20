@@ -54,6 +54,7 @@ The test server clears AI and Twilio provider credentials before loading Express
 | `supabase.ts`, `utils.ts` | Request deadlines and caller cancellation, corrupted storage, Unicode escaping, supported YouTube/Spotify URLs and lookalike rejection |
 | audio.ts | YouTube/Spotify provider switching, canonical embeds, stopping the old player, invalid link rejection, incoming room audio |
 | CSS and HTML | Browser-rendered checks at 320, 390, 768, 1024, and 1440px; horizontal overflow, primary text contrast in all themes, reduced motion, desktop/mobile screenshots |
+| `visits.ts`, `stats.ts`, `stats.astro` | Visits sent only from the hosted site, with the page name and linking site but no address; one id per browser. SQL: one row per visitor, page and day, the owner's browsers and account left out (past visits too), stats and exclusions refused to everyone else, period capped |
 | `server.js` | Static assets and missing/private paths, malformed/type/size boundaries, unconfigured providers, rate limiting, local concurrent static requests |
 | SQL | Legacy TEXT and current UUID fixtures, data preservation, repeat application, PIN checks, task isolation, author validation, publication preservation |
 | Dependency lockfile | `npm audit --omit=dev`: zero reported vulnerabilities at validation time |

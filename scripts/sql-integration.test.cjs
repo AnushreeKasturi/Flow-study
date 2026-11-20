@@ -391,6 +391,36 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.equal(days('Asia/Kolkata'), '2026-03-01:1500:1 2026-03-02:1800:1', 'Days follow my timezone (23:30 UTC is the next morning in India)');
             assert.equal(days('Not/AZone'), '2026-03-01:1800:1 2026-03-02:1500:1', 'An unknown timezone falls back to UTC');
             assert.throws(() => run(database, "SET ROLE anon; SELECT * FROM public.focus_days('UTC');"), /Command failed/, 'Signed-out visitors cannot call it');
+
+            // 020: the owner's stats. Visits from anyone; stats and exclusions for the owner only, who is never counted.
+            run(database, `ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email_confirmed_at TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS last_sign_in_at TIMESTAMPTZ;
+                UPDATE auth.users SET email_confirmed_at = now() WHERE id IN ('${one}', '${two}');`);
+            run(database, readFileSync('sql/020_platform_stats.sql', 'utf8'));
+            run(database, readFileSync('sql/020_platform_stats.sql', 'utf8'));
+            const browserA = 'c1111111-1111-4111-8111-111111111111', browserB = 'c2222222-2222-4222-8222-222222222222';
+            const visit = (who, page, source = 'NULL') => run(database, `SET ROLE anon; SELECT public.record_visit('${who}', '${page}', ${source}, 'desktop', false);`);
+            visit(browserA, 'index', "'Google.com'");
+            visit(browserA, 'index');
+            visit(browserA, 'groups');
+            visit(browserB, 'index');
+            assert.equal(run(database, 'SELECT count(*) FROM public.visits;').trim(), '3', 'One row per visitor, page and day');
+            assert.throws(() => visit(browserB, '../etc'), /Command failed/, 'Page names are plain words');
+            assert.throws(() => run(database, 'SET ROLE anon; SELECT * FROM public.visits;'), /Command failed/, 'Nobody reads visits directly');
+            assert.throws(() => asUser(one, 'SELECT public.platform_stats(30);'), /Command failed/, 'Only the owner sees stats');
+            assert.throws(() => asUser(one, `SELECT public.exclude_visitor('${browserB}');`), /Command failed/, 'Only the owner excludes browsers');
+            assert.throws(() => run(database, 'SET ROLE anon; SELECT public.platform_stats(30);'), /Command failed/);
+            run(database, `INSERT INTO public.admins VALUES ('${two}');`);
+            asUser(two, `SELECT public.exclude_visitor('${browserB}');`);
+            visit(browserB, 'room');
+            assert.equal(run(database, `SELECT count(*) FROM public.visits WHERE visitor = '${browserB}';`).trim(), '1', 'An excluded browser is no longer recorded');
+            const stats = JSON.parse(asUser(two, 'SELECT public.platform_stats(30);'));
+            assert.equal(stats.visitors.period, 1, 'The owner\'s browser is left out, past visits included');
+            assert.equal(stats.visitors.page_views, 2);
+            assert.deepEqual(stats.sources, [{ name: 'direct', visitors: 1 }, { name: 'google.com', visitors: 1 }], 'Sources are lowercased; no referrer is direct');
+            assert.equal(stats.accounts.verified, 1, 'The owner\'s account is left out of accounts');
+            assert.equal(stats.accounts.total, Number(run(database, 'SELECT count(*) FROM auth.users;').trim()) - 1);
+            assert.equal(stats.daily.length, 30);
+            assert.equal(JSON.parse(asUser(two, 'SELECT public.platform_stats(9999);')).days, 365, 'The period is capped');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }
