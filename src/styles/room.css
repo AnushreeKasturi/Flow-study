@@ -93,7 +93,8 @@ kbd { display: inline-block; min-width: 26px; padding: 2px 7px; border-radius: 6
 #chat-compose-help kbd + kbd { margin-left: 4px; }
 
 /* ── Scene: the clock stands on the horizon, under the sun ── */
-.scene { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+/* The play button sits on the scene's left edge; the extra room keeps its hover growth and focus ring from being clipped. */
+.scene { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; margin-left: -6px; padding-left: 6px; }
 /* Keeps the clock below the sky; the sun itself lives in the page-wide .sky layer. */
 .scene-sky { flex: 0 1 calc(var(--horizon) - var(--header-h)); min-height: 0; }
 .pill-timer { display: flex; flex-direction: column; gap: 14px; flex-shrink: 0; padding-top: 22px; }
