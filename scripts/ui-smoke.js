@@ -1347,6 +1347,13 @@ async (page) => {
     await visible('#stats-link');
     assert(await page.locator('#stats-link').getAttribute('href') === '/stats.html');
     await page.evaluate(() => localStorage.removeItem('fixture-admin'));
+    // The atmosphere can be changed from Home, without entering a room, and it's kept.
+    await page.locator('#home-theme-picker').selectOption('sakura');
+    assert(await page.evaluate(() => document.documentElement.dataset.theme === 'sakura'), 'Home changes the atmosphere');
+    await page.goto(origin + '/room.html');
+    await visible('#join-modal');
+    assert(await page.locator('#home-theme-picker').inputValue() === 'sakura' && await page.locator('#theme-picker').inputValue() === 'sakura', 'The atmosphere is kept, and the room picker agrees');
+    await page.locator('#home-theme-picker').selectOption('forest');
     await page.goto(origin + '/room.html');
     await visible('#join-modal');
     await page.getByRole('button', { name: 'Change name', exact: true }).click();

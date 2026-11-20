@@ -763,6 +763,7 @@ async function start() {
     initReminders();
     initAudio();
     bindThemePicker(byId<HTMLSelectElement>('theme-picker'));
+    bindThemePicker(byId<HTMLSelectElement>('home-theme-picker'));
     bindRoomControls();
 
     let invited = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';

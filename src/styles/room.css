@@ -351,6 +351,10 @@ body:not(.is-host) #room-settings-btn { display: none; }
 .home-figures dd { margin-top: 2px; font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .home-recap { padding: 12px 14px; border-radius: var(--radius-sm); background: var(--field); color: var(--text-2); font-size: .84rem; line-height: 1.5; }
 .home-recap:empty { display: none; }
+.home-theme { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; }
+.home-theme label { margin: 0; color: var(--text-3); font-size: .8rem; }
+.home-theme select { width: 132px; }
+.home-theme + .lobby-footer { margin-top: 0; }
 .lobby-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: auto; }
 .logout-link { font-size: .8rem; color: var(--text-3); }
 
