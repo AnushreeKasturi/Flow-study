@@ -122,6 +122,7 @@ window.supabase = { createClient() {
                 if (name === 'claim_host') { const ok = !!room.host_away && (!room.acting_host || room.acting_host === user.id); if (ok) room.acting_host = user.id; return { data: ok, error: null }; }
                 if (name === 'release_host') { if (room.acting_host === user.id) room.acting_host = null; return { data: null, error: null }; }
                 if (name === 'room_checkin') return { data: !!room.host_away && room.acting_host === user.id, error: null };
+                if (name === 'room_link_status') { const [status, minutes] = (localStorage.getItem('fixture-link-status') || 'open').split(':'); return { data: { status, minutes: Number(minutes) || undefined }, error: null }; }
                 if (name === 'lists_room') return { data: tables.open_rooms.some(row => row.host_id === user.id), error: null };
                 // The owner's stats (sql/020): sample numbers, or the refusal everyone else gets when fixture.admin is false.
                 if (name === 'is_admin') return { data: localStorage.getItem('fixture-admin') === '1', error: null };

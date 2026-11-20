@@ -1474,6 +1474,18 @@ async (page) => {
     await page.waitForFunction(() => !document.getElementById('preview-join').disabled);
     await page.locator('#preview-join').click();
     await visible('#app');
+    // A room that ended in the last 15 minutes says so, and when; any other dead link opens a plain Home
+    // with the code filled in (it may be a PIN room). Neither offers the preview or tries to join.
+    for (const [status, heading, code] of [['ended:3', 'This room has ended', ''], ['unknown', 'Join with a code', 'FOCUS6']]) {
+        await page.evaluate(value => localStorage.setItem('fixture-link-status', value), status);
+        await page.goto(origin + '/room.html?room=FOCUS6');
+        await visible('#join-modal');
+        const hint = await page.locator('#join-hint').innerText();
+        assert(await page.locator('#join-heading').innerText() === heading && (status === 'unknown' ? !hint.includes('FOCUS6') : hint.includes('3 minutes ago')), 'An old link: ' + status);
+        assert(await page.locator('#preview-modal').isHidden() && await page.locator('#room-code-input').inputValue() === code && new URL(page.url()).search === '', 'A dead link is not offered as an invite');
+        assert(await page.evaluate(() => !window.__fixture.calls.some(call => call.name === 'join_room')), 'A dead link never tries to join');
+    }
+    await page.evaluate(() => localStorage.removeItem('fixture-link-status'));
     await page.evaluate(() => localStorage.setItem('flow_preview', '0'));
     // Signed out, the board is readable but nothing on it can be used.
     await page.evaluate(() => { localStorage.removeItem('flow_signed_in'); localStorage.removeItem('fixture-session'); });

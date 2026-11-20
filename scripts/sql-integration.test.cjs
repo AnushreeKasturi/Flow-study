@@ -432,6 +432,25 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             const listed = asUser(two, `SELECT email || ' ' || provider || ' ' || verified || ' ' || focus_hours FROM public.platform_accounts() WHERE email IS NOT NULL;`);
             assert.deepEqual(listed, `one@example.com google true ${run(database, `SELECT round(coalesce(sum(duration_seconds),0)/3600.0,1) FROM public.sessions WHERE user_id = '${one}' AND mode LIKE 'focus%';`).trim()}`, 'Email, sign-in method, verified, focus hours');
             assert.equal(asUser(two, `SELECT count(*) FROM public.platform_accounts() WHERE email IS NULL AND verified;`), '0', 'The owner is not listed');
+
+            // 022: what a room link leads to, before joining. Ended shows for 15 minutes; anything else unknown is a wrong attempt.
+            run(database, readFileSync('sql/022_room_link_status.sql', 'utf8'));
+            run(database, readFileSync('sql/022_room_link_status.sql', 'utf8'));
+            run(database, `DELETE FROM public.join_failures; INSERT INTO public.rooms(room_code, created_by, ended_at) VALUES
+                ('ENDED1', '${one}', now() - interval '3 minutes 20 seconds'), ('OLDEND', '${one}', now() - interval '20 minutes'), ('LIVE01', '${one}', NULL);
+                INSERT INTO public.rooms(room_code, created_by, is_locked, pin, ended_at) VALUES ('LOCKD1', '${one}', true, '1234', now());`);
+            const status = code => asUser(two, `SELECT public.room_link_status('${code}');`);
+            assert.deepEqual(JSON.parse(status('ended1')), { status: 'ended', minutes: 3 }, 'A room that just ended says so, and when');
+            assert.deepEqual(JSON.parse(status('LIVE01')), { status: 'open' });
+            assert.equal(run(database, `SELECT count(*) FROM public.join_failures WHERE user_id = '${two}';`).trim(), '0', 'Live and just-ended links cost nothing');
+            for (const code of ['OLDEND', 'NOPE99', 'LOCKD1']) assert.deepEqual(JSON.parse(status(code)), { status: 'unknown' }, code + ' says nothing: ended long ago, no such room, or a PIN room');
+            assert.equal(run(database, `SELECT count(*) FROM public.join_failures WHERE user_id = '${two}';`).trim(), '3', 'Each unknown answer is a wrong attempt');
+            run(database, `INSERT INTO public.room_participants(room_id, user_id) SELECT id, '${two}' FROM public.rooms WHERE room_code = 'LOCKD1';`);
+            assert.equal(JSON.parse(status('LOCKD1')).status, 'ended', 'A PIN room\'s members are told it ended');
+            assert.equal(run(database, `SELECT count(*) FROM public.room_participants rp JOIN public.rooms r ON r.id = rp.room_id WHERE r.room_code IN ('ENDED1','LIVE01') AND rp.user_id = '${two}';`).trim(), '0', 'Checking a link never joins its room');
+            run(database, `INSERT INTO public.join_failures(user_id) SELECT '${two}' FROM generate_series(1, 7);`);
+            assert.throws(() => status('LIVE01'), /Command failed/, 'Too many misses stop the check, as they stop join_room');
+            assert.throws(() => run(database, "SET ROLE anon; SELECT public.room_link_status('LIVE01');"), /Command failed/, 'Signed-out visitors cannot check codes');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }

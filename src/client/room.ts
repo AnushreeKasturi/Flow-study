@@ -765,11 +765,26 @@ async function start() {
     bindThemePicker(byId<HTMLSelectElement>('theme-picker'));
     bindRoomControls();
 
-    const invited = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
-    roomCodeInput.value = invited || sessionStorage.getItem('flow_last_room') || '';
+    let invited = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
+    if (!/^[A-Z0-9]{6}$/.test(invited)) invited = '';
+    // A link to a room that ended in the last 15 minutes says so (sql/022). Any other dead link, or a PIN
+    // room not joined yet, opens a plain Home with the code filled in. Older servers have no check, and a
+    // failed check carries on as an invite; Join still reports what's wrong.
+    const link = invited ? await supabase.rpc('room_link_status', { p_room_code: invited }).then(({ data }) => data, () => null) : null;
+    if (link && link.status !== 'open') {
+        history.replaceState(null, '', '/room.html');
+        if (link.status === 'ended') {
+            const minutes = link.minutes ?? 0;
+            byId<HTMLElement>('join-heading').textContent = 'This room has ended';
+            byId<HTMLElement>('join-hint').textContent = `Room ${invited} was ended by its host ${minutes < 1 ? 'just now' : minutes === 1 ? 'a minute ago' : minutes + ' minutes ago'}. Start a room of your own, or ask for a new link.`;
+            if (sessionStorage.getItem('flow_last_room') === invited) sessionStorage.removeItem('flow_last_room');
+        }
+        roomCodeInput.value = link.status === 'ended' ? '' : invited;
+        invited = '';
+    } else roomCodeInput.value = invited || sessionStorage.getItem('flow_last_room') || '';
     // Arriving from an invite link: say so, and make joining the obvious next step.
     // The link goes straight on to "Ready to join?" (see the end of start), where the person still chooses.
-    if (/^[A-Z0-9]{6}$/.test(invited)) {
+    if (invited) {
         byId<HTMLElement>('join-heading').textContent = 'You’re invited';
         byId<HTMLElement>('join-hint').textContent = `Room ${invited} is waiting for you. Press Join to go in.`;
         byId<HTMLElement>('join-heading').closest('.home-card')!.classList.add('invited');
@@ -829,7 +844,7 @@ async function start() {
         setFromBoard(true);
         roomCodeInput.value = seat;
         await joinRoom();
-    } else if (/^[A-Z0-9]{6}$/.test(invited) && previewWanted()) {
+    } else if (invited && previewWanted()) {
         // An invite link opens its room's "Ready to join?" screen. The room is only joined (join_room) once
         // the person presses Join now, so a link alone never adds anyone to a room or uses up their attempts.
         // With that screen turned off, the link only fills in the code.

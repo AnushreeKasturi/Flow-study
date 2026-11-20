@@ -81,6 +81,7 @@ export interface Database {
         Views: Record<string, never>;
         Functions: {
             join_room: { Args: { p_room_code: string; p_pin: string }; Returns: string };
+            room_link_status: { Args: { p_room_code: string }; Returns: { status: 'open' | 'ended' | 'unknown'; minutes?: number } };
             join_open_room: { Args: { p_listing: string }; Returns: string };
             remove_participant: { Args: { p_room: string; p_user: string }; Returns: undefined };
             room_send: { Args: { p_room: string; p_event: string; p_payload: Record<string, unknown> }; Returns: undefined };
