@@ -3,7 +3,7 @@
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } }
 @keyframes scaleIn { from { opacity: 0; transform: scale(.98); } }
-@keyframes breathe { 0%, 100% { scale: .78; } 40% { scale: 1; } }
+@keyframes breathe { 0%, 100% { scale: 1; } 60% { scale: .78; } }
 .fade-in { animation: fadeIn .28s ease-out; }
 .scale-in { animation: scaleIn .22s ease-out; }
 
@@ -12,6 +12,13 @@
 .room-page .sky { position: fixed; }
 /* On a break the sun becomes a breathing pacer. */
 body[data-timer="break"] .sun { animation: breathe 10s ease-in-out infinite; }
+/* Breaks: the room exhales. The sky warms, the sun gets more room, other people's tiles soften.
+   Going into a break eases in slowly; coming back to focus is a little quicker. Reduced motion skips the easing (global.css). */
+.room-page .sky { transition: filter 1.2s var(--ease); }
+body.room-page[data-timer="break"] .sky { filter: sepia(.14) saturate(1.12) brightness(1.07); transition-duration: 2.4s; }
+body[data-timer="break"] .sun { width: calc(var(--sun-size) * 1.12); }
+.video-wrapper { transition: border-radius 1s var(--ease), filter 1s var(--ease); }
+body[data-timer="break"] .video-wrapper:not(#video-wrapper-local) { border-radius: 26px; filter: saturate(.82) contrast(.94) brightness(.97); transition-duration: 2.4s; }
 
 .app-container { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100dvh; padding: 0 var(--pad) var(--pad); overflow: hidden; }
 .app-header { height: var(--header-h); display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-shrink: 0; }

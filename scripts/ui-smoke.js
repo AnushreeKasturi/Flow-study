@@ -1158,6 +1158,7 @@ async (page) => {
     }
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: 'output/playwright/stress-room-mobile.png', fullPage: true });
+    await page.getByRole('tab', { name: 'Tasks' }).click(); // the break that just started brought chat forward
     await page.getByRole('button', { name: 'Delete Task', exact: true }).first().click();
     await page.getByRole('button', { name: 'Delete Task', exact: true }).first().click();
     assert(await page.locator('.task-item').count() === 0, 'Delete should remove the task');
@@ -1200,6 +1201,21 @@ async (page) => {
     await page.waitForFunction(() => document.body.dataset.timer === 'break', undefined, { timeout: 8000 });
     assert((await page.locator('#timer-alert-msg').innerText()).includes('The break has started.'), 'The end-of-block note says the break has begun');
     await page.locator('#close-timer-alert-btn').click();
+    // On a break, chat comes forward; when focus starts again, the tab you had comes back.
+    const activeTab = () => page.locator('.tab-btn.active').innerText();
+    const sync = payload => page.evaluate(value => window.__fixture.handlers['broadcast:timer-updated']({ payload: { action: 'sync', ...value } }), payload);
+    assert(await activeTab() === 'Chat' && await page.locator('#chat-input').getAttribute('placeholder') === 'On a break. Say hi…', 'A break brings chat forward');
+    await sync({ mode: 'focus', duration: 1500, timeLeft: 1500, isRunning: true });
+    await page.waitForFunction(() => document.body.dataset.timer === 'focus');
+    assert(await activeTab() === 'Tasks' && await page.locator('#chat-input').getAttribute('placeholder') === 'Write to your room…', 'Focus puts back the tab you had');
+    // A tab you pick yourself during the break stays.
+    await sync({ mode: 'shortBreak', duration: 300, timeLeft: 300, isRunning: true });
+    await page.waitForFunction(() => document.body.dataset.timer === 'break');
+    await page.getByRole('tab', { name: 'Sound' }).click();
+    await sync({ mode: 'focus', duration: 1500, timeLeft: 1500, isRunning: true });
+    await page.waitForFunction(() => document.body.dataset.timer === 'focus');
+    assert(await activeTab() === 'Sound', 'Your own choice of tab is kept');
+    await page.getByRole('tab', { name: 'Tasks' }).click();
     // A guest can't pause the room's timer (only the host runs it); they just leave.
     assert(await page.locator('#timer-toggle-btn').isDisabled(), 'A guest cannot pause the timer');
     await page.getByRole('button', { name: 'Leave', exact: true }).click();

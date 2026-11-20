@@ -282,6 +282,25 @@ async function joinRoom() {
 // What the timer callback remembers between ticks (enterRoom).
 let lastPhase = '';
 let lastMode = '';
+// On a break the room exhales (CSS keys off body[data-timer]) and chat comes forward. When focus
+// starts again, the tab you had goes back, unless you picked one yourself during the break.
+let resting = false;
+let tabBeforeBreak = '';
+let switchingForBreak = false;
+function restTabs(nowResting: boolean) {
+    if (nowResting === resting) return;
+    resting = nowResting;
+    byId<HTMLTextAreaElement>('chat-input').placeholder = resting ? 'On a break. Say hi…' : 'Write to your room…';
+    const go = (id: string) => { switchingForBreak = true; byId(id).click(); switchingForBreak = false; };
+    const active = document.querySelector<HTMLElement>('.tab-btn.active');
+    if (resting) {
+        tabBeforeBreak = '';
+        if (active && active.id !== 'chat-tab-button' && !document.body.classList.contains('focus-active')) { tabBeforeBreak = active.id; go('chat-tab-button'); }
+    } else if (tabBeforeBreak) {
+        go(tabBeforeBreak);
+        tabBeforeBreak = '';
+    }
+}
 let wasFocusing = false;
 // A long block is saved every five minutes as it runs, so a crash loses little.
 setInterval(() => { if (wasFocusing) saveFocus('focus-partial', true); }, 5 * 60 * 1000);
@@ -455,6 +474,7 @@ async function enterRoom(roomId: string, roomCode: string, mediaReady = false) {
 
     initTimer(roomId, timerState => {
         UI.updateTimerUI(timerState);
+        restTabs(timerState.isRunning && timerState.mode !== 'focus');
         if (timerState.isRunning) check('timer');
         // A stretch of focus just ended (paused, switched, reset, or stopped by someone else): save it now.
         const focusing = timerState.isRunning && timerState.mode === 'focus';
@@ -684,6 +704,7 @@ function bindRoomControls() {
             next?.focus();
         });
         tab.addEventListener('click', () => {
+            if (!switchingForBreak) tabBeforeBreak = ''; // your own choice stays
             tabs.forEach(other => {
                 const selected = other === tab;
                 other.classList.toggle('active', selected);
