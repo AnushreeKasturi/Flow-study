@@ -4,6 +4,7 @@ import { showLoader, hideLoader, leaveWithLoader, loaderText } from './loader';
 import type { Participants, TimerMode } from './types';
 import { byId, on } from './dom';
 import { bindThemePicker } from './theme';
+import { bindPlanetPicker } from './planet';
 import { initSocket, disconnectSocket, reloadTasks, getMyUserId, updateCameraState, updateMicState, sendReaction, sendHandRaise, sendBye } from './modules/socket';
 import { initNotifications, pushNote, systemNotify } from './modules/notifications';
 import { initMedia, toggleAudio, toggleVideo, handleSignal, removePeer, callUser, hasPeer, peerNeedsCall, isPeerConnected, cleanupMedia, isVideoActive, hasAudioTrack, showLocalStream, isMicOn, recoverCamera, whenCameraLost, sampleCalls, restartCalls } from './modules/rtc';
@@ -785,6 +786,7 @@ async function start() {
     initAudio();
     bindThemePicker(byId<HTMLSelectElement>('theme-picker'));
     bindThemePicker(byId<HTMLSelectElement>('home-theme-picker'));
+    bindPlanetPicker(byId<HTMLSelectElement>('planet-picker'));
     bindRoomControls();
 
     let invited = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
