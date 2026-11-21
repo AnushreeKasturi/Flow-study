@@ -685,9 +685,10 @@ async (page) => {
     assert(await page.locator('#planet-picker option').count() === 10, 'The Sun, the Moon and the eight planets to pick from');
     await page.getByLabel('Room planet').selectOption('moon');
     assert(await page.evaluate(() => document.documentElement.dataset.planet === 'moon' && localStorage.getItem('flow_planet') === 'moon'), 'Picking the Moon applies it and keeps it');
-    assert(await sunLayers() > sunOnly, 'The Moon is drawn with its craters, not as the sun');
+    assert(await page.evaluate(() => getComputedStyle(document.querySelector('.sun')).backgroundImage.includes('/planets/moon.webp')), 'The Moon is its photo, not the sun');
+    assert(await page.evaluate(async () => { const image = new Image(); image.src = '/planets/moon.webp'; await image.decode(); return image.naturalWidth > 0; }), 'The Moon photo is served by the site and decodes');
     await page.getByLabel('Room planet').selectOption('saturn');
-    assert(await page.evaluate(() => getComputedStyle(document.querySelector('.sun'), '::before').content !== 'none'), 'Saturn is drawn with its rings');
+    assert(await page.evaluate(() => getComputedStyle(document.querySelector('.sun'), '::before').backgroundImage.includes('/planets/saturn.webp')), 'Saturn is its photo, rings and all');
     const landing = await page.context().newPage();
     await landing.goto(origin + '/');
     assert(await landing.evaluate(() => document.documentElement.dataset.planet) === 'saturn', 'The pick is applied before the next page paints');
