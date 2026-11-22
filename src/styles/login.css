@@ -37,7 +37,8 @@
 
 @media (max-width: 760px) {
     .login-page { display: block; height: auto; }
-    .login-photo { flex-direction: row; align-items: center; padding: 20px 24px; }
+    .login-photo { flex-flow: row wrap; align-items: center; gap: 16px; padding: 20px 24px; }
+    .login-photo > div { flex-basis: 100%; } /* an invite gets its own line under the logo */
     .login-photo::after { display: none; }
     .login-photo > div { margin: 0; padding: 0; }
     .login-photo > div:has(.invite-note.hidden), .login-photo .github-star { display: none; }
@@ -45,6 +46,10 @@
     .invite-note { margin: 0; }
     .login-main { padding-top: 16px; }
     .theme-control label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    /* The sky picker moves up into the sky strip, across from the logo, instead of loitering on its own row. */
+    .login-page { position: relative; }
+    .theme-control { position: absolute; top: 14px; right: 24px; z-index: 2; }
+    .theme-control select { width: 124px; background-color: color-mix(in srgb, var(--sky-top) 55%, transparent); }
     .login-card { padding-top: 24px; }
     .login-card h1 { font-size: 2.4rem; }
 }
