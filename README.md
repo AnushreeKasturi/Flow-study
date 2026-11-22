@@ -6,6 +6,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-22%20%7C%2024%20%7C%2026-5f8056)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-f4dc8f)](LICENSE)
 [![Open Flow](https://img.shields.io/badge/demo-flow--study.me-b6d3ac)](https://flow-study.me)
+[![Visitors](https://img.shields.io/endpoint?url=https%3A%2F%2Fflow-study.me%2Fapi%2Fvisitors&cacheSeconds=3600)](https://flow-study.me)
 
 A shared study room for focused work. Bring your group, set a timer, and work through your goals together. Free to use and open source.
 

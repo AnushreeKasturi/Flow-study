@@ -22,6 +22,7 @@ test('HTTP boundaries and bounded local concurrency', async t => {
             if (req.headers.apikey !== 'service-test' || token !== 'service-test') return res.writeHead(401).end('{}');
             return res.writeHead(200, { 'Content-Type': 'application/json' }).end(String(JSON.parse(body).p_user === 'user-valid'));
         }
+        if (req.url === '/rest/v1/rpc/visitor_count') return res.writeHead(200, { 'Content-Type': 'application/json' }).end('2410'); // sql/023
         if (req.url === '/auth/v1/user' && known) return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ id: 'user-' + token }));
         if (req.url === '/rest/v1/rpc/api_allow') {
             if (!quotaInstalled) return res.writeHead(404).end('{}');
@@ -44,6 +45,11 @@ test('HTTP boundaries and bounded local concurrency', async t => {
         const asset = html.match(/src="([^"]+\.js)"/)[1];
         assert.equal((await fetch(origin + asset)).status, 200);
         for (const path of ['/src/client/app.ts', '/.env', '/sql/schema.sql', '/package.json', '/missing.html']) assert.equal((await fetch(origin + path)).status, 404, path);
+    });
+    await t.test('the README badge gets one public number, shaped for shields.io and cached', async () => {
+        const response = await fetch(origin + '/api/visitors');
+        assert.deepEqual(await response.json(), { schemaVersion: 1, label: 'visitors', message: '2.4k', color: 'f4dc8f', labelColor: '0b2a22' });
+        assert.match(response.headers.get('cache-control'), /s-maxage=3600/);
     });
     await t.test('link crawlers receive static metadata and a public preview image', async () => {
         const expected = {

@@ -421,6 +421,9 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             assert.equal(stats.accounts.total, Number(run(database, 'SELECT count(*) FROM auth.users;').trim()) - 1);
             assert.equal(stats.daily.length, 30);
             assert.equal(JSON.parse(asUser(two, 'SELECT public.platform_stats(9999);')).days, 365, 'The period is capped');
+            run(database, readFileSync('sql/023_visitor_count.sql', 'utf8'));
+            run(database, readFileSync('sql/023_visitor_count.sql', 'utf8'));
+            assert.equal(run(database, 'SET ROLE anon; SELECT public.visitor_count();').trim().split('\n').pop(), '1', 'The badge counts browsers, the owner\'s left out, and anyone may ask');
 
             // 021: every account for the owner, with how much each studies; the owner left out.
             run(database, `ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email TEXT, ADD COLUMN IF NOT EXISTS raw_app_meta_data JSONB;

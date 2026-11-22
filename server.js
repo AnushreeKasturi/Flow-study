@@ -132,6 +132,20 @@ function normalizeReminder(args, { now = Date.now(), tz = 0 } = {}) {
     return null;
 }
 
+// The README's visitor badge, in shields.io's endpoint format. One public number, cached for an hour,
+// so a popular README costs Supabase one call an hour instead of one per glance.
+app.get('/api/visitors', limiter(60), async (req, res) => {
+    try {
+        const response = await fetch(SUPABASE_URL + '/rest/v1/rpc/visitor_count', { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(5000) });
+        const count = await response.json();
+        if (!response.ok || !Number.isInteger(count)) throw new Error('No count');
+        res.set('Cache-Control', 'public, max-age=600, s-maxage=3600, stale-while-revalidate=86400');
+        res.json({ schemaVersion: 1, label: 'visitors', message: new Intl.NumberFormat('en', { notation: 'compact' }).format(count).toLowerCase(), color: 'f4dc8f', labelColor: '0b2a22' });
+    } catch {
+        res.status(503).json({ schemaVersion: 1, label: 'visitors', message: 'counting…', color: 'lightgrey', isError: true });
+    }
+});
+
 // Errors from visitors' browsers (src/client/report-errors.ts), written to the server logs
 // as one JSON line each, where Vercel's Logs page shows them. Open to everyone (errors
 // happen before sign-in too), so it is rate-limited, size-capped, and only keeps known
