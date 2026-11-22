@@ -1225,6 +1225,10 @@ async (page) => {
     await page.getByRole('button', { name: 'Leave', exact: true }).click();
     await page.getByRole('button', { name: 'Leave room', exact: true }).click();
     await visible('#join-modal');
+    // Phones show one card at a time, and a left room's code waiting means Join comes first; Start is a tap away.
+    assert(await page.locator('[data-card="join"]').isVisible() && await page.locator('[data-card="start"]').isHidden(), 'On a phone, Home opens on Join when a code is waiting');
+    await page.locator('.home-switch label', { hasText: 'Start' }).click();
+    assert(await page.evaluate(() => document.scrollingElement.scrollHeight <= innerHeight), 'Home is one block: the page never scrolls');
     await page.evaluate(() => { window.__fixture.collision = true; });
     await page.getByRole('button', { name: 'Create a room', exact: true }).click();
     await page.waitForFunction(() => !document.getElementById('host-btn').disabled);

@@ -42,8 +42,14 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
             <div id="lobby-step">
                 <h2 id="lobby-greeting">What would you like to do?</h2>
                 <p id="lobby-error" class="inline-error hidden" role="alert"></p>
+                <!-- Phones get one card at a time, picked here; bigger screens see all three and never this. -->
+                <div class="home-switch" role="radiogroup" aria-label="What to do">
+                    <label><input type="radio" name="home-card" value="start" checked>Start</label>
+                    <label><input type="radio" name="home-card" value="join" id="show-join">Join</label>
+                    <label><input type="radio" name="home-card" value="find">Find</label>
+                </div>
                 <div class="home-actions">
-                    <section class="home-card" aria-labelledby="start-heading">
+                    <section class="home-card" data-card="start" aria-labelledby="start-heading">
                         <h3 id="start-heading">Start a room</h3>
                         <p>Your own room, ready in a second.</p>
                         <fieldset class="home-choice">
@@ -77,7 +83,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
                         <button id="host-btn" class="btn btn-primary btn-lg btn-block" disabled>Create a room</button>
                     </section>
 
-                    <section class="home-card" aria-labelledby="join-heading">
+                    <section class="home-card" data-card="join" aria-labelledby="join-heading">
                         <h3 id="join-heading">Join with a code</h3>
                         <p id="join-hint">Someone sent you a link or a six-character code.</p>
                         <label for="room-code-input">Room code</label>
@@ -87,7 +93,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
                         <button id="join-btn" class="btn btn-lg btn-block" disabled>Join room</button>
                     </section>
 
-                    <section class="home-card" aria-labelledby="find-heading">
+                    <section class="home-card" data-card="find" aria-labelledby="find-heading">
                         <h3 id="find-heading">Find a study group</h3>
                         <p id="lobby-board">Sit down with people studying the same thing.</p>
                         <ul id="home-groups" class="home-groups"></ul>

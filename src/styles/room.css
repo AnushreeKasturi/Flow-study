@@ -338,9 +338,11 @@ body:not(.is-host) #room-settings-btn { display: none; }
 .board-form .check { margin: 14px 0 0; }
 
 
-/* Home: profile on the left, three ways in on the right. */
-#join-modal { width: min(1200px, 100%); max-height: none; padding: 0; display: grid; grid-template-columns: 320px minmax(0, 1fr); overflow: visible; }
-.home-profile { display: flex; flex-direction: column; gap: 20px; padding: 32px 28px 24px; border-radius: var(--radius-lg) 0 0 var(--radius-lg); background: var(--card); }
+/* Home: profile on the left, three ways in on the right, all of it one block that never scrolls.
+   A strip of sky stays clear above it, with the sun parked in the corner like it owns the place. */
+.room-page:has(#join-modal:not(.hidden)) { --home-top: clamp(20px, 13vh, 128px); --sun-x: 86%; --sun-size: clamp(52px, 8.5vh, 92px); overflow: hidden; }
+#join-modal { width: min(1160px, 100%); max-height: calc(100dvh - var(--home-top) - 20px); padding: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr); overflow-y: auto; } /* ponytail: inner scroll is the safety net for tiny laptops, not the plan */
+.home-profile { display: flex; flex-direction: column; gap: 18px; padding: 28px 26px 22px; border-radius: var(--radius-lg) 0 0 var(--radius-lg); background: var(--card); }
 .home-profile .brand { align-self: flex-start; }
 .home-me { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
 .home-me .avatar { width: 54px; height: 54px; border-radius: 16px; font-size: 1.5rem; }
@@ -349,8 +351,9 @@ body:not(.is-host) #room-settings-btn { display: none; }
 .link-btn:hover { color: var(--text); }
 .home-stats { display: flex; flex-direction: column; gap: 16px; padding: 18px 0; border-block: 1px solid var(--line); }
 .home-stats:empty { display: none; }
+.home-fresh { color: var(--text-2); font-size: .9rem; line-height: 1.5; }
 .home-today { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.home-today span { color: var(--text-2); font-size: .82rem; }
+.home-today span { color: var(--text-2); font-size: .82rem; white-space: nowrap; }
 .home-today strong { display: block; font-size: 3.2rem; font-weight: 800; font-stretch: 78%; font-variation-settings: 'wdth' 78; line-height: .9; font-variant-numeric: tabular-nums; }
 .home-figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .home-figures div { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--field); }
@@ -365,10 +368,12 @@ body:not(.is-host) #room-settings-btn { display: none; }
 .lobby-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: auto; }
 .logout-link { font-size: .8rem; color: var(--text-3); }
 
-.home-main { display: flex; flex-direction: column; min-width: 0; padding: 32px 28px 28px; }
+.home-main { display: flex; flex-direction: column; min-width: 0; padding: 28px 26px 26px; }
 .home-main h2 { font-size: 2.4rem; }
 .home-main .inline-error { margin-top: 16px; }
-.home-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+#lobby-step:not(.hidden) { flex: 1; display: flex; flex-direction: column; } /* passes the column's height down to the cards */
+.home-actions { flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 20px; } /* stretch to the floor: no dead zone under the cards */
+.home-switch { display: none; }
 .home-card { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 20px; border-radius: var(--radius-md); background: var(--field); }
 /* An open group's details: one line on the card, edited in a panel laid over it. */
 .create-details { margin: -4px 0 6px; color: var(--text-2); font-size: .8rem; line-height: 1.4; }
@@ -412,8 +417,7 @@ body:not(.is-host) #room-settings-btn { display: none; }
 .lobby-note { margin-top: 14px; color: var(--text-3); font-size: .78rem; text-align: center; }
 .room-code-field { text-transform: uppercase; letter-spacing: .12em; font-weight: 600; }
 .room-code-field::placeholder { letter-spacing: .12em; font-weight: 400; }
-.modal-overlay:has(#join-modal:not(.hidden)) { align-items: flex-start; }
-@media (min-height: 760px) { .modal-overlay:has(#join-modal:not(.hidden)) { align-items: center; } }
+.modal-overlay:has(#join-modal:not(.hidden)) { align-items: flex-start; padding-top: var(--home-top); overflow: hidden; }
 
 /* Profile */
 .profile-name-form { display: flex; align-items: flex-end; gap: 14px; margin-top: 16px; }
@@ -492,15 +496,63 @@ body:not(.is-host) #room-settings-btn { display: none; }
     .checklist .checklist-skip { position: absolute; top: 12px; right: 16px; }
     .stage-header { padding-inline: 16px; }
 }
+/* Short screens: the heatmap steps aside so everything else still fits in one block. */
+@media (max-height: 820px) { .home-stats .heatmap { display: none; } }
+/* Laptop-short screens: everything breathes in a little so the block still fits without a scrollbar. */
+@media (min-width: 701px) and (max-height: 720px) {
+    .room-page:has(#join-modal:not(.hidden)) { --home-top: clamp(16px, 9vh, 64px); --sun-size: clamp(40px, 7vh, 60px); }
+    .home-main, .home-profile { padding-block: 20px 18px; }
+    .home-main h2 { font-size: 1.9rem; }
+    .home-actions { margin-top: 14px; }
+    .home-card { padding: 16px; }
+    .home-card > p { margin: 4px 0 10px; }
+    .home-card .input { margin-bottom: 10px; }
+    .home-choice { margin-bottom: 10px; }
+    .home-choice label { padding: 8px 10px; font-size: .74rem; }
+}
 @media (max-width: 1080px) {
     #join-modal { grid-template-columns: minmax(0, 1fr); }
     .home-profile { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
     .home-actions { grid-template-columns: minmax(0, 1fr); }
     .home-main h2 { font-size: 1.9rem; }
 }
-@media (min-width: 700px) and (max-width: 1080px) {
-    .home-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .home-card:last-child { grid-column: 1 / -1; }
+/* Tablets: the profile slims into a header row so the three cards keep their side-by-side seats. */
+@media (min-width: 701px) and (max-width: 1080px) {
+    .home-profile { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 24px; padding: 20px 24px; }
+    .home-profile .brand, .home-stats > :not(.home-today, .home-fresh), .home-today .week, .home-profile > .home-recap:empty { display: none; }
+    .home-stats { padding: 0; border: 0; }
+    .home-today strong { font-size: 2rem; }
+    .home-theme, .lobby-footer { margin: 0; }
+    .lobby-footer { grid-column: 1 / -1; justify-content: flex-start; gap: 20px; }
+    .home-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* Phones: one card at a time and a slim profile, so Home still fits on one screen. */
+@media (max-width: 700px) {
+    .room-page:has(#join-modal:not(.hidden)) { --home-top: 16px; }
+    .modal-overlay:has(#join-modal:not(.hidden)) { padding-inline: 12px; }
+    #join-modal { max-height: calc(100dvh - 32px); }
+    /* The profile folds into two rows: you and today's minutes, then the sky and the exits. */
+    .home-profile { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 16px 18px 14px; }
+    .home-profile .brand, .home-stats:has(.home-fresh), .home-stats > :not(.home-today), .home-today .week, .home-today span, .home-theme label { display: none; }
+    .home-me { margin-top: 0; }
+    .home-me .avatar { width: 44px; height: 44px; border-radius: 13px; font-size: 1.2rem; }
+    #join-title { font-size: 1.6rem; }
+    .home-stats { padding: 0; border: 0; }
+    .home-today strong { font-size: 1.9rem; }
+    .home-theme { grid-column: 1; margin: 0; }
+    .home-theme select { width: 124px; }
+    .lobby-footer { grid-column: 2; margin: 0; gap: 14px; }
+    .lobby-footer .github-star, .lobby-footer a[href="/docs.html"] { display: none; } /* phones keep the exit, the landing page keeps the manual */
+    .home-main { padding: 16px 18px 18px; }
+    .home-main h2 { display: none; }
+    .home-switch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 999px; background: var(--field); }
+    .home-switch label { margin: 0; padding: 9px 0; border-radius: 999px; color: var(--text-2); font-size: .88rem; font-weight: 600; text-align: center; cursor: pointer; }
+    .home-switch label:has(:checked) { background: var(--text); color: var(--bg); }
+    .home-switch label:has(:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .home-switch input { position: absolute; opacity: 0; pointer-events: none; }
+    .home-actions { margin-top: 12px; }
+    .home-actions > .home-card { display: none; }
+    .home:has([value="start"]:checked) [data-card="start"], .home:has([value="join"]:checked) [data-card="join"], .home:has([value="find"]:checked) [data-card="find"] { display: flex; }
 }
 @media (max-width: 480px) {
     .modal-overlay { padding: 16px; }

@@ -26,7 +26,7 @@ export function openModal(id: string) {
     requestAnimationFrame(() => {
         const modal = byId(id);
         const shown = (selector: string) => [...modal.querySelectorAll<HTMLElement>(selector)].find(el => el.getClientRects().length);
-        (shown('[data-autofocus]') ?? shown('input:not([readonly])') ?? shown('input, button, a'))?.focus();
+        (shown('[data-autofocus]') ?? shown('input:not([readonly], [type="radio"], [type="checkbox"])') ?? shown('input, button, a'))?.focus(); // a radio is a choice, not a field
     });
 }
 

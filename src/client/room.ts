@@ -804,6 +804,7 @@ async function start() {
         roomCodeInput.value = link.status === 'ended' ? '' : invited;
         invited = '';
     } else roomCodeInput.value = invited || sessionStorage.getItem('flow_last_room') || '';
+    if (roomCodeInput.value) byId<HTMLInputElement>('show-join').checked = true; // phones: a code waiting means Join is the card you want
     // Arriving from an invite link: say so, and make joining the obvious next step.
     // The link goes straight on to "Ready to join?" (see the end of start), where the person still chooses.
     if (invited) {

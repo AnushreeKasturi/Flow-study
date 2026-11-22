@@ -50,6 +50,8 @@ export async function showHome(user: { id: string; email: string }, actions: Hom
     });
 
     getProfileStats(user.id).then(stats => {
+        // A brand-new account gets one inviting line instead of a museum of zeros.
+        if (!stats.totalMinutes && !stats.sessionsCompleted) return setMarkup(byId<HTMLElement>('home-stats'), '<p class="home-fresh">Nothing on the clock yet. Your first focus block starts the streak.</p>');
         // Numbers and locale weekday names only; nothing here comes from another user.
         setMarkup(byId<HTMLElement>('home-stats'),
             `<div class="home-today"><div><span>Focused today</span><strong>${formatFocusTime(stats.todayMinutes)}</strong></div>${weekChart(stats)}</div>` +
