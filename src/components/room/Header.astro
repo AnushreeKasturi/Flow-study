@@ -1,7 +1,6 @@
 ---
 import Icon from '../Icon.astro';
 import { SKIES } from '../../client/theme';
-import { PLANETS } from '../../client/planet';
 ---
 <header class="app-header">
     <div class="header-left">
@@ -33,7 +32,6 @@ import { PLANETS } from '../../client/planet';
         </details>
         <button id="open-shortcuts-btn" class="icon-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)"><Icon name="keyboard" /></button>
         <select id="theme-picker" class="input" aria-label="Room atmosphere">{SKIES.map(([id, name]) => <option value={id}>{name}</option>)}</select>
-        <select id="planet-picker" class="input" aria-label="Room planet">{PLANETS.map(([id, name]) => <option value={id}>{name}</option>)}</select>
         <button id="room-settings-btn" class="icon-btn" aria-label="Room settings" title="Room settings"><Icon name="settings" /></button>
         <button id="share-link-btn" class="btn">Invite</button>
         <button id="leave-btn" class="btn btn-danger">Leave</button>

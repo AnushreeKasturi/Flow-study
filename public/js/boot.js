@@ -6,9 +6,6 @@
         // Apply the saved sky before anything is drawn.
         var sky = localStorage.getItem('flow_theme');
         if (sky) document.documentElement.dataset.theme = sky;
-        // And what stands in for the sun in the room (src/client/planet.ts).
-        var planet = localStorage.getItem('flow_planet');
-        if (planet) document.documentElement.dataset.planet = planet;
 
         // A plain flag; the session itself is Supabase's. flow_user is the older form, cleared on the next page that reads the session.
         var signedIn = !!(localStorage.getItem('flow_signed_in') || localStorage.getItem('flow_user'));
