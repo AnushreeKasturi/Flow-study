@@ -39,7 +39,7 @@ test('HTTP boundaries and bounded local concurrency', async t => {
     const post = (body, token = 'valid') => fetch(origin + '/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body });
 
     await t.test('HTML, CSS, modules, missing files, and private files', async () => {
-        for (const path of ['/', '/start.html', '/login.html', '/room.html', '/groups.html', '/docs.html', '/verify.html', '/stats.html', '/favicon.svg', '/room-preview.webp']) assert.equal((await fetch(origin + path)).status, 200, path);
+        for (const path of ['/', '/start.html', '/login.html', '/room.html', '/groups.html', '/docs.html', '/verify.html', '/stats.html', '/favicon.svg', '/rooms/forest.webp', '/rooms/forest-chat.webp', '/rooms/forest-sound.webp']) assert.equal((await fetch(origin + path)).status, 200, path);
         const html = await (await fetch(origin + '/login.html')).text();
         const asset = html.match(/src="([^"]+\.js)"/)[1];
         assert.equal((await fetch(origin + asset)).status, 200);

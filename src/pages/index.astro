@@ -6,13 +6,15 @@ import '../styles/landing.css';
 import { SKIES as atmospheres } from '../client/theme';
 
 const repo = 'https://github.com/ManasDasri/Flow-study';
+// Each feature knows where the tour camera should look: which still (the room, or with Chat or Sound
+// open), then left, top, width, height in % of it. No spot means the camera steps back for the wide shot.
 const features = [
-    ['One sun for everyone', 'Start a focus block and the sun starts sinking for the whole room. When it sets, the room moves to a break, with a longer one after every fourth block.'],
-    ['Your group on camera, encrypted', 'Video and voice are encrypted and go directly between browsers over WebRTC. Flow’s servers never see or store them. Mute or turn the camera off whenever you like.'],
-    ['A task list you finish together', 'Add goals for the session, assign them to people, and watch the room’s progress fill in.'],
-    ['Chat, with a study assistant', 'Message the room, or start a message with /ai to ask a question without leaving.'],
-    ['Sound for concentration', 'Rain, ocean, a fireplace, wind, a quiet night. Share a YouTube or Spotify link when the room wants music.'],
-    ['Open study groups', 'List your room on the board and people studying the same thing can take a seat. Groups hold two to six.']
+    ['One sun for everyone', 'Start a focus block and the sun starts sinking for the whole room. When it sets, the room moves to a break, with a longer one after every fourth block.', '', '0 12 22 56'],
+    ['Your group on camera, encrypted', 'Video and voice are encrypted and go directly between browsers over WebRTC. Flow’s servers never see or store them. Mute or turn the camera off whenever you like.', '', '22.5 31 51 47'],
+    ['A task list you finish together', 'Add goals for the session, assign them to people, and watch the room’s progress fill in.', '', '75 8 24 42'],
+    ['Chat, with a study assistant', 'Message the room, or start a message with /ai to ask a question without leaving.', 'chat', '75 9 24 46'],
+    ['Sound for concentration', 'Rain, ocean, a fireplace, wind, a quiet night. Share a YouTube or Spotify link when the room wants music.', 'sound', '75 9 24 46'],
+    ['Open study groups', 'List your room on the board and people studying the same thing can take a seat. Groups hold two to six.', '', '']
 ];
 const steps = [
     ['Create a room', 'You get a six-character code. Add a PIN if you want the room private.'],
@@ -59,27 +61,22 @@ const steps = [
     </section>
 
     <main>
-        <section id="room" class="band">
+        <section id="room" class="band tour">
             <h2>One room holds the whole session.</h2>
             <figure class="shot">
-                <img src="/room-preview.webp" width="1600" height="900" loading="lazy" decoding="async" alt="A Flow room: the sun and session clock on the left, study partners in the middle, and shared tasks on the right.">
+                <img id="room-shot" src="/rooms/forest.webp" width="1600" height="900" loading="lazy" decoding="async" alt="A Flow room: the sun and session clock on the left, study partners in the middle, and shared tasks on the right.">
             </figure>
-            <dl class="features">
-                {features.map(([name, text]) => <div><dt>{name}</dt><dd>{text}</dd></div>)}
-            </dl>
-        </section>
-
-        <section id="how" class="band">
-            <h2>From a link to your first focus block.</h2>
-            <ol class="steps">
-                {steps.map(([name, text]) => <li><h3>{name}</h3><p>{text}</p></li>)}
-            </ol>
+            <ul class="features" aria-label="Show a part of the room">
+                {features.map(([name, text, still, spot]) => (
+                    <li><button type="button" aria-pressed="false" data-still={still || undefined} data-spot={spot || undefined}><strong>{name}</strong><span>{text}</span></button></li>
+                ))}
+            </ul>
         </section>
 
         <section class="band atmospheres">
             <div>
                 <h2>Pick your sky.</h2>
-                <p>Fifteen skies, from a forest dusk to a sunny meadow. Choose one and this page changes with it. Your room will match.</p>
+                <p>Fifteen skies, from a forest dusk to a sunny meadow. Choose one and this page, the room above, and your own room all change with it.</p>
             </div>
             <div class="swatches" role="group" aria-label="Atmosphere">
                 {atmospheres.map(([id, name]) => (
@@ -88,17 +85,17 @@ const steps = [
             </div>
         </section>
 
+        <section id="how" class="band how">
+            <h2>From a link to your first focus block.</h2>
+            <ol class="steps">
+                {steps.map(([name, text]) => <li><h3>{name}</h3><p>{text}</p></li>)}
+            </ol>
+        </section>
+
         <section id="open-source" class="band open">
             <div class="open-copy">
                 <h2>Open source, start to finish.</h2>
-                <p>Every line of Flow is public on GitHub. Read how it works, run your own copy, or fix something and send a pull request.</p>
-                <ul>
-                    <li>Astro pages with strict TypeScript, and no client framework</li>
-                    <li>Supabase for sign-in, saved tasks, and realtime rooms</li>
-                    <li>Encrypted, peer-to-peer video and voice over WebRTC</li>
-                    <li>MIT licensed: use it, change it, host it yourself</li>
-                    <li>Checked in CI on Node 22, 24, and 26, PostgreSQL 17, and Chromium</li>
-                </ul>
+                <p>Every line of Flow is public on GitHub under the MIT license. Read how it works, run your own copy, or fix something and send a pull request.</p>
                 <div class="hero-actions">
                     <a href={repo} class="btn btn-primary" target="_blank" rel="noopener noreferrer">View the source</a>
                     <a href={repo + '/issues'} class="btn" target="_blank" rel="noopener noreferrer">Report an issue</a>

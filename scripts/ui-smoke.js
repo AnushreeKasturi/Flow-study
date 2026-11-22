@@ -59,6 +59,10 @@ async (page) => {
     await page.waitForFunction(() => document.getElementById('preview-time').textContent !== '25:00' && Number(getComputedStyle(document.body).getPropertyValue('--sun-y')) > .43);
     await page.getByRole('button', { name: 'Daylight', exact: true }).click();
     assert(await page.locator('html').getAttribute('data-theme') === 'daylight', 'Landing swatches should change the atmosphere');
+    // The room tour: picking a feature points the camera at it, in the picked sky, with the right panel open.
+    await page.getByRole('button', { name: /^Chat, with a study assistant/ }).click();
+    assert(await page.evaluate(() => { const shot = document.getElementById('room-shot'); return shot.src.endsWith('/rooms/daylight-chat.webp') && shot.style.transform.startsWith('scale('); }), 'The tour opens Chat in the current sky and zooms in on it');
+    assert(await page.evaluate(async () => { const image = new Image(); image.src = '/rooms/daylight-chat.webp'; await image.decode(); return image.naturalWidth === 1600; }), 'Every tour still is served and decodes');
     // The browser's bars follow the sky: its top colour, at once, and again on the next visit.
     const themeColor = () => page.locator('meta[name="theme-color"]').getAttribute('content');
     assert(await themeColor() === 'rgb(127, 187, 230)', 'The theme colour should follow the chosen sky, not stay fixed');

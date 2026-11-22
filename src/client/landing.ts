@@ -12,7 +12,7 @@ const root = document.body;
 const DEMO_MS = 10000, BLOCK_SECONDS = 25 * 60;
 let playing = false;
 
-toggle.addEventListener('click', () => {
+function playSunset() {
     if (playing) return;
     playing = true;
     toggle.disabled = true;
@@ -35,13 +35,60 @@ toggle.addEventListener('click', () => {
         }, 2600);
     };
     requestAnimationFrame(frame);
-});
+}
+toggle.addEventListener('click', playSunset);
+// The sun sets once on its own, right after the intro bows out. Reduced motion keeps the sun where it is.
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setTimeout(playSunset, document.documentElement.classList.contains('intro-seen') ? 900 : 3400);
 
 // Atmosphere swatches retheme the page, and the choice carries into the room.
 const swatches = document.querySelectorAll<HTMLButtonElement>('[data-theme-choice]');
 const markTheme = () => swatches.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.themeChoice === currentTheme())));
 swatches.forEach(button => button.addEventListener('click', () => { setTheme(button.dataset.themeChoice as Theme); markTheme(); }));
 markTheme();
+
+// The tour: the room still is a camera that visits each feature in turn, then hands you the remote.
+const shot = byId<HTMLImageElement>('room-shot');
+const stops = [...document.querySelectorAll<HTMLButtonElement>('.features button')];
+const tour = byId<HTMLElement>('room');
+const TOUR_MS = 4500;
+let stop = 0, ticking = 0;
+function visit(index: number) {
+    stop = index;
+    const button = stops[index], still = button.dataset.still;
+    stops.forEach(other => other.setAttribute('aria-pressed', String(other === button)));
+    shot.src = `/rooms/${currentTheme()}${still ? '-' + still : ''}.webp`;
+    const [x, y, w, h] = (button.dataset.spot ?? '0 0 100 100').split(' ').map(Number);
+    const zoom = Math.min(2.4, 100 / w, 100 / h);
+    const pan = (start: number, size: number) => Math.min(0, Math.max(100 / zoom - 100, 50 / zoom - start - size / 2)); // centre it, never past the edge
+    shot.style.transform = `scale(${zoom}) translate(${pan(x, w)}%, ${pan(y, h)}%)`;
+}
+const handOver = () => { clearInterval(ticking); ticking = 0; tour.classList.remove('touring'); };
+stops.forEach((button, index) => {
+    const take = () => { handOver(); visit(index); };
+    button.addEventListener('pointerenter', take);
+    button.addEventListener('click', take);
+    button.addEventListener('focus', take);
+});
+// Plays only while you can see it, and never for people who asked the web to sit still.
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    let handedOver = false;
+    tour.addEventListener('pointerdown', () => { handedOver = true; }, { once: true });
+    new IntersectionObserver(([entry]) => {
+        if (!entry.isIntersecting || handedOver) return handOver();
+        if (ticking) return;
+        tour.classList.add('touring');
+        visit(stop);
+        ticking = window.setInterval(() => visit((stop + 1) % stops.length), TOUR_MS);
+    }, { threshold: .3 }).observe(shot.parentElement!); // the frame, not the zooming photo inside it
+    stops.forEach(button => button.addEventListener('pointerenter', () => { handedOver = true; }));
+}
+// A new sky re-dresses whatever the camera is looking at; the other stills wait in the wings.
+const dressRoom = () => {
+    visit(stop);
+    for (const still of ['chat', 'sound']) new Image().src = `/rooms/${currentTheme()}-${still}.webp`;
+};
+document.addEventListener('flow-theme', dressRoom);
+dressRoom();
 
 // Live star count. Purely decorative, so any failure leaves the plain link.
 (async () => {
