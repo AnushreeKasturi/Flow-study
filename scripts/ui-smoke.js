@@ -1229,6 +1229,14 @@ async (page) => {
     assert(await page.locator('[data-card="join"]').isVisible() && await page.locator('[data-card="start"]').isHidden(), 'On a phone, Home opens on Join when a code is waiting');
     await page.locator('.home-switch label', { hasText: 'Start' }).click();
     assert(await page.evaluate(() => document.scrollingElement.scrollHeight <= innerHeight), 'Home is one block: the page never scrolls');
+    // The heatmap doesn't fit a phone inline, so it opens as a panel inside the block, and still nothing scrolls.
+    await page.goto(origin + '/room.html?history');
+    await page.getByRole('button', { name: 'Last 6 months', exact: true }).click();
+    assert(await page.locator('#home-year').isVisible() && await page.evaluate(() => { const modal = document.getElementById('join-modal'); return modal.scrollHeight <= modal.clientHeight && document.scrollingElement.scrollHeight <= innerHeight; }), 'The heatmap panel opens without making Home scroll');
+    await page.keyboard.press('Escape');
+    assert(await page.locator('#home-year').isHidden(), 'Escape puts the heatmap away');
+    await page.goto(origin + '/room.html');
+    await page.locator('.home-switch label', { hasText: 'Start' }).click();
     await page.evaluate(() => { window.__fixture.collision = true; });
     await page.getByRole('button', { name: 'Create a room', exact: true }).click();
     await page.waitForFunction(() => !document.getElementById('host-btn').disabled);

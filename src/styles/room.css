@@ -496,8 +496,17 @@ body:not(.is-host) #room-settings-btn { display: none; }
     .checklist .checklist-skip { position: absolute; top: 12px; right: 16px; }
     .stage-header { padding-inline: 16px; }
 }
-/* Short screens: the heatmap steps aside so everything else still fits in one block. */
-@media (max-height: 820px) { .home-stats .heatmap { display: none; } }
+/* The heatmap sits inline only where it fits; everywhere else it waits behind "Last 6 months". */
+.home-year-btn { display: block; margin-top: 8px; padding: 4px 10px; border: 1.5px solid var(--line); border-radius: 999px; background: none; color: var(--text-2); font: inherit; font-size: .74rem; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.home-year-btn:hover, .home-year-btn[aria-expanded="true"] { border-color: var(--text-2); color: var(--text); }
+@media (min-width: 1081px) and (min-height: 821px) { .home-year-btn { display: none; } }
+@media (max-width: 1080px), (max-height: 820px) { .home-stats .heatmap { display: none; } }
+/* Opened, it floats over the block's top-left corner like a note pinned to the desk; the block itself never grows. */
+#join-modal { position: relative; }
+.home-stats.year-open > .heatmap {
+    display: block; position: absolute; top: 16px; left: 16px; z-index: 6; width: min(360px, calc(100% - 32px)); padding: 16px;
+    border: 1.5px solid var(--line); border-radius: var(--radius-md); background: var(--card); box-shadow: 0 18px 50px #0007;
+}
 /* Laptop-short screens: everything breathes in a little so the block still fits without a scrollbar. */
 @media (min-width: 701px) and (max-height: 720px) {
     .room-page:has(#join-modal:not(.hidden)) { --home-top: clamp(16px, 9vh, 64px); --sun-size: clamp(40px, 7vh, 60px); }

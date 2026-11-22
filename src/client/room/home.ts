@@ -54,9 +54,18 @@ export async function showHome(user: { id: string; email: string }, actions: Hom
         if (!stats.totalMinutes && !stats.sessionsCompleted) return setMarkup(byId<HTMLElement>('home-stats'), '<p class="home-fresh">Nothing on the clock yet. Your first focus block starts the streak.</p>');
         // Numbers and locale weekday names only; nothing here comes from another user.
         setMarkup(byId<HTMLElement>('home-stats'),
-            `<div class="home-today"><div><span>Focused today</span><strong>${formatFocusTime(stats.todayMinutes)}</strong></div>${weekChart(stats)}</div>` +
-            `<dl class="home-figures"><div><dt>Streak</dt><dd>${stats.streak} day${stats.streak === 1 ? '' : 's'}</dd></div><div><dt>All time</dt><dd>${formatFocusTime(stats.totalMinutes)}</dd></div><div><dt>Sessions</dt><dd>${stats.sessionsCompleted}</dd></div></dl>` + heatmap(stats));
+            `<div class="home-today"><div><span>Focused today</span><strong>${formatFocusTime(stats.todayMinutes)}</strong><button type="button" class="home-year-btn" aria-expanded="false" aria-controls="home-year">Last 6 months</button></div>${weekChart(stats)}</div>` +
+            `<dl class="home-figures"><div><dt>Streak</dt><dd>${stats.streak} day${stats.streak === 1 ? '' : 's'}</dd></div><div><dt>All time</dt><dd>${formatFocusTime(stats.totalMinutes)}</dd></div><div><dt>Sessions</dt><dd>${stats.sessionsCompleted}</dd></div></dl>` + heatmap(stats).replace('<figure class="heatmap"', '<figure id="home-year" class="heatmap"'));
     }).catch(() => {});
+
+    // Where the heatmap can't fit inline, it waits behind a button and opens as a panel inside the block,
+    // because Home doesn't scroll, not even for a very good streak.
+    const stats = byId<HTMLElement>('home-stats');
+    const yearButton = () => stats.querySelector<HTMLButtonElement>('.home-year-btn');
+    const showYear = (open: boolean) => { stats.classList.toggle('year-open', open); yearButton()?.setAttribute('aria-expanded', String(open)); };
+    stats.addEventListener('click', event => { if ((event.target as Element).closest('.home-year-btn')) showYear(!stats.classList.contains('year-open')); });
+    document.addEventListener('click', event => { if (stats.classList.contains('year-open') && !stats.contains(event.target as Node)) showYear(false); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && stats.classList.contains('year-open')) { showYear(false); yearButton()?.focus(); } });
 
     // Open groups on Home stay current: the board's ping refreshes them within a second.
     const homeGroups = () => fetchOpenRooms().then(rooms => {

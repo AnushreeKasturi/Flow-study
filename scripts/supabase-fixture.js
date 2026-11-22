@@ -20,7 +20,9 @@ window.turnstile = { issued: [], used: [],
 window.supabase = { createClient() {
         const user = { id: 'test-user', email: 'alex@example.com' };
         // ?fresh starts without a saved name, to show first-run setup.
-        const tables = { profiles: new URLSearchParams(location.search).has('fresh') ? [] : [{ id: user.id, display_name: 'Alex' }], rooms: [], tasks: [], sessions: [],
+        const tables = { profiles: new URLSearchParams(location.search).has('fresh') ? [] : [{ id: user.id, display_name: 'Alex' }], rooms: [], tasks: [],
+            // ?history: a few months of focus, so Home and the profile have a streak to show off.
+            sessions: new URLSearchParams(location.search).has('history') ? Array.from({ length: 40 }, (_, index) => ({ id: 'history-' + index, user_id: user.id, mode: 'focus', duration_seconds: 1500 * (1 + index % 3), completed_at: new Date(Date.now() - index * 3 * 864e5).toISOString() })) : [],
             // ?board seeds the study-groups page so it has something to show.
             open_rooms: new URLSearchParams(location.search).has('board') ? [
                 { id: 'listing-1', host_id: 'riya', host_name: 'Riya', topic: 'Organic chemistry: reaction mechanisms', subject: 'science', camera: 'optional', vibe: 'quiet', seats: 4, seats_taken: 2, closed: false, timer_mode: 'focus', timer_ends_at: new Date(Date.now() + 14 * 60000).toISOString(), last_seen: new Date().toISOString() },
