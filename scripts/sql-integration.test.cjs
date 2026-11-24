@@ -454,6 +454,31 @@ test('compatibility migration on legacy TEXT and current UUID schemas', async t 
             run(database, `INSERT INTO public.join_failures(user_id) SELECT '${two}' FROM generate_series(1, 7);`);
             assert.throws(() => status('LIVE01'), /Command failed/, 'Too many misses stop the check, as they stop join_room');
             assert.throws(() => run(database, "SET ROLE anon; SELECT public.room_link_status('LIVE01');"), /Command failed/, 'Signed-out visitors cannot check codes');
+
+            // 024: a new room and a focus session carry only what a browser may honestly say.
+            run(database, readFileSync('sql/024_room_and_session_integrity.sql', 'utf8'));
+            run(database, readFileSync('sql/024_room_and_session_integrity.sql', 'utf8'));
+            asUser(one, "INSERT INTO public.rooms(room_code, is_locked, pin) VALUES ('FRESH1', false, NULL);");
+            assert.equal(run(database, `SELECT created_by = '${one}' AND created_at > now() - interval '1 minute' AND ended_at IS NULL AND NOT host_away AND acting_host IS NULL FROM public.rooms WHERE room_code = 'FRESH1';`).trim(), 't', 'The database sets who, when, and a live room');
+            for (const [column, value] of [['created_at', "now() - interval '2 days'"], ['ended_at', 'now()'], ['host_away', 'true'], ['acting_host', `'${two}'`], ['acting_seen', 'now()'], ['created_by', `'${two}'`]])
+                assert.throws(() => asUser(one, `INSERT INTO public.rooms(room_code, ${column}) VALUES ('FORGE1', ${value});`), /Command failed/, 'A browser cannot set ' + column);
+            run(database, `INSERT INTO public.rooms(room_code, created_by) SELECT 'CAP' || lpad(g::text, 3, '0'), '${one}' FROM generate_series(1, 40 - (SELECT count(*) FROM public.rooms WHERE created_by = '${one}' AND created_at > now() - interval '1 day')::int) g;`);
+            assert.throws(() => asUser(one, "INSERT INTO public.rooms(room_code) VALUES ('OVER01');"), /Too many rooms/, 'The daily cap holds');
+
+            run(database, `INSERT INTO public.room_participants(room_id, user_id) VALUES ('${room}', '${one}') ON CONFLICT DO NOTHING;`);
+            const session = (mode, seconds, extra = '', value = '') => asUser(one, `INSERT INTO public.sessions(room_id, user_id, mode, duration_seconds${extra}) VALUES ('${room}', '${one}', '${mode}', ${seconds}${value});`);
+            session('focus', 1500, ', completed_at', ", '2030-01-01'");
+            assert.equal(run(database, `SELECT count(*) FROM public.sessions WHERE user_id = '${one}' AND completed_at > now();`).trim(), '0', 'A session is dated when it is saved, never in the future');
+            assert.throws(() => session('focusx', 1500), /Invalid session mode/);
+            assert.throws(() => session('focus', 99999), /Invalid session length/, 'One session is at most a full focus block');
+            // Fill the day to 86,300 seconds in 7,000-second rows (sql/008 caps a row at four hours).
+            run(database, `DO $$ DECLARE left_over INT := 86300 - (SELECT coalesce(sum(duration_seconds), 0) FROM public.sessions WHERE user_id = '${one}' AND completed_at > now() - interval '1 day')::int;
+                BEGIN WHILE left_over > 0 LOOP
+                    INSERT INTO public.sessions(room_id, user_id, mode, duration_seconds) VALUES ('${room}', '${one}', 'focus', least(left_over, 7000));
+                    left_over := left_over - 7000;
+                END LOOP; END $$;`);
+            session('focus-partial', 100);
+            assert.throws(() => session('focus-partial', 15), /Too much focus time/, 'No more than 24 hours of focus in 24 hours');
         } finally {
             run('postgres', 'DROP DATABASE ' + database + ' WITH (FORCE);');
         }
