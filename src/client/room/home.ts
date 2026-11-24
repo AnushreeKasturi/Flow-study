@@ -10,6 +10,7 @@ import * as UI from '../modules/ui';
 import { setFromBoard } from './hide-ip';
 import { weekChart, heatmap } from './profile';
 import { here } from './state';
+import { read, write } from '../modules/storage';
 
 export interface HomeActions {
     join: (code: string) => Promise<void>;
@@ -22,11 +23,11 @@ export async function showHome(user: { id: string; email: string }, actions: Hom
     const { join, create: createRoom, showError: showLobbyError } = actions;
     const hostBtn = byId<HTMLButtonElement>('host-btn');
     const appContainer = byId<HTMLElement>('app');
-    const recap = sessionStorage.getItem('flow_recap');
-    sessionStorage.removeItem('flow_recap');
+    const recap = read('flow_recap', 'session');
+    write('flow_recap', null, 'session');
     if (recap) byId<HTMLElement>('lobby-recap').textContent = recap;
-    const notice = sessionStorage.getItem('flow_notice');
-    sessionStorage.removeItem('flow_notice');
+    const notice = read('flow_notice', 'session');
+    write('flow_notice', null, 'session');
     if (notice) showLobbyError(notice);
 
     const setName = (name: string) => {

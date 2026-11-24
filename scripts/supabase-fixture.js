@@ -99,7 +99,7 @@ window.supabase = { createClient() {
             on(type, config, callback) { fixture.handlers[type + ':' + config.event] = callback; return this; },
             subscribe(callback) { fixture.status = callback; setTimeout(() => callback('SUBSCRIBED'), 0); return this; },
             async track(value) { if (fixture.trackFailures > 0) { fixture.trackFailures--; throw new Error('Track failed'); } this.presence = fixture.tracked = value; }, async untrack() { fixture.untracked = true; },
-            async send(value) { fixture.calls.push({ action: 'send', value }); return fixture.sendStatus || 'ok'; },
+            async send(value) { fixture.calls.push({ action: 'send', direct: true, value }); return fixture.sendStatus || 'ok'; },
             presenceState() { return { [user.id]: [this.presence || { username: 'Alex' }] }; }
         };
         return {

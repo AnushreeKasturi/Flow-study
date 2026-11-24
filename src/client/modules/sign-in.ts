@@ -6,6 +6,7 @@ import defaults from '../../../supabase.config.json';
 import supabase from './supabase';
 import { markSignedIn } from './session';
 import { saveDisplayName } from './profile';
+import { read, write } from './storage';
 
 type Provider = 'github' | 'google';
 const KNOWN: readonly string[] = ['github', 'google'];
@@ -17,7 +18,7 @@ const INVITE = 'flow_invite_room';
 const validRoom = (room: string | null) => room && /^[A-Za-z0-9]{6}$/.test(room) ? room.toUpperCase() : null;
 export function rememberInvite() {
     const room = validRoom(new URLSearchParams(location.search).get('room'));
-    try { if (room) localStorage.setItem(INVITE, room); else localStorage.removeItem(INVITE); } catch { /* storage blocked: the invite is lost, Home still works */ }
+    write(INVITE, room || null); // storage blocked: the invite is lost, Home still works
 }
 
 export async function continueWith(provider: Provider) {
@@ -40,13 +41,14 @@ export async function finishOAuth(): Promise<string | null> {
 // `keepName` is false when this browser can't tell the account is the one it set up.
 export async function completeSignIn(user: { id: string }, keepName = true): Promise<string> {
     markSignedIn();
-    const pendingName = keepName ? localStorage.getItem('flow_pending_name') : null;
+    const pendingName = keepName ? read('flow_pending_name') : null;
     if (pendingName && await saveDisplayName(user.id, pendingName)) {
-        localStorage.setItem('flow_named', '1');
-        localStorage.removeItem('flow_pending_name');
+        write('flow_named', '1');
+        write('flow_pending_name', null);
     }
     let room = validRoom(new URLSearchParams(location.search).get('room'));
-    try { room ||= validRoom(localStorage.getItem(INVITE)); localStorage.removeItem(INVITE); } catch { /* storage blocked */ }
+    room ||= validRoom(read(INVITE));
+    write(INVITE, null);
     return '/room.html' + (room ? '?room=' + room : '');
 }
 

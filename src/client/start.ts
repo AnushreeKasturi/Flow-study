@@ -10,6 +10,7 @@ import { playSound, stopSound, setSoundVolume, type Sound } from './modules/soun
 import { bindSocialButtons, rememberInvite } from './modules/sign-in';
 import { looksLikeEmail, suggestEmail } from './modules/email-check';
 import { captchaToken, prepCaptcha, isCaptchaError, CAPTCHA_MSG } from './modules/captcha';
+import { read, write } from './modules/storage';
 
 // Read the session before building the steps: someone signed in skips the account step.
 const signedIn = await loadUser();
@@ -60,7 +61,7 @@ function show(to: number) {
 }
 
 // Name: the headline answers as you type.
-nameInput.value = localStorage.getItem('flow_pending_name') || '';
+nameInput.value = read('flow_pending_name') || '';
 const greet = () => { byId<HTMLElement>('start-greeting').textContent = firstName() ? `Hello, ${firstName()}.` : 'What should we call you?'; };
 nameInput.addEventListener('input', greet);
 greet();
@@ -81,7 +82,7 @@ function setMinutes(minutes: number) {
 }
 lengthInput.addEventListener('input', () => setMinutes(Number(lengthInput.value)));
 document.querySelectorAll<HTMLButtonElement>('[data-minutes]').forEach(button => button.addEventListener('click', () => setMinutes(Number(button.dataset.minutes))));
-setMinutes(Number(localStorage.getItem('flow_focus_minutes')) || 25);
+setMinutes(Number(read('flow_focus_minutes')) || 25);
 
 const sun = document.querySelector<HTMLElement>('.sun')!;
 const sky = document.querySelector<HTMLElement>('.sky')!;
@@ -113,9 +114,9 @@ document.querySelectorAll<HTMLButtonElement>('[data-sound-choice]').forEach(butt
 }));
 
 function savePreferences() {
-    localStorage.setItem('flow_pending_name', firstName());
-    localStorage.setItem('flow_focus_minutes', lengthInput.value);
-    if (sound) localStorage.setItem('flow_sound', sound); else localStorage.removeItem('flow_sound');
+    write('flow_pending_name', firstName());
+    write('flow_focus_minutes', lengthInput.value);
+    write('flow_sound', sound || null);
 }
 
 async function finish(user: { id: string; email?: string }) {
@@ -123,8 +124,8 @@ async function finish(user: { id: string; email?: string }) {
     showLoader('Setting up your space…');
     // If saving the name fails here, the room's lobby asks for it again with this value filled in.
     if (await saveDisplayName(user.id, firstName())) {
-        localStorage.setItem('flow_named', '1');
-        localStorage.removeItem('flow_pending_name');
+        write('flow_named', '1');
+        write('flow_pending_name', null);
     }
     leaveWithLoader('/room.html' + location.search, 'Opening your space…');
 }
@@ -150,7 +151,7 @@ async function createAccount() {
     if (error) return say(error.message);
     if (data.session && data.user) return finish(data.user);
     // Projects with "Confirm email" on make no session until the link is opened.
-    try { localStorage.setItem('flow_verify_email', email); } catch { /* the inbox page asks for it instead */ }
+    try { write('flow_verify_email', email); } catch { /* the inbox page asks for it instead */ }
     leaveWithLoader('/verify.html', 'Sending your link…');
 }
 

@@ -67,6 +67,7 @@ The Supabase project URL and **public publishable key** live in [`supabase.confi
 | --- | --- |
 | `PORT` | HTTP port; defaults to `3000` |
 | `GROQ_API_KEY` | Optional; enables `/api/ai` for study-assistant questions |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server only. Required once `sql/016` has run: the assistant and TURN quotas are then recorded by the server, and both endpoints refuse requests without it |
 | `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Optional; override `supabase.config.json` at build time and on the server |
 | `PUBLIC_TURNSTILE_SITE_KEY` | Optional; overrides `captchaSiteKey` in `supabase.config.json` at build time (see the captcha, below) |
 | `TWILIO_ACCOUNT_SID` | Optional; used with the auth token to obtain TURN credentials |

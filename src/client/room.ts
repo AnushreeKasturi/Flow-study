@@ -33,6 +33,7 @@ import { adoptListing, bindHosting, boardForm, listOnBoard, prepareLeave, refres
 import { bindProfile } from './room/profile';
 import { showHome } from './room/home';
 import { preview, previewWanted, setPreviewWanted } from './room/preview';
+import { read, write } from './modules/storage';
 
 let handRaised = false;
 let toldLate = false;
@@ -67,8 +68,8 @@ const generateRoomCode = () => Array.from({ length: 6 }, () => ROOM_CODE_CHARS[M
 
 function signOutLocally(message?: string) {
     markSignedOut();
-    localStorage.removeItem('flow_named');
-    sessionStorage.removeItem('flow_last_room');
+    write('flow_named', null);
+    write('flow_last_room', null, 'session');
     if (message) leaveWithLoader('/login.html', message, true);
     else window.location.replace('/login.html');
 }
@@ -121,8 +122,8 @@ const inviteUrl = () => {
 // New accounts name themselves once, before choosing a room. The flag saves a
 // profile read on every later visit; the room still reads the saved name on join.
 async function firstRunName(userId: string) {
-    if (localStorage.getItem('flow_named') || await hasDisplayName(userId)) {
-        localStorage.setItem('flow_named', '1');
+    if (read('flow_named') || await hasDisplayName(userId)) {
+        write('flow_named', '1');
         return;
     }
     const step = byId<HTMLFormElement>('welcome-step');
@@ -130,7 +131,7 @@ async function firstRunName(userId: string) {
     const error = byId<HTMLElement>('welcome-error');
     byId<HTMLElement>('lobby-step').classList.add('hidden');
     step.classList.remove('hidden');
-    input.value = localStorage.getItem('flow_pending_name') || ''; // typed during setup, not yet saved
+    input.value = read('flow_pending_name') || ''; // typed during setup, not yet saved
     input.focus();
     step.addEventListener('submit', async event => {
         event.preventDefault();
@@ -146,8 +147,8 @@ async function firstRunName(userId: string) {
             error.classList.remove('hidden');
             return;
         }
-        localStorage.setItem('flow_named', '1');
-        localStorage.removeItem('flow_pending_name');
+        write('flow_named', '1');
+        write('flow_pending_name', null);
         // Home was drawn before there was a name to show; this updates it.
         document.dispatchEvent(new CustomEvent('flow-name', { detail: name }));
         step.classList.add('hidden');
@@ -199,7 +200,7 @@ async function createRoom(open?: Omit<GroupDetails, 'host_name'> & { planId?: st
         if (await listOnBoard(boardForm()) && open.planId) cancelPlan(open.planId).then(undefined, () => {});
     }
     // A new room starts with the focus length its creator chose during setup.
-    const minutes = Number(localStorage.getItem('flow_focus_minutes'));
+    const minutes = Number(read('flow_focus_minutes'));
     if (here.code === createdCode && minutes >= 10 && minutes <= 90 && minutes !== 25) {
         setTimerSettings({ focus: minutes * 60, shortBreak: 5 * 60, longBreak: 15 * 60 });
     }
@@ -225,7 +226,7 @@ async function joinRoom() {
             // An ended room is not a connection problem: say what happened, and offer the way on.
             if (error?.message?.includes('Room ended')) {
                 showLobbyError('This room was ended by its host.', { label: 'Start a new room', run: () => { lobbyError.classList.add('hidden'); roomCodeInput.value = ''; byId<HTMLButtonElement>('host-btn').focus(); byId<HTMLButtonElement>('host-btn').click(); } });
-                sessionStorage.removeItem('flow_last_room');
+                write('flow_last_room', null, 'session');
                 return;
             }
             showLobbyError(!error ? 'No room matches that code and PIN. Check both and try again.'
@@ -312,7 +313,7 @@ async function enterRoom(roomId: string, roomCode: string, mediaReady = false) {
     const roomUrl = new URL(window.location.href);
     roomUrl.searchParams.set('room', roomCode);
     history.replaceState(null, '', roomUrl);
-    sessionStorage.setItem('flow_last_room', roomCode);
+    write('flow_last_room', roomCode, 'session');
     UI.updateRoomInfo(roomCode, 1);
 
     // The task list is visible from here, but tasks.ts has no room id until
@@ -519,9 +520,9 @@ async function enterRoom(roomId: string, roomCode: string, mediaReady = false) {
     }, userId => partners[userId]?.username);
 
     // The soundscape chosen during setup starts with the room; the Sound tab turns it off.
-    const sound = localStorage.getItem('flow_sound');
+    const sound = read('flow_sound');
     if (isSound(sound)) document.querySelector<HTMLButtonElement>(`[data-sound="${sound}"]`)?.click();
-    if (!localStorage.getItem('flow_first_session')) byId<HTMLElement>('room-guidance').classList.remove('hidden');
+    if (!read('flow_first_session')) byId<HTMLElement>('room-guidance').classList.remove('hidden');
 }
 
 // First-session checklist: each item ticks itself when the thing actually happens.
@@ -530,7 +531,7 @@ function check(item: 'invite' | 'task' | 'timer') {
     if (list.classList.contains('hidden')) return;
     list.querySelector(`[data-check="${item}"]`)!.classList.add('done');
     if (list.querySelectorAll('li:not(.done)').length) return;
-    localStorage.setItem('flow_first_session', 'done');
+    write('flow_first_session', 'done');
     setTimeout(() => list.classList.add('hidden'), 2400);
 }
 
@@ -595,7 +596,7 @@ function bindRoomControls() {
         byId<HTMLInputElement>('setting-long-break-duration').value = String(Math.round(lengths.longBreak / 60));
     });
     const notifyBox = byId<HTMLInputElement>('setting-notify');
-    notifyBox.checked = localStorage.getItem('flow_notify') === '1';
+    notifyBox.checked = read('flow_notify') === '1';
     on('open-timer-settings-btn', () => openModal('timer-settings-modal'));
     on('close-timer-settings-btn', closeModal);
     on('save-timer-settings-btn', async () => {
@@ -611,7 +612,7 @@ function bindRoomControls() {
             if (!allowed) notify('Notifications are blocked for this site. Allow them in your browser settings, then tick the box again.', 'error');
         }
         notifyBox.checked = allowed;
-        localStorage.setItem('flow_notify', allowed ? '1' : '0');
+        write('flow_notify', allowed ? '1' : '0');
         // A changed choice applies at once: calls are set up again with the new route.
         setPreviewWanted(previewBox.checked);
         if (hideIpBox.checked !== hidingIp()) {
@@ -653,7 +654,7 @@ function bindRoomControls() {
     });
     on('invite-empty-btn', () => byId<HTMLButtonElement>('share-link-btn').click());
     // The first-session checklist can be put away for good.
-    on('skip-guidance', () => { localStorage.setItem('flow_first_session', 'done'); byId<HTMLElement>('room-guidance').classList.add('hidden'); });
+    on('skip-guidance', () => { write('flow_first_session', 'done'); byId<HTMLElement>('room-guidance').classList.add('hidden'); });
     on('header-room-code', async () => {
         try {
             await navigator.clipboard.writeText(here.code);
@@ -684,11 +685,11 @@ function bindRoomControls() {
         if (!playSound(button.dataset.sound as Sound)) notify('This browser cannot generate audio.', 'error');
     }));
     // The volume is kept between visits. Anything stored that the slider could not have set keeps its default.
-    const savedVolume = localStorage.getItem('flow_sound_volume');
+    const savedVolume = read('flow_sound_volume');
     if (savedVolume && /^(100|\d{1,2})$/.test(savedVolume)) volume.value = savedVolume;
     volume.addEventListener('input', () => {
         setSoundVolume(Number(volume.value) / 100);
-        localStorage.setItem('flow_sound_volume', volume.value);
+        write('flow_sound_volume', volume.value);
     });
     setSoundVolume(Number(volume.value) / 100);
 
@@ -750,8 +751,8 @@ function bindRoomControls() {
         // A one-line summary, shown in the lobby we are about to return to.
         const minutes = Math.max(1, Math.round((Date.now() - here.enteredAt) / 60000));
         const tasks = getTaskStats();
-        sessionStorage.setItem('flow_recap', `Last session: ${formatFocusTime(minutes)} in room ${here.code}` + (tasks.total ? `, ${tasks.completed} of ${tasks.total} tasks done.` : '.'));
-        if (ended) sessionStorage.removeItem('flow_last_room'); // its code no longer works
+        write('flow_recap', `Last session: ${formatFocusTime(minutes)} in room ${here.code}` + (tasks.total ? `, ${tasks.completed} of ${tasks.total} tasks done.` : '.'), 'session');
+        if (ended) write('flow_last_room', null, 'session'); // its code no longer works
         const goodbye = [saveFocus('focus-partial'), disconnectSocket(), here.listed ? unlistRoom(getMyUserId()) : null,
             here.isActing ? supabase.rpc('release_host', { p_room: here.id }) : null]; // standing in: the next person takes over
         try { await Promise.race([Promise.allSettled(goodbye), new Promise(resolve => setTimeout(resolve, 1500))]); }
@@ -799,11 +800,11 @@ async function start() {
             const minutes = link.minutes ?? 0;
             byId<HTMLElement>('join-heading').textContent = 'This room has ended';
             byId<HTMLElement>('join-hint').textContent = `Room ${invited} was ended by its host ${minutes < 1 ? 'just now' : minutes === 1 ? 'a minute ago' : minutes + ' minutes ago'}. Start a room of your own, or ask for a new link.`;
-            if (sessionStorage.getItem('flow_last_room') === invited) sessionStorage.removeItem('flow_last_room');
+            if (read('flow_last_room', 'session') === invited) write('flow_last_room', null, 'session');
         }
         roomCodeInput.value = link.status === 'ended' ? '' : invited;
         invited = '';
-    } else roomCodeInput.value = invited || sessionStorage.getItem('flow_last_room') || '';
+    } else roomCodeInput.value = invited || read('flow_last_room', 'session') || '';
     if (roomCodeInput.value) byId<HTMLInputElement>('show-join').checked = true; // phones: a code waiting means Join is the card you want
     // Arriving from an invite link: say so, and make joining the obvious next step.
     // The link goes straight on to "Ready to join?" (see the end of start), where the person still chooses.
@@ -856,10 +857,10 @@ async function start() {
 
     // Arriving from the study-groups board: either to host a new group, or with a seat already taken.
     // Both are one-time notes left by the board page in this tab.
-    const hosting = sessionStorage.getItem('flow_host');
-    const seat = sessionStorage.getItem('flow_join');
-    sessionStorage.removeItem('flow_host');
-    sessionStorage.removeItem('flow_join');
+    const hosting = read('flow_host', 'session');
+    const seat = read('flow_join', 'session');
+    write('flow_host', null, 'session');
+    write('flow_join', null, 'session');
     if (hosting) {
         const plan = JSON.parse(hosting);
         if (typeof plan.topic === 'string') await createRoom({ topic: plan.topic, subject: plan.subject, camera: plan.camera, vibe: plan.vibe, seats: Math.min(6, Math.max(2, Number(plan.seats) || 4)), planId: typeof plan.planId === 'string' ? plan.planId : undefined });

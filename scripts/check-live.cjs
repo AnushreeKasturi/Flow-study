@@ -49,13 +49,25 @@ async function main() {
         const response = await read(table);
         check(!response.ok, `${table} is closed to signed-out visitors (${response.status})`);
     }
-    // Migrations are in: a recent column exists (a missing one is "column does not exist", 42703).
-    const timer = await get(`${config.url}/rest/v1/rooms?select=timer&limit=1`, { headers });
-    const timerError = timer.ok ? null : (await timer.json()).code;
-    check(timerError !== '42703', 'Migrations are applied through sql/017 (rooms.timer exists)');
+    // Migrations are in. A function signed-out visitors may not call answers 401; one that
+    // doesn't exist answers 404. (Signed-out visitors can't read rooms at all, so a column can't be checked.)
+    const rpc = (name, body) => get(`${config.url}/rest/v1/rpc/${name}`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    for (const [name, body, migration] of [
+        ['api_allow_for', { p_user: '00000000-0000-0000-0000-000000000000', p_kind: 'ai' }, 'sql/016'],
+        ['focus_days', { p_tz: 'UTC' }, 'sql/019'],
+        ['platform_stats', { p_days: 30 }, 'sql/020'],
+        ['room_link_status', { p_room_code: 'AAAAAA' }, 'sql/022']
+    ]) {
+        const { status } = await rpc(name, body);
+        check(status === 401 || status === 403, `${migration} is applied, and ${name} is closed to signed-out visitors (${status})`);
+    }
+    check((await rpc('visitor_count', {})).ok, 'sql/023 is applied (the visitor count answers)');
     // Quotas are server-only: browsers can't call them.
     const quota = await get(`${config.url}/rest/v1/rpc/api_allow`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: '{"p_kind":"ai"}' });
     check(quota.status === 401 || quota.status === 403 || quota.status === 404, `The quota function is closed to browsers (${quota.status})`);
+    for (const page of ['/stats.html']) check((await get(SITE + page)).ok, `${page} loads`);
+    for (const [name, want] of [['strict-transport-security', 'max-age'], ['x-content-type-options', 'nosniff'], ['x-frame-options', '']])
+        check((home.headers.get(name) || '').toLowerCase().includes(want) && home.headers.has(name), `${name} is served`);
 
     // The API answers without a sign-in only where it should.
     const post = (path, body) => get(SITE + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });

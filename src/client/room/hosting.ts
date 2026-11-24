@@ -16,6 +16,7 @@ import supabase from '../modules/supabase';
 import { saveFocus, timerSnapshot, setRunsTimer } from '../modules/timer';
 import { markListed } from './hide-ip';
 import { here, partners, pendingLeaves, peopleHere } from './state';
+import { write } from '../modules/storage';
 
 export async function listOnBoard(details: Omit<GroupDetails, 'host_name'>) {
     const status = byId<HTMLElement>('board-status');
@@ -127,8 +128,8 @@ export async function roomEnded() {
     const { error } = await supabase.rpc('join_room', { p_room_code: here.code, p_pin: here.pin });
     if (!error?.message?.includes('Room ended') || here.leaving) return;
     here.leaving = true;
-    sessionStorage.setItem('flow_recap', 'The host ended the room. Your focus time from it is saved.');
-    sessionStorage.removeItem('flow_last_room');
+    write('flow_recap', 'The host ended the room. Your focus time from it is saved.', 'session');
+    write('flow_last_room', null, 'session');
     await Promise.race([Promise.allSettled([saveFocus('focus-partial'), disconnectSocket()]), new Promise(resolve => setTimeout(resolve, 1500))]);
     cleanupMedia();
     stopSound();
@@ -186,8 +187,8 @@ export async function confirmRemoval() {
     here.leaving = true;
     cleanupMedia();
     stopSound();
-    sessionStorage.removeItem('flow_last_room');
-    sessionStorage.setItem('flow_notice', 'The host removed you from that room.');
+    write('flow_last_room', null, 'session');
+    write('flow_notice', 'The host removed you from that room.', 'session');
     await Promise.race([disconnectSocket(), new Promise(resolve => setTimeout(resolve, 1000))]);
     leaveWithLoader('/room.html', 'Back to your space…', true);
 }

@@ -110,8 +110,9 @@ export function restoreTimer(saved: unknown) {
     const savedAt = typeof timer.at === 'string' ? Date.parse(timer.at) : NaN;
     if (!Number.isFinite(savedAt) || !Number.isInteger(timer.timeLeft)) return;
     const elapsed = timer.isRunning ? Math.max(0, Math.round((Date.now() - savedAt) / 1000)) : 0;
-    const { mode, isRunning, duration, sessionCount, durations, autoAdvance: advance } = timer;
-    syncState({ mode, isRunning, duration, sessionCount, durations, autoAdvance: advance, timeLeft: Math.max(0, timer.timeLeft! - elapsed) });
+    const { mode, isRunning, duration, sessionCount, durations, autoAdvance: advance, version, by } = timer;
+    // With the room's version, so this page's next change is newer than everyone's (not version 1 again).
+    syncState({ mode, isRunning, duration, sessionCount, durations, autoAdvance: advance, version, from: by, timeLeft: Math.max(0, timer.timeLeft! - elapsed) });
 }
 
 const broadcastState = () => {

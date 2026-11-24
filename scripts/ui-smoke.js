@@ -611,7 +611,7 @@ async (page) => {
         const fixture = window.__fixture, id = fixture.tables.profiles[0].id, day = n => new Date(Date.now() - n * 864e5).toISOString();
         fixture.tables.sessions.push({ id: 'heat-1', user_id: id, mode: 'focus', duration_seconds: 5400, completed_at: day(3) }, { id: 'heat-2', user_id: id, mode: 'focus-partial', duration_seconds: 600, completed_at: day(10) });
     });
-    await page.getByRole('button', { name: 'Edit your profile', exact: true }).focus();
+    await page.getByRole('button', { name: /, edit your profile$/ }).focus();
     await page.keyboard.press('Enter');
     await visible('#profile-modal');
     // Six months of focus, one square a day: 26 weeks, darker for longer days, with the time on hover.
@@ -719,7 +719,7 @@ async (page) => {
     await page.evaluate(() => { window.__fixture.delay = 0; });
 
     // Profile failures recover, and markup is rendered as text.
-    await page.getByRole('button', { name: 'Edit your profile', exact: true }).click();
+    await page.getByRole('button', { name: /, edit your profile$/ }).click();
     await page.getByLabel('Display name', { exact: true }).fill('<img src=x onerror=alert(1)>');
     await page.getByRole('button', { name: 'Save Name', exact: true }).click();
     await page.waitForFunction(() => !document.getElementById('save-profile-name-btn').disabled);
@@ -729,7 +729,7 @@ async (page) => {
     await page.waitForFunction(() => !document.getElementById('save-profile-name-btn').disabled);
     await page.keyboard.press('Escape');
 
-    await page.getByRole('button', { name: 'Edit your profile', exact: true }).click();
+    await page.getByRole('button', { name: /, edit your profile$/ }).click();
     await page.getByLabel('Display name', { exact: true }).fill('Alex');
     await page.getByRole('button', { name: 'Save Name', exact: true }).click();
     await page.waitForFunction(() => !document.getElementById('save-profile-name-btn').disabled);
@@ -776,6 +776,8 @@ async (page) => {
     await page.getByLabel('Message to room').fill('Retry this message');
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await page.waitForFunction(() => document.getElementById('chat-input').value === 'Retry this message');
+    // A message the database refused is never sent around it, straight onto the channel.
+    assert(!(await page.evaluate(() => window.__fixture.calls.some(call => call.direct && call.value?.payload?.text === 'Retry this message'))), 'A refused message must not fall back to a direct broadcast');
     await page.evaluate(() => { window.__fixture.sendStatus = 'ok'; });
 
     // Chat formatting: a safe subset of Markdown, built as elements and never parsed as HTML.
@@ -1118,7 +1120,7 @@ async (page) => {
     await page.clock.fastForward(61000);
     const elapsedTime = await page.locator('#time-display').innerText();
     assert(['28:59', '28:58'].includes(elapsedTime), 'Timer should follow elapsed wall time after throttled ticks');
-    await page.getByRole('button', { name: 'Edit your profile', exact: true }).click();
+    await page.getByRole('button', { name: /, edit your profile$/ }).click();
     await page.waitForFunction(() => document.getElementById('profile-today-value')?.textContent === '1m');
     assert((await page.locator('#my-focus-time').textContent()).includes('1m'), 'Card and open profile must agree on live focus');
     await page.clock.fastForward(60000);
@@ -1144,7 +1146,7 @@ async (page) => {
     // The paused stretch was saved as partial focus. (The block that ran out here lasted under a
     // second, so whether it is long enough to store varies; it is never stored twice.)
     await page.waitForFunction(() => { const modes = window.__fixture.tables.sessions.map(row => row.mode); return modes.includes('focus-partial') && modes.filter(mode => mode === 'focus').length <= 1; });
-    await page.getByRole('button', { name: 'Edit your profile', exact: true }).click();
+    await page.getByRole('button', { name: /, edit your profile$/ }).click();
     await page.waitForFunction(() => document.getElementById('profile-today-value')?.textContent === '2m');
     assert((await page.locator('#my-focus-time').textContent()).includes('2m'), 'Saved focus must replace live focus without double counting');
     await page.keyboard.press('Escape');

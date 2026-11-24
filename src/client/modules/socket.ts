@@ -277,10 +277,13 @@ export function sendToRoom(event: string, payload: Record<string, unknown>): Pro
         if (viaDatabase) {
             const { error } = await getSupabase().rpc('room_send', { p_room: room, p_event: event, p_payload: message });
             if (!error) return 'ok';
+            // A refusal (not a member, not the host, room ended) or a failed call is final: the
+            // room's channel only takes what room_send stamps (sql/009), so going around it can't help.
+            if (error.code !== 'PGRST202') return 'denied';
             // PGRST202: this server has not run sql/008 yet. Use the direct path for the rest of this visit.
-            if (error.code === 'PGRST202') viaDatabase = false;
+            viaDatabase = false;
         }
-        // Direct broadcast: the path before sql/008, and the fallback if the database call fails.
+        // Direct broadcast: only for a database without room_send (before sql/008).
         return String(await direct.send({ type: 'broadcast', event, payload: message }));
     };
     const result = outbox.then(deliver, deliver);

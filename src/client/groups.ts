@@ -5,6 +5,7 @@ import { fetchOpenRooms, fetchPlanned, fetchMyPlans, takeSeat, planGroup, cancel
 import { getMyProfile } from './modules/profile';
 import { loadUser } from './modules/session';
 import { showLoader, hideLoader, leaveWithLoader } from './loader';
+import { write } from './modules/storage';
 
 // Signed-out visitors can read the board; the session decides what they can do on it.
 const user = await loadUser();
@@ -49,7 +50,7 @@ async function sit(room: OpenRoom) {
     const result = await takeSeat(room.id).catch((): { reason: string } => ({ reason: 'Could not join this group. Check your connection and try again.' }));
     if ('code' in result) {
         // Handed over in sessionStorage, not the URL: a link must never be able to walk someone into a room with their camera on.
-        sessionStorage.setItem('flow_join', result.code);
+        write('flow_join', result.code, 'session');
         leaveWithLoader('/room.html', 'Opening your room…');
         return;
     }
@@ -145,7 +146,7 @@ async function load() {
 
 // Hosting now: remember what to list, then let the room page create the room and list it.
 function hostNow(details: GroupDetails & { planId?: string }) {
-    sessionStorage.setItem('flow_host', JSON.stringify(details));
+    write('flow_host', JSON.stringify(details), 'session');
     leaveWithLoader('/room.html', 'Opening your study group…');
 }
 

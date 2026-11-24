@@ -23,6 +23,7 @@ In Vercel Project Settings → Environment Variables, copy these values directly
 | Name | Purpose |
 | --- | --- |
 | `GROQ_API_KEY` | Study-assistant requests |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-side quota calls. Required once `sql/016` has run, or `/api/ai` and `/api/turn-credentials` refuse every request |
 | `TWILIO_ACCOUNT_SID` | TURN credential requests |
 | `TWILIO_AUTH_TOKEN` | Server-side Twilio authentication |
 
