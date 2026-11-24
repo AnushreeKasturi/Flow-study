@@ -122,6 +122,12 @@ async (page) => {
     await page.getByRole('button', { name: 'Send it again', exact: true }).click();
     await page.waitForFunction(() => document.getElementById('verify-status').textContent.startsWith('Sent.') && document.getElementById('verify-resend').disabled);
     assert(await page.evaluate(() => window.__fixture.calls.some(call => call.action === 'resend' && call.email === 'alex@example.com')), 'The link can be sent again, then waits a minute');
+    // A wrong address: back to the email step only, with the earlier answers kept and the old address ready to fix.
+    await page.getByRole('link', { name: 'use a different email', exact: true }).click();
+    await page.getByLabel('Email address').waitFor();
+    assert(await page.getByLabel('Email address').inputValue() === 'alex@example.com' && await page.getByRole('button', { name: 'Create my account', exact: true }).isVisible()
+        && await page.locator('#start-name').inputValue() !== '', 'Using a different email goes straight to the email step, not the whole setup');
+    await page.goto(origin + '/verify.html');
     // Opening a link only asks: scanners can't spend the token, and nothing happens without a tap.
     await page.goto(origin + '/verify.html?token_hash=used-token&type=email');
     await page.getByRole('heading', { name: 'Confirm your email.' }).waitFor();

@@ -108,8 +108,10 @@ sun.addEventListener('pointerdown', event => {
     }, { once: true });
 });
 
-// Sound: tapping a choice plays it straight away.
+// Sound: tapping a choice plays it straight away. A choice from an earlier visit is kept, silently.
 setSoundVolume(.35);
+sound = read('flow_sound') || '';
+document.querySelectorAll<HTMLButtonElement>('[data-sound-choice]').forEach(item => item.setAttribute('aria-pressed', String(item.dataset.soundChoice === sound)));
 document.querySelectorAll<HTMLButtonElement>('[data-sound-choice]').forEach(button => button.addEventListener('click', () => {
     sound = button.dataset.soundChoice!;
     document.querySelectorAll<HTMLButtonElement>('[data-sound-choice]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
@@ -179,4 +181,13 @@ back.addEventListener('click', () => show(index - 1));
 // GitHub or Google on the last step: your choices are kept on this device for the round trip.
 bindSocialButtons(message => say(message), savePreferences);
 if (signedIn) byId<HTMLElement>('start-login').remove();
-show(0);
+// "Use a different email" on the inbox page comes back here with #account: the earlier answers
+// are still saved, so it goes straight to the email, with the old address there to fix or replace.
+const retry = location.hash === '#account' && steps.includes('account') && !!firstName();
+if (retry) {
+    const email = byId<HTMLInputElement>('start-email');
+    email.value = read('flow_verify_email') || '';
+    history.replaceState(null, '', location.pathname + location.search);
+    show(steps.indexOf('account'));
+    email.select();
+} else show(0);
