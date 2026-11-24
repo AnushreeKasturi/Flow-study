@@ -43,6 +43,18 @@ const joinBtn = byId<HTMLButtonElement>('join-btn');
 const hostBtn = byId<HTMLButtonElement>('host-btn');
 const lobbyError = byId<HTMLElement>('lobby-error');
 const roomCodeInput = byId<HTMLInputElement>('room-code-input');
+// The code shows as six boxes that fill as you type. The input underneath does the work; the boxes mirror it,
+// including when the code is filled in for you (an invite link, the last room), hence the value setter.
+const codeCells = [...document.querySelectorAll<HTMLElement>('.code-cells span')];
+const paintCode = () => {
+    const code = roomCodeInput.value.toUpperCase();
+    codeCells.forEach((cell, index) => { cell.textContent = code[index] ?? ''; cell.classList.toggle('active', index === Math.min(code.length, 5)); });
+    codeCells[0].parentElement!.classList.toggle('full', code.length === 6);
+};
+const valueField = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!;
+Object.defineProperty(roomCodeInput, 'value', { get() { return valueField.get!.call(this); }, set(next: string) { valueField.set!.call(this, next); paintCode(); } });
+roomCodeInput.addEventListener('input', paintCode);
+paintCode();
 const pinInput = byId<HTMLInputElement>('room-pin-input');
 const appContainer = byId<HTMLElement>('app');
 

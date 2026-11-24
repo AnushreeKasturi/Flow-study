@@ -63,6 +63,7 @@ const logIn = async () => {
 
     authBusy = loginBtn.disabled = true;
     loginBtn.innerText = 'Logging in…';
+    loginBtn.classList.add('busy');
     try {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: await captchaToken() } });
         if (isCaptchaError(error)) { showError(CAPTCHA_MSG); return; }
@@ -86,6 +87,7 @@ const logIn = async () => {
     } finally {
         authBusy = false;
         loginBtn.innerText = 'Log in';
+        loginBtn.classList.remove('busy');
         loginBtn.disabled = redirectPending;
     }
 };
@@ -106,7 +108,6 @@ byId<HTMLAnchorElement>('forgot-link').addEventListener('click', () => {
 byId<HTMLButtonElement>('toggle-password').addEventListener('click', event => {
     const visible = passwordInput.type === 'password';
     passwordInput.type = visible ? 'text' : 'password';
-    (event.currentTarget as HTMLButtonElement).textContent = visible ? 'Hide' : 'Show';
     (event.currentTarget as HTMLButtonElement).setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
     (event.currentTarget as HTMLButtonElement).setAttribute('aria-pressed', String(visible));
 });

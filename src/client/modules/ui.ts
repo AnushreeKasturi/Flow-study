@@ -61,6 +61,8 @@ export const updateTimerUI = (state: TimerState) => {
     // CSS reads these to pulse the clock and turn the sun into a breathing pacer on breaks.
     document.body.dataset.mode = focus ? 'focus' : 'break';
     document.body.dataset.timer = state.isRunning ? document.body.dataset.mode : 'idle';
+    // The last minute of a focus block: the sky starts to warm toward sunset and the clock breathes, so the break never ambushes anyone.
+    document.body.toggleAttribute('data-final', focus && state.isRunning && state.timeLeft > 0 && state.timeLeft <= 60);
 
     // Four focus blocks make a set; the fourth earns the long break.
     const inSet = state.sessionCount % ROUNDS;
@@ -152,7 +154,10 @@ export const renderTaskList = (container: HTMLElement, tasks: Task[], onToggle: 
 export const updateTaskStatsUI = (stats: TaskStats) => {
     const percentage = stats.total === 0 ? 0 : Math.round((stats.completed / stats.total) * 100);
     byId<HTMLElement>('room-task-progress-text').textContent = `${percentage}%`;
-    byId<HTMLElement>('room-task-progress-fill').style.width = `${percentage}%`;
+    const fill = byId<HTMLElement>('room-task-progress-fill');
+    // A shimmer runs along the bar whenever the room gets closer to done.
+    if (percentage > (parseFloat(fill.style.width) || 0)) { fill.classList.remove('grew'); void fill.offsetWidth; fill.classList.add('grew'); }
+    fill.style.width = `${percentage}%`;
 };
 
 export const updateMyPresenceUI = (state: PresenceState, username: string) => {

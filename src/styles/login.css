@@ -21,12 +21,15 @@
 #auth-form .btn-lg { min-height: 46px; }
 #auth-form .divider { margin: clamp(8px, 1.8svh, 18px) 0; }
 .password-field { position: relative; }
-.password-field .input { padding-right: 70px !important; }
+/* The input keeps its spacing below; the eye centres on the input itself, not the whole field. */
+.password-field:has(> .input) { margin-bottom: clamp(10px, 2svh, 18px); }
+.password-field > .input { margin-bottom: 0 !important; }
+.password-field .input { padding-right: 52px !important; }
 .pw-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px; }
 .pw-label label { margin-bottom: 0 !important; }
 .pw-label a { color: var(--text-2); font-size: .8rem; }
 .pw-label a:hover { color: var(--text); }
-#toggle-password, #pw-toggle { position: absolute; right: 8px; top: 8px; padding: 6px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--text-2); font-size: .8rem; cursor: pointer; }
+#toggle-password, #pw-toggle { position: absolute; right: 6px; top: 50%; translate: 0 -50%; display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-2); font-size: .8rem; cursor: pointer; }
 #toggle-password:hover, #pw-toggle:hover { background: var(--hover); }
 .auth-message { display: none; padding: 12px; margin-bottom: 20px; border: 1px solid currentColor; border-radius: 8px; font-size: .88rem; overflow-wrap: anywhere; }
 .error-msg { color: var(--danger); }
@@ -61,3 +64,12 @@
 .login-note .link-btn { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
 .login-note .link-btn:hover { color: var(--text); }
 .verify-status { min-height: 1.4em; margin-top: 14px; color: var(--text-2); font-size: .86rem; text-align: center; }
+
+/* Password visibility: an eye, crossed out once the password is showing. */
+[aria-pressed="false"] > .pw-hide, [aria-pressed="true"] > .pw-show { display: none; }
+
+/* "Check your inbox": an envelope with a sun-coloured dot, as if something just arrived. */
+.envelope { position: relative; display: grid; place-items: center; width: 72px; height: 72px; margin-bottom: 22px; border-radius: 22px; background: var(--surface); color: var(--primary); animation: envelope-in .7s var(--ease) both; }
+.envelope i { position: absolute; top: 12px; right: 11px; width: 12px; height: 12px; border: 2px solid var(--surface); border-radius: 50%; background: var(--sun); animation: envelope-dot .4s .55s cubic-bezier(.3, 1.6, .5, 1) both; }
+@keyframes envelope-in { from { opacity: 0; translate: 0 14px; rotate: -8deg; } }
+@keyframes envelope-dot { from { scale: 0; } }

@@ -1,5 +1,6 @@
 ---
 import Page from '../layouts/Page.astro';
+import Icon from '../components/Icon.astro';
 import '../styles/login.css';
 ---
 <!-- Email links: "check your inbox" after signing up or asking for a password reset, and where those links land. -->
@@ -11,6 +12,7 @@ import '../styles/login.css';
     <main class="login-main">
         <section class="login-card verify-card" aria-live="polite">
             <div data-state="sent" hidden>
+                <div class="envelope" aria-hidden="true"><Icon name="mail" size={34} /><i></i></div>
                 <h1>Check your inbox.</h1>
                 <p class="login-description">We sent a link to <strong id="verify-email"></strong>. Open it on any device to finish setting up your space. It works once, for an hour.</p>
                 <button id="verify-resend" type="button" class="btn btn-lg btn-block">Send it again</button>
@@ -70,7 +72,7 @@ import '../styles/login.css';
                     <label for="pw-input">New password</label>
                     <div class="password-field">
                         <input type="password" id="pw-input" class="input" placeholder="At least 8 characters" autocomplete="new-password" minlength="8" required>
-                        <button id="pw-toggle" type="button" aria-label="Show password" aria-pressed="false">Show</button>
+                        <button id="pw-toggle" type="button" aria-label="Show password" aria-pressed="false"><Icon name="eye" size={18} class="pw-show" /><Icon name="eyeOff" size={18} class="pw-hide" /></button>
                     </div>
                     <button type="submit" class="btn btn-primary btn-lg btn-block">Save password</button>
                 </form>

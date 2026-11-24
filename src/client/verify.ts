@@ -162,7 +162,6 @@ byId<HTMLButtonElement>('pw-toggle').addEventListener('click', event => {
     const button = event.currentTarget as HTMLButtonElement;
     const visible = pwInput.type === 'password';
     pwInput.type = visible ? 'text' : 'password';
-    button.textContent = visible ? 'Hide' : 'Show';
     button.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
     button.setAttribute('aria-pressed', String(visible));
 });

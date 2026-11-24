@@ -1,6 +1,7 @@
 ---
 import Page from '../layouts/Page.astro';
 import Sky from '../components/Sky.astro';
+import Icon from '../components/Icon.astro';
 import '../styles/pages.css';
 import { SOUNDS } from '../client/modules/soundscape';
 const repo = 'https://github.com/ManasDasri/Flow-study';
@@ -10,14 +11,14 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
     <Sky />
     <header class="plain-nav">
         <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
-        <nav aria-label="Main"><a href="/groups.html">Study groups</a><a href={repo} target="_blank" rel="noopener noreferrer">GitHub</a><a href="/start.html" class="btn" data-home-when-signed-in>Get started</a></nav>
+        <nav aria-label="Main"><a href="/groups.html"><Icon name="users" size={16} />Study groups</a><a href={repo} target="_blank" rel="noopener noreferrer"><Icon name="github" size={16} />GitHub</a><a href="/start.html" class="btn" data-home-when-signed-in><Icon name="sunrise" size={16} class="i-out" /><Icon name="house" size={16} class="i-home" /><span class="link-label">Get started</span></a></nav>
     </header>
     <main class="plain-main docs">
         <h1>How Flow works.</h1>
         <p class="lead">Everything you need to run a study session, on one page.</p>
 
         <nav class="docs-toc" aria-label="On this page">
-            <a href="#start">Getting started</a><a href="#timer">The sun timer</a><a href="#rooms">Rooms and invites</a><a href="#groups">Study groups</a><a href="#sound">Sound</a><a href="#shortcuts">Shortcuts</a><a href="#data">Your data</a><a href="#self-host">Run your own copy</a>
+            <a href="#start"><Icon name="sunrise" size={15} />Getting started</a><a href="#timer"><Icon name="sun" size={15} />The sun timer</a><a href="#rooms"><Icon name="hash" size={15} />Rooms and invites</a><a href="#groups"><Icon name="users" size={15} />Study groups</a><a href="#sound"><Icon name="headphones" size={15} />Sound</a><a href="#shortcuts"><Icon name="keyboard" size={15} />Shortcuts</a><a href="#data"><Icon name="lock" size={15} />Your data</a><a href="#self-host"><Icon name="github" size={15} />Run your own copy</a>
         </nav>
 
         <section id="start">

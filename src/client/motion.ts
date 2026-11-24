@@ -18,6 +18,16 @@ export function clearMotion(element: Element) {
 export function completeTask(element: Element) {
     if (reduced()) return;
     gsap.fromTo(element, { scale: .86 }, { scale: 1, duration: .24, ease: 'back.out(1.6)', clearProps: 'transform', overwrite: true });
+    // A few small suns float up from the box and fade: a tiny reward for finishing something.
+    const box = element.getBoundingClientRect();
+    for (let i = 0; i < 7; i++) {
+        const sun = document.body.appendChild(Object.assign(document.createElement('i'), { className: 'task-sun' }));
+        gsap.set(sun, { left: box.left + box.width / 2, top: box.top + box.height / 2, scale: .4 + Math.random() * .6 });
+        gsap.to(sun, {
+            x: (Math.random() - .5) * 70, y: -36 - Math.random() * 46, opacity: 0, duration: .75 + Math.random() * .35,
+            ease: 'power2.out', onComplete: () => sun.remove()
+        });
+    }
 }
 
 // Preference changes take effect during the current visit, including open dialogs.

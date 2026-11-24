@@ -118,7 +118,13 @@ function planCard(plan: PlannedGroup) {
         actions);
 }
 
-const empty = (title: string, text: string) => el('li', { className: 'group-empty' }, el('strong', { textContent: title }), el('span', { textContent: text }));
+// An empty list gets the sleepy sun from the loader, slowly peeking over its horizon.
+const sleepySun = () => {
+    const scene = el('div', { className: 'loader-scene' }, el('div', { className: 'loader-sky' }, el('i', { className: 'loader-sun' }, el('b'))), el('i', { className: 'loader-horizon' }));
+    scene.setAttribute('aria-hidden', 'true');
+    return scene;
+};
+const empty = (title: string, text: string) => el('li', { className: 'group-empty' }, sleepySun(), el('strong', { textContent: title }), el('span', { textContent: text }));
 
 function render() {
     const open = rooms.filter(matches), upcoming = plans.filter(matches);

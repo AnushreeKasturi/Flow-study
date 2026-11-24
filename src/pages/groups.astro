@@ -1,6 +1,7 @@
 ---
 import Page from '../layouts/Page.astro';
 import Sky from '../components/Sky.astro';
+import Icon from '../components/Icon.astro';
 import '../styles/pages.css';
 import { SUBJECTS, CAMERAS, VIBES } from '../client/modules/board-options';
 ---
@@ -8,7 +9,7 @@ import { SUBJECTS, CAMERAS, VIBES } from '../client/modules/board-options';
     <Sky />
     <header class="plain-nav">
         <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
-        <nav aria-label="Main"><a href="/docs.html">Docs</a><a href="/login.html" class="btn" data-home-when-signed-in>Log in</a></nav>
+        <nav aria-label="Main"><a href="/docs.html"><Icon name="book" size={16} />Docs</a><a href="/login.html" class="btn" data-home-when-signed-in><Icon name="logIn" size={16} class="i-out" /><Icon name="house" size={16} class="i-home" /><span class="link-label">Log in</span></a></nav>
     </header>
     <main class="plain-main">
         <h1>Find people to study with.</h1>
@@ -18,9 +19,9 @@ import { SUBJECTS, CAMERAS, VIBES } from '../client/modules/board-options';
             <input type="search" id="board-search" class="input" placeholder="Search topics" aria-label="Search topics">
             <div class="chips" role="group" aria-label="Filter by subject">
                 <button type="button" data-subject="" aria-pressed="true">All</button>
-                {SUBJECTS.map(([id, name]) => <button type="button" data-subject={id} aria-pressed="false">{name}</button>)}
+                {SUBJECTS.map(([id, name]) => <button type="button" data-subject={id} aria-pressed="false"><Icon name={id} size={15} />{name}</button>)}
             </div>
-            <button type="button" id="find-seat" class="btn btn-primary">Find me a seat</button>
+            <button type="button" id="find-seat" class="btn btn-primary"><Icon name="users" size={16} />Find me a seat</button>
         </div>
         <p id="board-message" class="board-message" role="status"></p>
 

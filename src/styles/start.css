@@ -63,3 +63,14 @@
 @media (max-width: 560px) { .step .social-signin { grid-template-columns: minmax(0, 1fr); } }
 /* The page's main landmark, without changing the layout around the form. */
 .start-landmark { display: contents; }
+
+/* The name step shows the tile your partners will see, so the name feels like yours straight away. */
+.tile-preview {
+    position: relative; display: grid; place-items: center; width: min(260px, 70%); aspect-ratio: 4 / 3; margin-top: 28px;
+    border-radius: 18px; background: color-mix(in srgb, var(--primary) 22%, var(--surface));
+    box-shadow: 0 24px 50px -28px color-mix(in srgb, var(--sun) 55%, transparent);
+}
+.tile-preview b { color: var(--primary); font-size: 5rem; font-weight: 800; font-stretch: 78%; font-variation-settings: 'wdth' 78; line-height: 1; }
+.tile-preview span { position: absolute; top: 10px; left: 10px; display: inline-flex; align-items: center; gap: 6px; max-width: calc(100% - 20px); padding: 3px 10px; border-radius: 999px; background: rgb(0 0 0 / .45); color: #fff; font-size: .78rem; font-weight: 600; }
+.tile-preview i { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--ok); }
+.tile-preview em { overflow: hidden; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }

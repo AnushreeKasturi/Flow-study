@@ -1,12 +1,13 @@
 ---
 import GitHubStar from '../GitHubStar.astro';
+import Icon from '../Icon.astro';
 import { SOUNDS } from '../../client/modules/soundscape';
 ---
 <aside class="right-sidebar" aria-label="Room tools">
     <div class="tabs-header" role="tablist" aria-label="Room tools">
-        <button id="tasks-tab-button" class="tab-btn active" data-tab="tasks-tab" role="tab" aria-controls="tasks-tab" aria-selected="true">Tasks</button>
-        <button id="chat-tab-button" class="tab-btn" data-tab="chat-tab" role="tab" aria-controls="chat-tab" aria-selected="false" tabindex="-1">Chat<span id="chat-unread" class="tab-badge hidden" aria-hidden="true">0</span></button>
-        <button id="sound-tab-button" class="tab-btn" data-tab="sound-tab" role="tab" aria-controls="sound-tab" aria-selected="false" tabindex="-1">Sound</button>
+        <button id="tasks-tab-button" class="tab-btn active" data-tab="tasks-tab" role="tab" aria-controls="tasks-tab" aria-selected="true"><Icon name="tasks" size={15} />Tasks</button>
+        <button id="chat-tab-button" class="tab-btn" data-tab="chat-tab" role="tab" aria-controls="chat-tab" aria-selected="false" tabindex="-1"><Icon name="chat" size={15} />Chat<span id="chat-unread" class="tab-badge hidden" aria-hidden="true">0</span></button>
+        <button id="sound-tab-button" class="tab-btn" data-tab="sound-tab" role="tab" aria-controls="sound-tab" aria-selected="false" tabindex="-1"><Icon name="headphones" size={15} />Sound</button>
     </div>
 
     <div id="tasks-tab" class="tab-content active" role="tabpanel" aria-labelledby="tasks-tab-button">

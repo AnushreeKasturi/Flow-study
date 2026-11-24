@@ -17,6 +17,10 @@ body[data-timer="break"] .sun { animation: breathe 10s ease-in-out infinite; }
 .room-page .sky { transition: filter 1.2s var(--ease); }
 body.room-page[data-timer="break"] .sky { filter: sepia(.14) saturate(1.12) brightness(1.07); transition-duration: 2.4s; }
 body[data-timer="break"] .sun { width: calc(var(--sun-size) * 1.12); }
+/* The last minute of a focus block: the sky slowly warms toward sunset and the clock breathes. */
+body.room-page[data-final] .sky { filter: sepia(.22) saturate(1.3) hue-rotate(-10deg) brightness(.97); transition-duration: 40s; }
+body[data-final]:not(.hide-time) .time-display { animation: final-breath 2.6s ease-in-out infinite; }
+@keyframes final-breath { 50% { opacity: .7; } }
 .video-wrapper { transition: border-radius 1s var(--ease), filter 1s var(--ease); }
 body[data-timer="break"] .video-wrapper:not(#video-wrapper-local) { border-radius: 26px; filter: saturate(.82) contrast(.94) brightness(.97); transition-duration: 2.4s; }
 
@@ -238,14 +242,19 @@ body[data-timer="break"] .breath { display: block; }
 /* ── Tools: tasks, chat, sound ── */
 .right-sidebar { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; border-radius: var(--radius-md); background: var(--surface); box-shadow: 0 30px 60px -30px #0008; }
 .tabs-header { display: flex; gap: 4px; flex-shrink: 0; margin: 14px 14px 0; padding: 4px; border-radius: 999px; background: var(--field); }
-.tab-btn { flex: 1; padding: 9px 12px; border: 0; border-radius: 999px; background: transparent; color: var(--text-3); font-size: .88rem; font-weight: 600; cursor: pointer; transition: background-color .15s, color .15s; }
+.tab-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 12px; border: 0; border-radius: 999px; background: transparent; color: var(--text-3); font-size: .88rem; font-weight: 600; cursor: pointer; transition: background-color .15s, color .15s; }
 .tab-btn:hover { color: var(--text); }
 .tab-btn.active { background: var(--text); color: var(--bg); }
+.tab-btn svg { opacity: .75; }
+.tab-btn.active svg { opacity: 1; }
 .tab-content { display: none; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; padding: 18px; }
 .tab-content.active { display: flex; }
 .progress-heading { display: flex; justify-content: space-between; margin: 18px 0 8px; color: var(--text-3); font-size: .76rem; font-weight: 500; }
 .task-progress-bar { height: 6px; flex-shrink: 0; margin-bottom: 14px; overflow: hidden; border-radius: 6px; background: var(--field); }
-.task-progress-fill { height: 100%; border-radius: 6px; background: var(--primary); transition: width .4s var(--ease); }
+.task-progress-fill { position: relative; height: 100%; overflow: hidden; border-radius: 6px; background: var(--primary); transition: width .6s var(--ease); }
+.task-progress-fill.grew::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgb(255 255 255 / .7), transparent); animation: shimmer 1s ease-out .2s both; }
+@keyframes shimmer { from { translate: -100% 0; } to { translate: 100% 0; } }
+.task-sun { position: fixed; z-index: 3000; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; pointer-events: none; background: var(--sun); box-shadow: 0 0 8px var(--sun); }
 #tasks-tab:not(:has(#room-task-list > li:not(.task-empty-msg))) :is(.progress-heading, .task-progress-bar) { display: none; }
 .task-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; list-style: none; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .task-item { display: flex; align-items: center; flex-shrink: 0; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
@@ -363,6 +372,11 @@ body:not(.is-host) #room-settings-btn { display: none; }
 .home-stats { display: flex; flex-direction: column; gap: 16px; padding: 18px 0; border-block: 1px solid var(--line); }
 .home-stats:empty { display: none; }
 .home-fresh { color: var(--text-2); font-size: .9rem; line-height: 1.5; }
+/* A new account sees the week as seven empty suns, today's waiting to be lit. */
+.week-suns { display: flex; gap: 8px; margin-top: 14px; }
+.week-suns i { width: 18px; height: 18px; border: 1.5px solid color-mix(in srgb, var(--text) 25%, transparent); border-radius: 50%; }
+.week-suns i.today { border-color: var(--sun); box-shadow: 0 0 10px color-mix(in srgb, var(--sun) 50%, transparent); animation: today-glow 2.8s ease-in-out infinite; }
+@keyframes today-glow { 50% { box-shadow: 0 0 2px color-mix(in srgb, var(--sun) 20%, transparent); } }
 .home-today { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .home-today span { color: var(--text-2); font-size: .82rem; white-space: nowrap; }
 .home-today strong { display: block; font-size: 3.2rem; font-weight: 800; font-stretch: 78%; font-variation-settings: 'wdth' 78; line-height: .9; font-variant-numeric: tabular-nums; }
@@ -399,7 +413,30 @@ body:not(.is-host) #room-settings-btn { display: none; }
 .create-details-panel select.input { padding-inline: 12px 26px; background-position: right 8px center; }
 #create-open .input { margin-top: 0; }
 @keyframes panelUp { from { opacity: 0; translate: 0 8px; } }
-.home-card h3 { font-size: 1.5rem; font-stretch: 82%; font-variation-settings: 'wdth' 82; }
+.home-card h3 { display: flex; align-items: center; gap: 10px; font-size: 1.5rem; font-stretch: 82%; font-variation-settings: 'wdth' 82; }
+.home-card h3 svg { color: var(--primary); }
+/* The card you're using lights up; on a pointer, the others step back while you hover one. */
+.home-card { transition: opacity .3s var(--ease), box-shadow .3s var(--ease); }
+.home-card:is(:hover, :focus-within) { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--primary) 45%, transparent), 0 22px 50px -24px color-mix(in srgb, var(--sun) 50%, transparent); }
+@media (hover: hover) { .home-actions:has(.home-card:hover) .home-card:not(:hover, :focus-within) { opacity: .62; } }
+
+/* Six boxes for the room code, drawn over the real input. */
+.code-wrap { position: relative; margin-bottom: 14px; }
+.home-card .code-wrap .input { height: 54px; margin: 0; border-color: transparent; background: transparent; color: transparent; caret-color: transparent; box-shadow: none; }
+.code-wrap .input::placeholder { color: transparent; }
+.code-cells { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; pointer-events: none; }
+.code-cells span {
+    display: grid; place-items: center; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface);
+    font-size: 1.35rem; font-weight: 700; transition: border-color .15s, box-shadow .15s, transform .2s var(--ease);
+}
+.code-cells span:not(:empty) { transform: translateY(-1px); }
+.code-wrap:focus-within .code-cells span.active { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
+.code-cells.full span { border-color: color-mix(in srgb, var(--primary) 70%, transparent); animation: code-done .5s var(--ease); }
+.code-cells.full span:nth-child(2) { animation-delay: .04s; } .code-cells.full span:nth-child(3) { animation-delay: .08s; }
+.code-cells.full span:nth-child(4) { animation-delay: .12s; } .code-cells.full span:nth-child(5) { animation-delay: .16s; } .code-cells.full span:nth-child(6) { animation-delay: .2s; }
+@keyframes code-done { 50% { transform: translateY(-4px); } }
+/* The lit box is the focus indicator, so the input's own outline stays off. */
+.code-wrap .input:focus-visible { outline: none; }
 .home-card > p { margin: 6px 0 16px; color: var(--text-2); font-size: .86rem; line-height: 1.5; }
 .home-card label { margin: 0 0 6px; font-size: .8rem; }
 .home-card .input { margin-bottom: 14px; background: var(--surface); }

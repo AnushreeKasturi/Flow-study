@@ -21,6 +21,8 @@ import SocialSignIn from '../components/SocialSignIn.astro';
             <h1 id="start-greeting">What should we call you?</h1>
             <input type="text" id="start-name" class="big-input" placeholder="Your name" aria-label="Your name" maxlength="40" autocomplete="nickname">
             <p class="step-hint">Your study partners see this on your tile and next to your tasks.</p>
+            <!-- What partners will see, updated as you type. -->
+            <div class="tile-preview" aria-hidden="true"><b id="tile-initial">?</b><span><i></i><em id="tile-name">You</em></span></div>
         </section>
 
         <section class="step" data-step="sky" hidden>

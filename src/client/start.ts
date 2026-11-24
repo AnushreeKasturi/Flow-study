@@ -62,7 +62,11 @@ function show(to: number) {
 
 // Name: the headline answers as you type.
 nameInput.value = read('flow_pending_name') || '';
-const greet = () => { byId<HTMLElement>('start-greeting').textContent = firstName() ? `Hello, ${firstName()}.` : 'What should we call you?'; };
+const greet = () => {
+    byId<HTMLElement>('start-greeting').textContent = firstName() ? `Hello, ${firstName()}.` : 'What should we call you?';
+    byId<HTMLElement>('tile-initial').textContent = (firstName().charAt(0) || '?').toUpperCase();
+    byId<HTMLElement>('tile-name').textContent = firstName() || 'You';
+};
 nameInput.addEventListener('input', greet);
 greet();
 

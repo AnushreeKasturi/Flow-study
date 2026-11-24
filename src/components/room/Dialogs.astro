@@ -50,7 +50,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
                 </div>
                 <div class="home-actions">
                     <section class="home-card" data-card="start" aria-labelledby="start-heading">
-                        <h3 id="start-heading">Start a room</h3>
+                        <h3 id="start-heading"><Icon name="sunrise" size={20} />Start a room</h3>
                         <p>Your own room, ready in a second.</p>
                         <fieldset class="home-choice">
                             <legend>Who is it for?</legend>
@@ -84,17 +84,20 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
                     </section>
 
                     <section class="home-card" data-card="join" aria-labelledby="join-heading">
-                        <h3 id="join-heading">Join with a code</h3>
+                        <h3 id="join-heading"><Icon name="hash" size={20} />Join with a code</h3>
                         <p id="join-hint">Someone sent you a link or a six-character code.</p>
                         <label for="room-code-input">Room code</label>
-                        <input type="text" id="room-code-input" class="input room-code-field" aria-describedby="lobby-error" placeholder="ABC123" maxlength="6" autocomplete="off" spellcheck="false" data-autofocus>
+                        <div class="code-wrap">
+                            <input type="text" id="room-code-input" class="input room-code-field" aria-describedby="lobby-error" placeholder="ABC123" maxlength="6" autocomplete="off" spellcheck="false" data-autofocus>
+                            <div class="code-cells" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                        </div>
                         <label for="room-pin-input">Room PIN <span class="muted">(only if it has one)</span></label>
                         <input type="text" id="room-pin-input" class="input" placeholder="4 digits" maxlength="4" inputmode="numeric" autocomplete="off">
                         <button id="join-btn" class="btn btn-lg btn-block" disabled>Join room</button>
                     </section>
 
                     <section class="home-card" data-card="find" aria-labelledby="find-heading">
-                        <h3 id="find-heading">Find a study group</h3>
+                        <h3 id="find-heading"><Icon name="users" size={20} />Find a study group</h3>
                         <p id="lobby-board">Sit down with people studying the same thing.</p>
                         <ul id="home-groups" class="home-groups"></ul>
                         <a href="/groups.html" class="btn btn-lg btn-block">Browse all groups</a>
