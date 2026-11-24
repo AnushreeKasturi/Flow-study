@@ -1,10 +1,10 @@
 ---
+import SkyPicker from '../components/SkyPicker.astro';
 import Page from '../layouts/Page.astro';
 import Icon from '../components/Icon.astro';
 import GitHubStar from '../components/GitHubStar.astro';
 import SocialSignIn from '../components/SocialSignIn.astro';
 import '../styles/login.css';
-import { SKIES } from '../client/theme';
 ---
 <Page page="login" title="Log in | Flow" bodyClass="login-page">
     <aside class="login-photo">
@@ -18,7 +18,7 @@ import { SKIES } from '../client/theme';
     <main class="login-main">
         <div class="theme-control">
             <label for="theme-picker">Your atmosphere</label>
-            <select id="theme-picker" class="input">{SKIES.map(([id, name]) => <option value={id}>{name}</option>)}</select>
+            <SkyPicker id="theme-picker" />
         </div>
         <section class="login-card" aria-labelledby="login-title">
             <h1 id="login-title">Welcome to your space.</h1>

@@ -11,6 +11,7 @@ import { bindSocialButtons, rememberInvite } from './modules/sign-in';
 import { looksLikeEmail, suggestEmail } from './modules/email-check';
 import { captchaToken, prepCaptcha, isCaptchaError, CAPTCHA_MSG } from './modules/captcha';
 import { read, write } from './modules/storage';
+import { weather } from './weather';
 
 // Read the session before building the steps: someone signed in skips the account step.
 const signedIn = await loadUser();
@@ -45,6 +46,7 @@ function show(to: number) {
     index = to;
     const step = steps[index];
     document.body.dataset.step = step;
+    document.body.classList.add('seen-' + step); // the scene keeps what each step added
     document.querySelectorAll<HTMLElement>('.step').forEach(section => { section.hidden = section.dataset.step !== step; });
     back.hidden = index === 0;
     next.textContent = index < steps.length - 1 ? 'Continue' : signedIn ? 'Open my room' : 'Create my account';
@@ -66,6 +68,7 @@ const greet = () => {
     byId<HTMLElement>('start-greeting').textContent = firstName() ? `Hello, ${firstName()}.` : 'What should we call you?';
     byId<HTMLElement>('tile-initial').textContent = (firstName().charAt(0) || '?').toUpperCase();
     byId<HTMLElement>('tile-name').textContent = firstName() || 'You';
+    document.body.classList.toggle('named', !!firstName());
 };
 nameInput.addEventListener('input', greet);
 greet();
@@ -81,6 +84,7 @@ function setMinutes(minutes: number) {
     minutes = Math.min(90, Math.max(10, Math.round(minutes / 5) * 5));
     lengthInput.value = String(minutes);
     byId<HTMLElement>('start-minutes').textContent = String(minutes);
+    byId<HTMLElement>('scene-clock').textContent = `${minutes}:00`;
     document.querySelectorAll<HTMLButtonElement>('[data-minutes]').forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.minutes) === minutes)));
     if (steps[index] === 'length') setSun(sunForMinutes(minutes));
 }
@@ -108,15 +112,21 @@ sun.addEventListener('pointerdown', event => {
     }, { once: true });
 });
 
-// Sound: tapping a choice plays it straight away. A choice from an earlier visit is kept, silently.
+const setWeather = weather(byId<HTMLCanvasElement>('weather'), document.querySelector<HTMLElement>('.sun')!);
+// Sound: tapping a choice plays it straight away. A choice from an earlier visit is kept, silently,
+// though its weather shows in the window.
 setSoundVolume(.35);
 sound = read('flow_sound') || '';
+document.body.dataset.sound = sound;
+setWeather(sound);
 document.querySelectorAll<HTMLButtonElement>('[data-sound-choice]').forEach(item => item.setAttribute('aria-pressed', String(item.dataset.soundChoice === sound)));
 document.querySelectorAll<HTMLButtonElement>('[data-sound-choice]').forEach(button => button.addEventListener('click', () => {
     sound = button.dataset.soundChoice!;
     document.querySelectorAll<HTMLButtonElement>('[data-sound-choice]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
     if (sound) playSound(sound as Sound); else stopSound();
     document.body.classList.toggle('sounding', !!sound);
+    document.body.dataset.sound = sound;
+    setWeather(sound); // the window shows the weather that goes with it
 }));
 
 function savePreferences() {

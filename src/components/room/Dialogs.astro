@@ -1,8 +1,8 @@
 ---
+import SkyPicker from '../SkyPicker.astro';
 import GitHubStar from '../GitHubStar.astro';
 import Icon from '../Icon.astro';
 import { SUBJECTS, CAMERAS, VIBES } from '../../client/modules/board-options';
-import { SKIES } from '../../client/theme';
 const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focus mode'], ['M', 'Mute or unmute your microphone'], ['V', 'Turn your camera on or off'], ['C', 'Open chat and start a message'], ['N', 'Open notifications'], ['?', 'Show these shortcuts'], ['Esc', 'Close a dialog']];
 ---
 <div id="modal-overlay" class="modal-overlay">
@@ -23,7 +23,7 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
             </form>
             <div id="home-stats" class="home-stats" aria-live="polite"></div>
             <p id="lobby-recap" class="home-recap"></p>
-            <div class="home-theme"><label for="home-theme-picker">Atmosphere</label><select id="home-theme-picker" class="input" aria-label="Atmosphere">{SKIES.map(([id, name]) => <option value={id}>{name}</option>)}</select></div>
+            <div class="home-theme"><label for="home-theme-picker">Atmosphere</label><SkyPicker id="home-theme-picker" /></div>
             <div class="lobby-footer"><a href="#" id="logout-link" class="logout-link">Log out</a><a href="/docs.html" class="logout-link">How Flow works</a><a href="/stats.html" id="stats-link" class="logout-link" hidden>Stats</a><GitHubStar label="Star" /></div>
         </aside>
 

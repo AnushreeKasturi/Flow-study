@@ -797,8 +797,8 @@ async function start() {
     initNotifications();
     initReminders();
     initAudio();
-    bindThemePicker(byId<HTMLSelectElement>('theme-picker'));
-    bindThemePicker(byId<HTMLSelectElement>('home-theme-picker'));
+    bindThemePicker(byId<HTMLButtonElement>('theme-picker'));
+    bindThemePicker(byId<HTMLButtonElement>('home-theme-picker'));
     bindRoomControls();
 
     let invited = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';

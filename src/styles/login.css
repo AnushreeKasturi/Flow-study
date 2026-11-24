@@ -12,7 +12,7 @@
 .login-main { display: flex; flex-direction: column; min-height: 0; padding: 18px clamp(24px, 5vw, 72px) 20px; overflow-y: auto; }
 .theme-control { display: flex; align-items: center; gap: 12px; align-self: flex-end; }
 .theme-control label { font-size: .78rem; white-space: nowrap; color: var(--text-3); }
-.theme-control select { width: 132px; }
+.theme-control .sky-picker { width: 138px; }
 .login-card { width: 100%; max-width: 400px; margin: auto; padding-block: 8px; }
 .login-card h1 { font-size: clamp(2rem, 5.4svh, 3rem); font-weight: 800; }
 .login-description { margin: 8px 0 clamp(14px, 3svh, 28px); color: var(--text-2); font-size: .94rem; line-height: 1.65; }
@@ -39,7 +39,9 @@
 @media (max-height: 700px) and (min-width: 761px) { .login-page:not(.verify-page) .login-note { display: none; } }
 
 @media (max-width: 760px) {
-    .login-page { display: block; height: auto; }
+    /* One screen on phones too: the sky strip on top, the form filling the rest. */
+    .login-page { display: flex; flex-direction: column; height: 100svh; min-height: 0; }
+    .login-main { flex: 1; }
     .login-photo { flex-flow: row wrap; align-items: center; gap: 16px; padding: 20px 24px; }
     .login-photo > div { flex-basis: 100%; } /* an invite gets its own line under the logo */
     .login-photo::after { display: none; }
@@ -52,9 +54,16 @@
     /* The sky picker moves up into the sky strip, across from the logo, instead of loitering on its own row. */
     .login-page { position: relative; }
     .theme-control { position: absolute; top: 14px; right: 24px; z-index: 2; }
-    .theme-control select { width: 124px; background-color: color-mix(in srgb, var(--sky-top) 55%, transparent); }
+    .theme-control .sky-picker { width: 128px; }
+    .theme-control .sky-picker-button { background-color: color-mix(in srgb, var(--sky-top) 55%, transparent); }
     .login-card { padding-top: 24px; }
     .login-card h1 { font-size: 2.4rem; }
+}
+@media (max-width: 760px) and (max-height: 720px) {
+    .login-page:not(.verify-page) .login-note { display: none; }
+    .login-card { padding-top: 8px; }
+    .login-card h1 { font-size: 2rem; }
+    .login-description { margin-bottom: 12px; }
 }
 
 /* Email verification reuses the login layout. */

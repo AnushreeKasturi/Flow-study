@@ -1,0 +1,19 @@
+---
+// The sky picker: a button showing the current sky that opens a small grid of round skies, named as you point at them. Pointing at one
+// previews it on the page; choosing saves it. Behaviour lives in bindThemePicker (src/client/theme.ts).
+import { SKIES } from '../client/theme';
+interface Props { id: string; label?: string; }
+const { id, label } = Astro.props;
+---
+<div class="sky-picker">
+    <button type="button" id={id} class="sky-picker-button" aria-haspopup="listbox" aria-expanded="false" aria-label={label}>
+        <span class="sky-dot" aria-hidden="true"></span><span class="sky-picker-name">Forest</span>
+        <svg class="sky-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+    </button>
+    <div class="sky-picker-list" role="listbox" aria-label={label ?? 'Atmosphere'} hidden>
+        <p class="sky-picker-now" aria-hidden="true"></p>
+        {SKIES.map(([value, name]) => (
+            <div role="option" data-value={value} aria-selected="false" tabindex="-1"><span class="swatch" data-theme={value} aria-hidden="true"></span><span class="sky-option-name">{name}</span></div>
+        ))}
+    </div>
+</div>

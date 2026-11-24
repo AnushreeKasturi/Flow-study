@@ -10,6 +10,11 @@ async (page) => {
         if (selector === '#join-modal') await page.waitForFunction(() => !document.getElementById('join-btn').disabled);
     };
     // Polls briefly: right after a resize, size transitions hold the old layout for a frame.
+    // The sky picker: open it, then choose a sky from its grid.
+    const pickSky = async (picker, sky) => {
+        await picker.click();
+        await picker.locator('xpath=following-sibling::*[@role="listbox"]').locator(`[data-value="${sky}"]`).click();
+    };
     const fitsViewport = () => page.waitForFunction(() => document.documentElement.scrollWidth <= innerWidth, undefined, { timeout: 2000 }).catch(() => { throw new Error('Page overflows horizontally at ' + page.viewportSize().width + 'px'); });
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
@@ -88,6 +93,7 @@ async (page) => {
     const lowSun = await sunAt();
     await page.getByRole('button', { name: '45 min', exact: true }).click();
     assert(await page.locator('#start-minutes').innerText() === '45' && await sunAt() < lowSun, 'A longer block should lift the sun');
+    await page.waitForFunction(() => !document.querySelector('.sun').getAnimations().length); // let it finish gliding to 45 first
     const sunBox = await page.locator('.sun').boundingBox();
     await page.mouse.move(sunBox.x + sunBox.width / 2, sunBox.y + sunBox.height / 2);
     await page.mouse.down();
@@ -257,10 +263,10 @@ async (page) => {
     await page.getByRole('button', { name: 'Show password', exact: true }).click();
     assert(await page.locator('#password-input').getAttribute('type') === 'text', 'Password visibility should toggle');
     await page.getByRole('button', { name: 'Hide password', exact: true }).click();
-    await page.getByLabel('Your atmosphere').selectOption('midnight');
+    await pickSky(page.getByRole('button', { name: 'Your atmosphere' }), 'midnight');
     await page.reload();
     assert(await page.locator('html').getAttribute('data-theme') === 'midnight', 'Theme should persist');
-    await page.getByLabel('Your atmosphere').selectOption('forest');
+    await pickSky(page.getByRole('button', { name: 'Your atmosphere' }), 'forest');
     await page.getByLabel('Email address').fill('invalid');
     await page.getByRole('button', { name: 'Log in', exact: true }).click();
     assert(await page.evaluate(() => window.__fixture.calls.length) === 0, 'Invalid email must not reach auth');
@@ -676,7 +682,7 @@ async (page) => {
 
     // All appearance themes maintain readable body text.
     for (const theme of ['forest', 'midnight', 'warm', 'aqua', 'amethyst', 'desert', 'aurora', 'storm', 'sakura', 'ember', 'dawn', 'daylight', 'glacier', 'mist', 'meadow']) {
-        await page.getByLabel('Room atmosphere').selectOption(theme);
+        await pickSky(page.getByRole('button', { name: 'Room atmosphere' }), theme);
         // Skies cross-fade, so wait for the ground colour to settle before measuring.
         await page.waitForFunction(() => {
             const style = getComputedStyle(document.body);
@@ -688,7 +694,7 @@ async (page) => {
             return (Math.max(a, b) + .05) / (Math.min(a, b) + .05) >= 4.5;
         }, undefined, { timeout: 3000 }).catch(() => { throw new Error(theme + ' body text contrast'); });
     }
-    await page.getByLabel('Room atmosphere').selectOption('forest');
+    await pickSky(page.getByRole('button', { name: 'Room atmosphere' }), 'forest');
 
     // Rejected and empty-row writes roll back without erasing input.
     await page.evaluate(() => { window.__fixture.fail = { table: 'tasks', action: 'insert', throw: true }; });
@@ -1389,12 +1395,18 @@ async (page) => {
     assert(await page.locator('#stats-link').getAttribute('href') === '/stats.html');
     await page.evaluate(() => localStorage.removeItem('fixture-admin'));
     // The atmosphere can be changed from Home, without entering a room, and it's kept.
-    await page.locator('#home-theme-picker').selectOption('sakura');
+    await pickSky(page.locator('#home-theme-picker'), 'sakura');
     assert(await page.evaluate(() => document.documentElement.dataset.theme === 'sakura'), 'Home changes the atmosphere');
+    // Pointing at a sky previews it; Escape puts the chosen one back.
+    await page.locator('#home-theme-picker').click();
+    await page.locator('#home-theme-picker + [role="listbox"] [data-value="ember"]').hover();
+    assert(await page.evaluate(() => document.documentElement.dataset.theme === 'ember'), 'Pointing at a sky previews it');
+    await page.keyboard.press('Escape');
+    assert(await page.evaluate(() => document.documentElement.dataset.theme === 'sakura' && localStorage.getItem('flow_theme') === 'sakura'), 'Escape restores the chosen sky');
     await page.goto(origin + '/room.html');
     await visible('#join-modal');
-    assert(await page.locator('#home-theme-picker').inputValue() === 'sakura' && await page.locator('#theme-picker').inputValue() === 'sakura', 'The atmosphere is kept, and the room picker agrees');
-    await page.locator('#home-theme-picker').selectOption('forest');
+    assert(await page.locator('#home-theme-picker .sky-picker-name').textContent() === 'Sakura' && await page.locator('#theme-picker .sky-picker-name').textContent() === 'Sakura', 'The atmosphere is kept, and the room picker agrees');
+    await pickSky(page.locator('#home-theme-picker'), 'forest');
     await page.goto(origin + '/room.html');
     await visible('#join-modal');
     await page.getByRole('button', { name: 'Change name', exact: true }).click();

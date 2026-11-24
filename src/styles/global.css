@@ -237,6 +237,12 @@ select.input {
 .social-signin .divider { margin: 6px 0 2px; }
 .btn-social { display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
 .btn-social svg { flex-shrink: 0; }
+/* Phones: GitHub and Google side by side, named by brand alone; screen readers still hear "Continue with". */
+@media (max-width: 760px) {
+    .social-signin { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .social-signin .divider { grid-column: 1 / -1; }
+    .social-lead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
 .divider { display: flex; align-items: center; gap: 12px; margin: 22px 0; color: var(--text-3); font-size: .78rem; }
 .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .inline-error { padding: 12px 14px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); font-size: .84rem; }
@@ -244,6 +250,38 @@ select.input {
 .github-star { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; color: var(--text-2); font-size: .82rem; font-weight: 500; text-decoration: none; white-space: nowrap; }
 .github-star:hover { color: var(--text); text-decoration: underline; }
 .github-star [data-stars]:not(:empty) { padding: 1px 8px; border-radius: 99px; background: color-mix(in srgb, var(--text) 14%, transparent); font-variant-numeric: tabular-nums; font-size: .74rem; }
+
+/* The sky picker (SkyPicker.astro): a pill with the current sky, opening a grid of every sky. */
+.sky-picker { position: relative; }
+.sky-picker-button {
+    display: inline-flex; align-items: center; gap: 9px; width: 100%; min-height: 40px; padding: 6px 14px 6px 7px;
+    border: 1.5px solid color-mix(in srgb, var(--text) 22%, transparent); border-radius: 999px; background: var(--field);
+    color: var(--text); font-size: .88rem; font-weight: 600; cursor: pointer; transition: border-color .15s, background-color .15s;
+}
+.sky-picker-button:hover, .sky-picker-button[aria-expanded="true"] { border-color: color-mix(in srgb, var(--text) 50%, transparent); }
+.sky-picker-name { flex: 1; text-align: left; white-space: nowrap; }
+.sky-chevron { opacity: .7; transition: rotate .25s var(--ease); }
+[aria-expanded="true"] > .sky-chevron { rotate: 180deg; }
+/* The current sky in miniature: its gradient with the sun low in it. */
+.sky-dot { position: relative; width: 26px; height: 26px; flex-shrink: 0; overflow: hidden; border-radius: 50%; background: linear-gradient(var(--sky-top), var(--sky-bottom)); box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text) 18%, transparent); }
+.sky-dot::after { content: ''; position: absolute; left: 50%; bottom: -5px; width: 13px; height: 13px; translate: -50% 0; border-radius: 50%; background: var(--sun); }
+.sky-picker-list {
+    position: fixed; z-index: 6000; display: grid; grid-template-columns: repeat(5, 34px); gap: 8px; padding: 10px 12px 12px;
+    border-radius: var(--radius-md); background: color-mix(in srgb, var(--bg) 96%, transparent); backdrop-filter: blur(16px) saturate(1.3);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent), 0 24px 60px -18px rgb(0 0 0 / .55);
+    transform-origin: top right; animation: picker-in .22s var(--ease);
+}
+.sky-picker-list.up { transform-origin: bottom right; }
+@keyframes picker-in { from { opacity: 0; scale: .96; } }
+/* The name of the sky you're pointing at, above the dots. */
+.sky-picker-now { grid-column: 1 / -1; min-height: 1.3em; color: var(--text); font-size: .8rem; font-weight: 700; text-align: center; }
+.sky-picker-list [role="option"] { display: grid; padding: 0; border-radius: 50%; cursor: pointer; outline: none; transition: scale .2s var(--ease); }
+.sky-picker-list .swatch { width: 34px; height: 34px; border-radius: 50%; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text) 16%, transparent); }
+.sky-picker-list .swatch::after { left: 50%; bottom: -7px; width: 16px; height: 16px; translate: -50% 0; }
+.sky-picker-list [role="option"]:focus { scale: 1.12; }
+.sky-picker-list [role="option"]:focus .swatch { box-shadow: 0 0 0 2px var(--text); }
+.sky-picker-list [aria-selected="true"] .swatch { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--sun); }
+.sky-option-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* Sky swatches, shared by the landing page and setup. */
 .swatches { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }

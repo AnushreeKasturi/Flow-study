@@ -25,7 +25,8 @@ async page => {
         chat.handleIncomingMessage({ sender: 'Riya', text: 'I’m reviewing the practice set. Let’s work through question 3 in this session.' });
         chat.handleIncomingMessage({ sender: 'AI Assistant', text: 'Start by identifying what the question asks you to find.\n\nWrite down the known values, choose the relevant relationship, and work through one step at a time. Compare your result with your study partner before moving on.' });
     });
-    await page.getByLabel('Room atmosphere').selectOption('amethyst');
+    await page.getByRole('button', { name: 'Room atmosphere' }).click();
+    await page.locator('#theme-picker + [role="listbox"] [data-value="amethyst"]').click();
 
 
     const measurements = [];
@@ -95,7 +96,8 @@ async page => {
         await page.waitForFunction(() => !document.body.classList.contains('focus-active'));
     }
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.getByLabel('Room atmosphere').selectOption('forest');
+    await page.getByRole('button', { name: 'Room atmosphere' }).click();
+    await page.locator('#theme-picker + [role="listbox"] [data-value="forest"]').click();
     await page.locator('.right-sidebar').screenshot({ path: 'output/playwright/tools-forest-desktop.png' });
     const icon = await page.evaluate(async () => {
         const link = document.querySelector('link[rel="icon"]');

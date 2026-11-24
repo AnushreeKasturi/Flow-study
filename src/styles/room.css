@@ -29,8 +29,8 @@ body[data-timer="break"] .video-wrapper:not(#video-wrapper-local) { border-radiu
 .header-left, .header-right { display: flex; align-items: center; min-width: 0; }
 .header-left { gap: 20px; }
 .header-right { gap: 8px; }
-.header-right .btn, .header-right .icon-btn, .header-right select { background-color: color-mix(in srgb, var(--sky-top) 55%, transparent); }
-.header-right select { width: 132px; border-color: color-mix(in srgb, var(--text) 22%, transparent); }
+.header-right .btn, .header-right .icon-btn, .header-right .sky-picker-button { background-color: color-mix(in srgb, var(--sky-top) 55%, transparent); }
+.header-right .sky-picker-button { width: 138px; }
 .room-info { display: flex; gap: 16px; align-items: center; font-size: .86rem; font-weight: 500; }
 .room-info .highlight { padding: 4px 10px; margin-left: 6px; border-radius: 999px; background: var(--text); color: var(--bg); font-weight: 700; letter-spacing: .1em; }
 .room-info button.highlight { border: 0; font: inherit; font-weight: 700; cursor: copy; }
@@ -379,18 +379,21 @@ body:not(.is-host) #room-settings-btn { display: none; }
 @keyframes today-glow { 50% { box-shadow: 0 0 2px color-mix(in srgb, var(--sun) 20%, transparent); } }
 .home-today { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .home-today span { color: var(--text-2); font-size: .82rem; white-space: nowrap; }
-.home-today strong { display: block; font-size: 3.2rem; font-weight: 800; font-stretch: 78%; font-variation-settings: 'wdth' 78; line-height: .9; font-variant-numeric: tabular-nums; }
-.home-figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.home-figures div { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--field); }
+.home-today strong { display: block; font-size: 2.3rem; white-space: nowrap; font-weight: 800; font-stretch: 78%; font-variation-settings: 'wdth' 78; line-height: .9; font-variant-numeric: tabular-nums; }
+/* Columns sized to their numbers, so "34h 36m" and "11 days" stay on one line. */
+.home-figures { display: grid; grid-template-columns: repeat(3, auto); gap: 6px; }
+.home-figures div { padding: 9px 10px; border-radius: var(--radius-sm); background: var(--field); }
 .home-figures dt { color: var(--text-3); font-size: .72rem; }
-.home-figures dd { margin-top: 2px; font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.home-figures dd { margin-top: 2px; font-size: .98rem; white-space: nowrap; font-weight: 700; font-variant-numeric: tabular-nums; }
 .home-recap { padding: 12px 14px; border-radius: var(--radius-sm); background: var(--field); color: var(--text-2); font-size: .84rem; line-height: 1.5; }
 .home-recap:empty { display: none; }
 .home-theme { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; }
 .home-theme label { margin: 0; color: var(--text-3); font-size: .8rem; }
-.home-theme select { width: 132px; }
+.home-theme .sky-picker { width: 138px; }
 .home-theme + .lobby-footer { margin-top: 0; }
 .lobby-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: auto; }
+/* With the owner's Stats link there's no room for the star on one line; the landing page keeps it. */
+.lobby-footer:has(#stats-link:not([hidden])) .github-star { display: none; }
 .logout-link { font-size: .8rem; color: var(--text-3); }
 
 .home-main { display: flex; flex-direction: column; min-width: 0; padding: 28px 26px 26px; }
@@ -477,7 +480,7 @@ body:not(.is-host) #room-settings-btn { display: none; }
 .focus-summary strong { display: block; font-size: 3.6rem; font-weight: 800; font-stretch: 78%; font-variation-settings: 'wdth' 78; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .focus-summary p { margin-top: 4px; font-size: .76rem; color: var(--text-3); }
 /* Seven-day focus: one series, so one hue; bars share a baseline with a 2px gap. */
-.week { display: grid; grid-template-columns: repeat(7, 20px); gap: 2px; height: 88px; align-items: end; flex-shrink: 0; }
+.week { display: grid; grid-template-columns: repeat(7, 16px); gap: 2px; height: 76px; align-items: end; flex-shrink: 0; }
 .week-day { position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; height: 100%; font-size: .68rem; color: var(--text-3); }
 .week-day i { width: 100%; min-height: 2px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--primary) 45%, var(--surface)); }
 .week-day.today i, .week-day:hover i { background: var(--primary); }
@@ -548,8 +551,10 @@ body:not(.is-host) #room-settings-btn { display: none; }
     /* The room code and count stay readable when the sun passes behind them. */
     .room-info { padding: 4px 6px 4px 12px; border-radius: 999px; background: color-mix(in srgb, var(--sky-top) 55%, transparent); }
     /* The sky picker shrinks to a round button with a small sun; the list still names every sky. */
-    #theme-picker { width: 44px; height: 44px; flex-shrink: 0; padding: 0; color: transparent; background-image: radial-gradient(circle, var(--text) 0 6px, transparent 6.5px); background-position: center; background-size: auto; }
-    #theme-picker option { color: var(--text); background: var(--bg); }
+    /* Phones: the picker shrinks to its round sky. */
+    #theme-picker { width: 44px; height: 44px; justify-content: center; padding: 0; }
+    #theme-picker :is(.sky-picker-name, .sky-chevron) { display: none; }
+    #theme-picker .sky-dot { width: 30px; height: 30px; }
     /* While the clock runs it gets compact, so the people you're with show without scrolling. */
     .room-page:not(.focus-active):is([data-timer="focus"], [data-timer="break"]) { --horizon: 200px; --sun-size: 96px; }
     .room-page:not(.focus-active):is([data-timer="focus"], [data-timer="break"]) :is(.time-display) { font-size: 3.6rem; }
@@ -608,7 +613,7 @@ body:not(.is-host) #room-settings-btn { display: none; }
     .home-stats { padding: 0; border: 0; }
     .home-today strong { font-size: 1.9rem; }
     .home-theme { grid-column: 1; margin: 0; }
-    .home-theme select { width: 124px; }
+    .home-theme .sky-picker { width: 128px; }
     .lobby-footer { grid-column: 2; margin: 0; gap: 14px; }
     .lobby-footer .github-star, .lobby-footer a[href="/docs.html"] { display: none; } /* phones keep the exit, the landing page keeps the manual */
     .home-main { padding: 16px 18px 18px; }
@@ -626,7 +631,7 @@ body:not(.is-host) #room-settings-btn { display: none; }
     .modal-overlay { padding: 16px; }
     .modal { padding: 22px; max-height: calc(100dvh - 32px); }
     .focus-summary { flex-direction: column; align-items: flex-start; }
-    .header-right select { width: 108px; }
+    .header-right .sky-picker-button { width: 118px; }
 }
 @media (max-width: 370px) {
     .room-info { gap: 8px; font-size: .78rem; }
@@ -689,3 +694,22 @@ body:not(.is-host) #room-settings-btn { display: none; }
 .heatmap figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin-top: 8px; font-size: .74rem; color: var(--text-3); }
 .heatmap-key { display: inline-flex; align-items: center; gap: 3px; }
 .profile-stat-list + .heatmap { margin-top: 20px; }
+
+/* Short laptop screens: Home tightens up so it fits without scrolling. */
+@media (min-width: 761px) and (max-height: 720px) {
+    .home-profile { gap: 12px; padding-block: 20px 18px; }
+    .home-stats { gap: 12px; padding-block: 12px; }
+    .home-me .avatar { width: 46px; height: 46px; }
+    .home-main { padding-block: 20px 18px; }
+    .home-card { padding: 16px; }
+    .home-card > p { margin-bottom: 10px; }
+    .home-card .input, .code-wrap { margin-bottom: 10px; }
+    .home-choice label { padding-block: 8px; }
+}
+/* Short phones: Home's card trims its spacing so it fits. */
+@media (max-width: 760px) and (max-height: 720px) {
+    .home-card { padding: 14px 16px; }
+    .home-card > p { margin: 4px 0 10px; }
+    .home-card .input, .code-wrap { margin-bottom: 10px; }
+    .home-choice label { padding-block: 7px; }
+}

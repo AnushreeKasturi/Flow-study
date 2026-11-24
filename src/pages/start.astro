@@ -9,7 +9,15 @@ const sounds = [['', 'Silence', 'Just the room.'], ...SOUNDS];
 import SocialSignIn from '../components/SocialSignIn.astro';
 ---
 <Page title="Set up your space | Flow" bodyClass="start">
-    <Sky />
+    <!-- A window into the room you're making: each answer adds to it. Decorative; the form says everything it shows. -->
+    <div class="scene" aria-hidden="true">
+        <Sky />
+        <div class="weather"><canvas id="weather"></canvas></div>
+        <div class="scene-ground">
+            <div class="scene-clock"><span>Focus block</span><strong id="scene-clock" class="display">25:00</strong></div>
+            <div class="scene-you"><b id="tile-initial">?</b><em id="tile-name">You</em></div>
+        </div>
+    </div>
     <header class="start-nav">
         <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
         <a href="/login.html" class="btn" id="start-login">Log in</a>
@@ -21,14 +29,13 @@ import SocialSignIn from '../components/SocialSignIn.astro';
             <h1 id="start-greeting">What should we call you?</h1>
             <input type="text" id="start-name" class="big-input" placeholder="Your name" aria-label="Your name" maxlength="40" autocomplete="nickname">
             <p class="step-hint">Your study partners see this on your tile and next to your tasks.</p>
-            <!-- What partners will see, updated as you type. -->
-            <div class="tile-preview" aria-hidden="true"><b id="tile-initial">?</b><span><i></i><em id="tile-name">You</em></span></div>
         </section>
 
         <section class="step" data-step="sky" hidden>
             <h1>Pick your sky<span data-name></span>.</h1>
-            <div class="swatches" role="group" aria-label="Sky">
-                {skies.map(([id, name]) => <button type="button" data-theme-choice={id} aria-pressed="false"><span class="swatch" data-theme={id} aria-hidden="true"></span>{name}</button>)}
+            <!-- Fifteen slices of sky; the chosen one opens up. Each slice wears its own sky's colours. -->
+            <div class="sky-strip" role="group" aria-label="Sky">
+                {skies.map(([id, name]) => <button type="button" data-theme-choice={id} data-theme={id} aria-pressed="false"><span>{name}</span></button>)}
             </div>
             <p class="step-hint">The whole room takes its colours from this. Change it whenever the mood does.</p>
         </section>

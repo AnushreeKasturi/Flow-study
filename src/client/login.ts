@@ -15,7 +15,7 @@ const successMsg = byId<HTMLElement>('success-message');
 let authBusy = false;
 let redirectPending = false;
 
-bindThemePicker(byId<HTMLSelectElement>('theme-picker'));
+bindThemePicker(byId<HTMLButtonElement>('theme-picker'));
 
 // An invite link survives the trip through sign-in.
 const invitedRoom = new URLSearchParams(location.search).get('room');

@@ -1,6 +1,6 @@
 ---
+import SkyPicker from '../SkyPicker.astro';
 import Icon from '../Icon.astro';
-import { SKIES } from '../../client/theme';
 ---
 <header class="app-header">
     <div class="header-left">
@@ -32,7 +32,7 @@ import { SKIES } from '../../client/theme';
             </div>
         </details>
         <button id="open-shortcuts-btn" class="icon-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)"><Icon name="keyboard" /></button>
-        <select id="theme-picker" class="input" aria-label="Room atmosphere">{SKIES.map(([id, name]) => <option value={id}>{name}</option>)}</select>
+        <SkyPicker id="theme-picker" label="Room atmosphere" />
         <button id="room-settings-btn" class="icon-btn" aria-label="Room settings" title="Room settings"><Icon name="settings" /></button>
         <button id="share-link-btn" class="btn">Invite</button>
         <button id="leave-btn" class="btn btn-danger">Leave</button>
