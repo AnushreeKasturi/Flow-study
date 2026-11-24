@@ -7,7 +7,10 @@ export function homeLinks() {
     if (!signedIn) return;
     document.querySelectorAll<HTMLAnchorElement>('a[data-home-when-signed-in]').forEach(link => {
         link.href = '/room.html';
-        link.textContent = link.dataset.homeWhenSignedIn || 'Home';
+        link.classList.add('is-home');
+        // Links with an icon keep it: only their label changes, and CSS swaps the icon for a house.
+        const label = link.querySelector('.link-label') || link;
+        label.textContent = link.dataset.homeWhenSignedIn || 'Home';
     });
     document.querySelectorAll<HTMLElement>('[data-hide-when-signed-in]').forEach(el => el.remove());
 }

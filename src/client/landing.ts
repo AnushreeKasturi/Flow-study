@@ -46,21 +46,35 @@ const markTheme = () => swatches.forEach(button => button.setAttribute('aria-pre
 swatches.forEach(button => button.addEventListener('click', () => { setTheme(button.dataset.themeChoice as Theme); markTheme(); }));
 markTheme();
 
-// The tour: the room still is a camera that visits each feature in turn, then hands you the remote.
+// The tour: a spotlight visits each part of the room in turn, with a note beside it, then hands you the remote.
 const shot = byId<HTMLImageElement>('room-shot');
-const stops = [...document.querySelectorAll<HTMLButtonElement>('.features button')];
+const stops = [...document.querySelectorAll<HTMLButtonElement>('.stops button')];
 const tour = byId<HTMLElement>('room');
-const TOUR_MS = 4500;
+const spot = tour.querySelector<HTMLElement>('.spot')!;
+const callout = tour.querySelector<HTMLElement>('.callout')!;
+const TOUR_MS = 5500;
 let stop = 0, ticking = 0;
 function visit(index: number) {
+    const changed = index !== stop;
     stop = index;
     const button = stops[index], still = button.dataset.still;
     stops.forEach(other => other.setAttribute('aria-pressed', String(other === button)));
     shot.src = `/rooms/${currentTheme()}${still ? '-' + still : ''}.webp`;
-    const [x, y, w, h] = (button.dataset.spot ?? '0 0 100 100').split(' ').map(Number);
-    const zoom = Math.min(2.4, 100 / w, 100 / h);
-    const pan = (start: number, size: number) => Math.min(0, Math.max(100 / zoom - 100, 50 / zoom - start - size / 2)); // centre it, never past the edge
-    shot.style.transform = `scale(${zoom}) translate(${pan(x, w)}%, ${pan(y, h)}%)`;
+    const lit = button.dataset.spot;
+    const [x, y, w, h] = (lit ?? '0 0 100 100').split(' ').map(Number);
+    Object.assign(spot.style, { left: x + '%', top: y + '%', width: w + '%', height: h + '%' });
+    tour.classList.toggle('whole-room', !lit);
+    byId('tour-name').textContent = button.dataset.name!;
+    byId('tour-text').textContent = button.dataset.text!;
+    // The note sits on whichever side of the spotlight has more room, kept inside the frame.
+    const onRight = x + w / 2 < 50;
+    const room = 98.5 - callout.offsetWidth / shot.offsetWidth * 100;
+    Object.assign(callout.style, lit
+        ? { left: onRight ? `${Math.min(x + w + 1.5, room)}%` : 'auto', right: onRight ? 'auto' : `${Math.min(100 - x + 1.5, room)}%`, top: `${Math.min(y, 50)}%` }
+        : { left: '', right: '', top: '' });
+    if (changed && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        callout.animate([{ opacity: 0, translate: '0 10px' }, { opacity: 1, translate: '0 0' }], { duration: 420, easing: 'cubic-bezier(.2, .8, .2, 1)' });
+    }
 }
 const handOver = () => { clearInterval(ticking); ticking = 0; tour.classList.remove('touring'); };
 stops.forEach((button, index) => {
@@ -79,7 +93,7 @@ if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
         tour.classList.add('touring');
         visit(stop);
         ticking = window.setInterval(() => visit((stop + 1) % stops.length), TOUR_MS);
-    }, { threshold: .3 }).observe(shot.parentElement!); // the frame, not the zooming photo inside it
+    }, { threshold: .3 }).observe(shot);
     stops.forEach(button => button.addEventListener('pointerenter', () => { handedOver = true; }));
 }
 // A new sky re-dresses whatever the camera is looking at; the other stills wait in the wings.
@@ -112,7 +126,8 @@ whenIdle(async () => {
         const { fetchOpenRooms, fetchPlanned } = await import('./modules/board');
         const [open, planned] = await Promise.all([fetchOpenRooms(), fetchPlanned()]);
         const link = byId<HTMLAnchorElement>('live-groups');
-        if (open.length) { link.textContent = `${open.length} study group${open.length === 1 ? '' : 's'} open right now`; link.classList.add('live'); }
-        else if (planned.length) link.textContent = `${planned.length} study group${planned.length === 1 ? '' : 's'} planned`;
+        const label = link.querySelector('.link-label') || link;
+        if (open.length) { label.textContent = `${open.length} study group${open.length === 1 ? '' : 's'} open right now`; link.classList.add('live'); }
+        else if (planned.length) label.textContent = `${planned.length} study group${planned.length === 1 ? '' : 's'} planned`;
     } catch { /* The plain link stays. */ }
 });

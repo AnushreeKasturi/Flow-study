@@ -2,20 +2,21 @@
 import Page from '../layouts/Page.astro';
 import GitHubStar from '../components/GitHubStar.astro';
 import Sky from '../components/Sky.astro';
+import Icon from '../components/Icon.astro';
 import '../styles/landing.css';
 import { SKIES as atmospheres } from '../client/theme';
 
 const repo = 'https://github.com/ManasDasri/Flow-study';
-// Each feature knows where the tour camera should look: which still (the room, or with Chat or Sound
-// open), then left, top, width, height in % of it. No spot means the camera steps back for the wide shot.
+// Each stop on the tour: chip label, icon, title, text, which still to show (the room, or with Chat or
+// Sound open), and the spotlight as left, top, width, height in % of it. No spot lights the whole room.
 const features = [
-    ['One sun for everyone', 'Start a focus block and the sun starts sinking for the whole room. When it sets, the room moves to a break, with a longer one after every fourth block.', '', '0 12 22 56'],
-    ['Your group on camera, encrypted', 'Video and voice are encrypted and go directly between browsers over WebRTC. Flow’s servers never see or store them. Mute or turn the camera off whenever you like.', '', '22.5 31 51 47'],
-    ['A task list you finish together', 'Add goals for the session, assign them to people, and watch the room’s progress fill in.', '', '75 8 24 42'],
-    ['Chat, with a study assistant', 'Message the room, or start a message with /ai to ask a question without leaving.', 'chat', '75 9 24 46'],
-    ['Sound for concentration', 'Rain, ocean, a fireplace, wind, a quiet night. Share a YouTube or Spotify link when the room wants music.', 'sound', '75 9 24 46'],
-    ['Open study groups', 'List your room on the board and people studying the same thing can take a seat. Groups hold two to six.', '', '']
-];
+    ['Shared sun', 'sun', 'One sun for everyone', 'Start a focus block and the sun starts sinking for the whole room. When it sets, everyone takes a break, with a longer one after every fourth block.', '', '0.5 10 21 70'],
+    ['Video call', 'video', 'Your group on camera, encrypted', 'Video and voice go directly between browsers and are encrypted. Flow’s servers never see or store them.', '', '22.5 32 50 46'],
+    ['Tasks', 'tasks', 'A task list you finish together', 'Add goals for the session, give them to people, and watch the room’s progress fill in.', '', '75.5 9 23 40'],
+    ['Chat and AI', 'chat', 'Chat, with a study assistant', 'Message the room, or start with /ai to ask a question without leaving.', 'chat', '75.5 16 23 33'],
+    ['Sound', 'headphones', 'Sound for concentration', 'Rain, ocean, a fireplace, wind, a quiet night. Or share a YouTube or Spotify link.', 'sound', '75.5 9 23 46'],
+    ['Study groups', 'users', 'Open study groups', 'List your room on the board and people studying the same thing can take a seat. Groups hold two to six.', '', '']
+] as const;
 const steps = [
     ['Create a room', 'You get a six-character code. Add a PIN if you want the room private.'],
     ['Share the link', 'Your friends open it, sign in, and land in the same room.'],
@@ -25,19 +26,21 @@ const steps = [
 <Page page="home" bodyClass="landing">
 
     <Sky />
+    <span id="top"></span>
     <div class="intro" aria-hidden="true"><div class="intro-word"><span>f</span><span>l</span><span>o</span><span>w</span><i></i></div></div>
 
     <header class="site-nav">
         <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
         <nav aria-label="Main">
-            <a href="#room">What’s inside</a>
-            <a href="/groups.html">Study groups</a>
-            <a href="/docs.html">Docs</a>
-            <a href="#open-source">Open source</a>
+            <a href="#room"><Icon name="window" size={16} />What’s inside</a>
+            <a href="/groups.html"><Icon name="users" size={16} />Study groups</a>
+            <a href="/docs.html"><Icon name="book" size={16} />Docs</a>
+            <a href="#open-source"><Icon name="github" size={16} />Open source</a>
         </nav>
         <div class="site-nav-actions">
             <GitHubStar label="Star" />
-            <a id="nav-login" href="/login.html" class="btn" data-home-when-signed-in>Log in</a>
+            <a id="nav-login" href="/login.html" class="btn" data-home-when-signed-in><Icon name="logIn" size={16} class="i-out" /><Icon name="house" size={16} class="i-home" /><span class="link-label">Log in</span></a>
+            <a href="/start.html" class="btn btn-primary nav-cta" data-hide-when-signed-in><Icon name="sunrise" size={16} /><span class="link-label">Set up your space</span></a>
         </div>
     </header>
 
@@ -47,8 +50,8 @@ const steps = [
         <div class="hero-side">
             <p>Flow is a study room you share with friends. Start a focus block and a sun starts sinking for everyone in the room. When it sets, you all take a break. It’s free, and the code is open.</p>
             <div class="hero-actions">
-                <a href="/start.html" class="btn btn-primary btn-lg" data-home-when-signed-in="Go to Home">Set up your space</a>
-                <a href="/login.html" class="btn btn-lg" data-hide-when-signed-in>I have an account</a>
+                <a href="/start.html" class="btn btn-primary btn-lg" data-home-when-signed-in="Go to Home"><Icon name="sunrise" class="i-out" /><Icon name="house" class="i-home" /><span class="link-label">Set up your space</span></a>
+                <a href="/login.html" class="btn btn-lg" data-hide-when-signed-in><Icon name="logIn" />I have an account</a>
             </div>
         </div>
         <div class="demo">
@@ -57,20 +60,25 @@ const steps = [
             </button>
             <strong id="preview-time" class="display" role="timer">25:00</strong>
             <span id="preview-label">Watch a 25-minute focus block in ten seconds.</span>
-            <a id="live-groups" class="live-groups" href="/groups.html">Browse study groups</a>
+            <a id="live-groups" class="live-groups" href="/groups.html"><Icon name="users" size={16} /><span class="link-label">Browse study groups</span></a>
         </div>
     </section>
 
         <section id="room" class="band tour">
             <h2>One room holds the whole session.</h2>
-            <figure class="shot">
-                <img id="room-shot" src="/rooms/forest.webp" width="1600" height="900" loading="lazy" decoding="async" alt="A Flow room: the sun and session clock on the left, study partners in the middle, and shared tasks on the right.">
-            </figure>
-            <ul class="features" aria-label="Show a part of the room">
-                {features.map(([name, text, still, spot]) => (
-                    <li><button type="button" aria-pressed="false" data-still={still || undefined} data-spot={spot || undefined}><strong>{name}</strong><span>{text}</span></button></li>
+            <div class="stops" role="group" aria-label="Show a part of the room">
+                {features.map(([chip, icon, name, text, still, spot]) => (
+                    <button type="button" aria-pressed="false" data-name={name} data-text={text} data-still={still || undefined} data-spot={spot || undefined}><Icon name={icon} size={16} />{chip}<i class="fuse" aria-hidden="true"></i></button>
                 ))}
-            </ul>
+            </div>
+            <figure class="shot">
+                <div class="shot-bar" aria-hidden="true"><span></span><span></span><span></span><b>flow-study.me/room</b></div>
+                <div class="shot-view">
+                    <img id="room-shot" src="/rooms/forest.webp" width="1600" height="900" loading="lazy" decoding="async" alt="A Flow room: the sun and session clock on the left, study partners in the middle, and shared tasks on the right.">
+                    <div class="spot" aria-hidden="true"></div>
+                    <div class="callout"><strong id="tour-name">{features[0][2]}</strong><span id="tour-text">{features[0][3]}</span></div>
+                </div>
+            </figure>
         </section>
 
         <section class="band atmospheres">
@@ -97,8 +105,8 @@ const steps = [
                 <h2>Open source, start to finish.</h2>
                 <p>Every line of Flow is public on GitHub under the MIT license. Read how it works, run your own copy, or fix something and send a pull request.</p>
                 <div class="hero-actions">
-                    <a href={repo} class="btn btn-primary" target="_blank" rel="noopener noreferrer">View the source</a>
-                    <a href={repo + '/issues'} class="btn" target="_blank" rel="noopener noreferrer">Report an issue</a>
+                    <a href={repo} class="btn btn-primary" target="_blank" rel="noopener noreferrer"><Icon name="github" />View the source</a>
+                    <a href={repo + '/issues'} class="btn" target="_blank" rel="noopener noreferrer"><Icon name="bug" />Report an issue</a>
                 </div>
             </div>
             <figure class="terminal">
@@ -113,19 +121,30 @@ const steps = [
 
         <section class="band closing">
             <h2>Your next session can start now.</h2>
-            <a href="/start.html" class="btn btn-primary btn-lg" data-home-when-signed-in="Go to Home">Set up your space</a>
+            <a href="/start.html" class="btn btn-primary btn-lg" data-home-when-signed-in="Go to Home"><Icon name="sunrise" class="i-out" /><Icon name="house" class="i-home" /><span class="link-label">Set up your space</span></a>
         </section>
     </main>
 
     <footer class="site-footer">
-        <a href="/" class="brand" aria-label="Flow home">flow<i></i></a>
-        <span>Study better, together. Open source under the MIT license.</span>
-        <nav aria-label="Footer">
-            <a href="/groups.html">Study groups</a>
-            <a href="/docs.html">Docs</a>
-            <a href={repo} target="_blank" rel="noopener noreferrer">GitHub</a>
-            <a href="/login.html" data-home-when-signed-in>Log in</a>
-        </nav>
+        <!-- The page opens at sunrise and closes at sunset: the wordmark stands on the horizon while its sun goes down. -->
+        <div class="dusk">
+            <div class="stars" aria-hidden="true"></div>
+            <div class="dusk-word" aria-hidden="true">flow<i></i></div>
+            <nav class="dusk-links" aria-label="Footer">
+                <a href="/groups.html"><Icon name="users" size={16} />Study groups</a>
+                <a href="/docs.html"><Icon name="book" size={16} />Docs</a>
+                <a href="#how"><Icon name="route" size={16} />How it works</a>
+                <a href="/login.html" data-home-when-signed-in><Icon name="logIn" size={16} class="i-out" /><Icon name="house" size={16} class="i-home" /><span class="link-label">Log in</span></a>
+                <a href={repo} target="_blank" rel="noopener noreferrer"><Icon name="github" size={16} />Source</a>
+                <a href={repo + '/issues'} target="_blank" rel="noopener noreferrer"><Icon name="bug" size={16} />Report an issue</a>
+                <a href={repo + '/blob/main/LICENSE'} target="_blank" rel="noopener noreferrer"><Icon name="scale" size={16} />MIT license</a>
+                <a href="#top"><Icon name="arrowUp" size={16} />Back to top</a>
+            </nav>
+        </div>
+        <div class="ground">
+            <span>© {new Date().getFullYear()} Flow</span>
+            <p class="credit">Built by <a href="https://algorithmicbit.tech" target="_blank" rel="noopener" class="scribble">Manas<svg viewBox="0 0 120 44" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M10 27C5 13 38 5 68 6s48 8 44 21-36 15-62 13S2 33 9 21 52 5 94 11" /></svg></a> with <Icon name="heart" size={15} class="heart" /><span class="visually-hidden">love</span> and a lot of coffee</p>
+        </div>
     </footer>
     <script>import '../client/landing';</script>
 </Page>
