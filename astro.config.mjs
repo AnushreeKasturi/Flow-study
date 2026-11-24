@@ -8,7 +8,9 @@ export default defineConfig({
     build: { format: 'file' },
     vite: {
         // Never inline a script into the page: the Content-Security-Policy forbids inline scripts.
-        build: { assetsInlineLimit: 0 },
+        // esbuild, not Lightning CSS, minifies the CSS: Lightning folds animation-timeline into the animation
+        // shorthand, which Chrome rejects, and every scroll-driven animation silently stops (the nav pill, the footer sunset).
+        build: { assetsInlineLimit: 0, cssMinify: 'esbuild' },
         plugins: [{
             name: 'flow-local-api',
             configureServer(server) {

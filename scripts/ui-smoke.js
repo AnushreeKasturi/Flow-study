@@ -64,6 +64,9 @@ async (page) => {
     await page.waitForFunction(() => document.getElementById('preview-time').textContent !== '25:00' && Number(getComputedStyle(document.body).getPropertyValue('--sun-y')) > .43);
     await page.getByRole('button', { name: 'Daylight', exact: true }).click();
     assert(await page.locator('html').getAttribute('data-theme') === 'daylight', 'Landing swatches should change the atmosphere');
+    // Scroll-driven animations survive the CSS minifier (it once folded the timeline into the shorthand, which Chrome drops).
+    assert(await page.evaluate(() => !CSS.supports('animation-timeline: scroll()') || (getComputedStyle(document.querySelector('.site-nav'), '::before').animationName === 'dock'
+        && (matchMedia('(prefers-reduced-motion: reduce)').matches || getComputedStyle(document.querySelector('.dusk')).animationName === 'nightfall'))), 'The nav pill and the footer sunset keep their scroll animations in the built page');
     // The room tour: picking a part of the room spotlights it, in the picked sky, with the right panel open and its note beside it.
     await page.getByRole('button', { name: 'Chat and AI', exact: true }).click();
     assert(await page.evaluate(() => document.getElementById('room-shot').src.endsWith('/rooms/daylight-chat.webp') && document.querySelector('.spot').style.left === '75.5%'
