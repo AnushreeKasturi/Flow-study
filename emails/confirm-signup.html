@@ -1,52 +1,74 @@
 <!-- Flow's "Confirm signup" email. Paste into Supabase → Authentication → Emails → Templates → Confirm signup.
      Subject: Confirm your email for Flow
      The link goes to Flow's own /verify.html (not Supabase's page), which confirms the address
-     with the token and shows "You're verified". Built with tables and inline styles, the only
-     layout every email client agrees on. -->
+     with the token and shows "You're verified".
+     The picture comes from the site ({{ .SiteURL }}/email/sunrise.jpg; npm run art:email remakes it), so
+     deploy before pasting. Tables and inline styles only: the one layout every email client agrees on. -->
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="dark">
+  <meta name="supported-color-schemes" content="dark">
   <title>Confirm your email for Flow</title>
 </head>
 <body style="margin:0; padding:0; background:#0a1a15;">
-  <!-- Preview line in the inbox list -->
-  <div style="display:none; max-height:0; overflow:hidden; opacity:0;">One tap and your study space is ready.</div>
+  <!-- The line shown after the subject in the inbox list -->
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0;">One tap and your study space opens.</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a1a15;">
     <tr>
-      <td align="center" style="padding:32px 16px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; border-radius:20px; overflow:hidden; background:#10241d;">
-          <!-- The sky, with the sun low on the horizon -->
+      <td align="center" style="padding:28px 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; border-radius:24px; overflow:hidden; background:#10241d;">
+          <!-- The wordmark standing on the horizon, its dot the rising sun -->
           <tr>
-            <td align="center" style="padding:36px 24px 0; background:#0b2a22; background-image:linear-gradient(#0b2a22, #3f7d5c);">
-              <div style="font-family:'Bricolage Grotesque', 'Helvetica Neue', Arial, sans-serif; font-size:30px; font-weight:800; letter-spacing:-1px; color:#eff3e9;">flow<span style="color:#f4dc8f;">.</span></div>
-              <div style="width:96px; height:48px; margin:28px auto 0; border-radius:96px 96px 0 0; background:#f4dc8f;"></div>
+            <td style="padding:0; line-height:0; font-size:0;">
+              <img src="{{ .SiteURL }}/email/sunrise.jpg" width="560" alt="Flow, its dot a sun rising over the horizon" style="display:block; width:100%; max-width:560px; height:auto; border:0; color:#94a898; font:14px Arial, sans-serif;">
             </td>
           </tr>
           <tr>
-            <td style="padding:32px 32px 8px; font-family:'Helvetica Neue', Arial, sans-serif; color:#eff3e9;">
-              <h1 style="margin:0 0 12px; font-size:24px; line-height:1.25; font-weight:800;">Confirm your email</h1>
-              <p style="margin:0 0 24px; font-size:15px; line-height:1.6; color:#c4d1c6;">You’re one tap from your study space. Confirm this address and your space is ready.</p>
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+            <td style="padding:14px 36px 4px; font-family:'Helvetica Neue', Arial, sans-serif; color:#f2f5ea;">
+              <h1 style="margin:0 0 12px; font-family:'Bricolage Grotesque', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif; font-size:36px; line-height:1.02; font-weight:800; letter-spacing:-1px; color:#f2f5ea;">Your seat is saved.</h1>
+              <p style="margin:0 0 26px; font-size:16px; line-height:1.6; color:#c3d2c4;">Confirm this address and your study space opens. The sun’s already coming up.</p>
+              <!-- The pass: who it's for and how long it holds, torn off above the button -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1.5px solid #2a4a3c; border-radius:18px; background:#142b23;">
                 <tr>
-                  <td align="center" style="border-radius:999px; background:#f4dc8f;">
-                    <a href="{{ .SiteURL }}/verify.html?token_hash={{ .TokenHash }}&amp;type=email" style="display:block; padding:14px 24px; font-family:'Helvetica Neue', Arial, sans-serif; font-size:16px; font-weight:700; color:#1d1a16; text-decoration:none;">Confirm my email</a>
+                  <td style="padding:18px 22px 16px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td valign="top" style="font-family:'Helvetica Neue', Arial, sans-serif;">
+                          <div style="font-size:12px; color:#94a898;">For</div>
+                          <div style="margin-top:3px; font-size:15px; font-weight:700; color:#f2f5ea; word-break:break-all;">{{ .Email }}</div>
+                        </td>
+                        <td valign="top" align="right" width="96" style="font-family:'Helvetica Neue', Arial, sans-serif;">
+                          <div style="font-size:12px; color:#94a898;">Holds for</div>
+                          <div style="margin-top:3px; font-size:15px; font-weight:700; color:#f2f5ea;">1 hour</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:18px 22px 22px; border-top:2px dashed #2a4a3c;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center" style="border-radius:999px; background:#f4dc8f;">
+                          <a href="{{ .SiteURL }}/verify.html?token_hash={{ .TokenHash }}&amp;type=email" style="display:block; padding:15px 24px; font-family:'Helvetica Neue', Arial, sans-serif; font-size:16px; font-weight:700; color:#10241d; text-decoration:none;">Confirm my email</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:12px 0 0; font-family:'Helvetica Neue', Arial, sans-serif; font-size:12px; line-height:1.5; color:#94a898; text-align:center;">Works once.</p>
                   </td>
                 </tr>
               </table>
-              <p style="margin:24px 0 0; font-size:13px; line-height:1.6; color:#8fa395;">The link works once, for an hour. If the button doesn’t work, paste this into your browser:</p>
-              <p style="margin:6px 0 0; font-size:12px; line-height:1.5; word-break:break-all;"><a href="{{ .SiteURL }}/verify.html?token_hash={{ .TokenHash }}&amp;type=email" style="color:#c4d1c6;">{{ .SiteURL }}/verify.html?token_hash={{ .TokenHash }}&amp;type=email</a></p>
+              <p style="margin:22px 0 0; font-size:12px; line-height:1.6; color:#94a898;">Button not working? Paste this into your browser:<br><a href="{{ .SiteURL }}/verify.html?token_hash={{ .TokenHash }}&amp;type=email" style="color:#c3d2c4; word-break:break-all;">{{ .SiteURL }}/verify.html?token_hash={{ .TokenHash }}&amp;type=email</a></p>
             </td>
           </tr>
           <tr>
-            <td style="padding:24px 32px 32px; font-family:'Helvetica Neue', Arial, sans-serif; font-size:12px; line-height:1.6; color:#8fa395;">
-              Didn’t sign up for Flow? Ignore this email: the account can’t be used until this address is confirmed.
-            </td>
+            <td style="padding:22px 36px 32px; font-family:'Helvetica Neue', Arial, sans-serif; font-size:12px; line-height:1.6; color:#94a898;">Didn’t sign up for Flow? Ignore this email. Nothing happens without the tap, and the account can’t be used.</td>
           </tr>
         </table>
-        <p style="margin:20px 0 0; font-family:'Helvetica Neue', Arial, sans-serif; font-size:12px; color:#5f7568;">Flow · study better, together · <a href="{{ .SiteURL }}" style="color:#8fa395;">flow-study.me</a></p>
+        <p style="margin:20px 0 0; font-family:'Helvetica Neue', Arial, sans-serif; font-size:12px; color:#94a898;">Study until the sun sets. <a href="{{ .SiteURL }}" style="color:#c3d2c4;">flow-study.me</a></p>
       </td>
     </tr>
   </table>
