@@ -41,10 +41,12 @@ export function refreshEmpty() {
 
 // Adds a line to the centre. Text is always inserted as text, never as markup.
 // `action` makes the whole line clickable; a `{ label, run }` adds a small button instead.
-export function pushNote(text: string, action?: (() => void) | Action) {
+// `quiet` notes (someone joined or left, which the tiles already show) are listed without
+// raising the red count, so the badge only asks for attention when something needs you.
+export function pushNote(text: string, action?: (() => void) | Action, quiet = false) {
     notes.unshift({ text: text.slice(0, 160), at: Date.now(), ...(typeof action === 'function' ? { action } : action ? { button: action } : {}) });
     notes.length = Math.min(notes.length, MAX_NOTES);
-    if (!panel().open) unread++;
+    if (!panel().open && !quiet) unread++;
     render();
 }
 

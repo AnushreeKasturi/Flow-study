@@ -5,6 +5,7 @@ import { getMyUserId } from './socket';
 import { currentUser } from './session';
 import { initial } from './ui';
 import { AWAY_STATUSES } from './presence';
+import { fitGallery } from './gallery';
 
 const videoGrid = byId<HTMLElement>('video-grid');
 const wrapperFor = (userId: string) =>
@@ -122,6 +123,7 @@ export function pinTile(userId: string | null) {
         button.setAttribute('aria-pressed', String(pinned));
     });
     videoGrid.classList.toggle('has-pin', !!userId);
+    fitTiles();
 }
 
 // A crossed-out mic beside the name when someone mutes. Same icon as your own mic button.
@@ -231,3 +233,23 @@ export function setHandRaised(userId: string, raised: boolean) {
     }
     else if (!raised) badge?.remove();
 }
+
+// On a desktop the stage has a fixed height, so the tiles grow to fill it instead of floating
+// in the middle. Not while a tile is pinned or in focus mode, which lay tiles out their own
+// way, nor on narrower screens, where the page scrolls. Tiles that would come out small keep
+// the ordinary grid, which scrolls.
+const desktop = matchMedia('(min-width: 1051px)');
+function fitTiles() {
+    const style = getComputedStyle(videoGrid);
+    const width = videoGrid.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const height = videoGrid.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    const { columns, tileWidth } = fitGallery(videoGrid.children.length, width, height, parseFloat(style.columnGap) || 14);
+    const fit = desktop.matches && tileWidth >= 200 && !videoGrid.classList.contains('has-pin') && !document.body.classList.contains('focus-active');
+    videoGrid.classList.toggle('fitted', fit);
+    videoGrid.style.setProperty('--cols', String(columns));
+    videoGrid.style.setProperty('--tile-w', tileWidth + 'px');
+}
+new ResizeObserver(fitTiles).observe(videoGrid);
+new MutationObserver(fitTiles).observe(videoGrid, { childList: true });
+new MutationObserver(fitTiles).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+desktop.addEventListener('change', fitTiles);

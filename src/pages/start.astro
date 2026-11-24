@@ -15,6 +15,7 @@ import SocialSignIn from '../components/SocialSignIn.astro';
         <a href="/login.html" class="btn" id="start-login">Log in</a>
     </header>
 
+    <main class="start-landmark">
     <form id="start-form" class="start-main" novalidate>
         <section class="step" data-step="name">
             <h1 id="start-greeting">What should we call you?</h1>
@@ -66,5 +67,6 @@ import SocialSignIn from '../components/SocialSignIn.astro';
             <button type="submit" id="start-next" class="btn btn-primary btn-lg">Continue</button>
         </footer>
     </form>
+    </main>
     <script>import '../client/start';</script>
 </Page>

@@ -7,7 +7,10 @@ import Icon from '../Icon.astro';
     <div class="pill-timer">
         <div class="timer-heading">
             <h2 id="timer-state-label">Ready to focus</h2>
-            <div id="rounds" class="rounds" role="img" aria-label="Round 1 of 4"><i></i><i></i><i></i><i></i></div>
+            <div class="rounds-wrap">
+                <span id="rounds-text" class="rounds-text" aria-hidden="true">1 of 4</span>
+                <div id="rounds" class="rounds" role="img" aria-label="Round 1 of 4"><i></i><i></i><i></i><i></i></div>
+            </div>
         </div>
         <div class="time-display display" id="time-display" role="timer">25:00</div>
         <!-- Some people find a ticking clock stressful; the sun still shows how far along the block is. -->

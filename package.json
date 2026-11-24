@@ -7,7 +7,7 @@
     "node": "^22.23.4 || ^24.0.0 || ^26.0.0"
   },
   "scripts": {
-    "test": "node --test scripts/server.test.cjs scripts/utils.test.cjs scripts/focus-progress.test.cjs scripts/host-state.test.cjs scripts/automation.test.cjs",
+    "test": "node --test scripts/server.test.cjs scripts/utils.test.cjs scripts/focus-progress.test.cjs scripts/host-state.test.cjs scripts/automation.test.cjs scripts/gallery.test.cjs",
     "start": "node server.js",
     "dev": "astro dev",
     "test:db": "node --test scripts/sql-integration.test.cjs",

@@ -356,7 +356,7 @@ async function enterRoom(roomId: string, roomCode: string, mediaReady = false) {
         if (!(userId in pendingLeaves)) {
             chime('leave');
             markLeft(userId, true, partners[userId].username);
-            pushNote(`${partners[userId].username || 'Someone'} left the room.`);
+            pushNote(`${partners[userId].username || 'Someone'} left the room.`, undefined, true);
         }
         clearTimeout(pendingLeaves[userId]);
         const finish = () => {
@@ -389,7 +389,7 @@ async function enterRoom(roomId: string, roomCode: string, mediaReady = false) {
         lastHeard[userId] = Date.now();
         // A new face gets a chime; someone returning from a blip does not.
         const arriving = !partners[userId];
-        if (arriving) { chime('join'); pushNote(`${data.username || 'Someone'} joined the room.`); }
+        if (arriving) { chime('join'); pushNote(`${data.username || 'Someone'} joined the room.`, undefined, true); }
         cancelLeave(userId);
         partners[userId] = data;
         countPeople();
@@ -457,7 +457,7 @@ async function enterRoom(roomId: string, roomCode: string, mediaReady = false) {
         },
         onRemoved: userId => {
             if (userId === getMyUserId()) confirmRemoval();
-            else if (partners[userId]) pushNote(`${partners[userId].username || 'Someone'} was removed by the host.`);
+            else if (partners[userId]) pushNote(`${partners[userId].username || 'Someone'} was removed by the host.`, undefined, true);
         }
     });
 

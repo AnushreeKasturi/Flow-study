@@ -62,7 +62,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 24px; }
 
 /* ── Sections ── */
 .band { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding: clamp(56px, 7vw, 104px) clamp(20px, 5vw, 72px); }
-.band + .band, .hero + main .band:first-child { border-top: 1.5px solid color-mix(in srgb, var(--text) 16%, transparent); }
+.band + .band, .hero + .band { border-top: 1.5px solid color-mix(in srgb, var(--text) 16%, transparent); }
 .band h2 { max-width: 16ch; font-size: clamp(2.6rem, 6vw, 5.4rem); font-weight: 800; line-height: .9; letter-spacing: -.03em; text-wrap: balance; }
 .band p { color: var(--text-2); line-height: 1.65; }
 

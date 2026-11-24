@@ -61,3 +61,5 @@
 .step .social-signin { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
 .step .social-signin .divider { grid-column: 1 / -1; margin: 4px 0 0; }
 @media (max-width: 560px) { .step .social-signin { grid-template-columns: minmax(0, 1fr); } }
+/* The page's main landmark, without changing the layout around the form. */
+.start-landmark { display: contents; }

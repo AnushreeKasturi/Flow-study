@@ -67,7 +67,9 @@ export const updateTimerUI = (state: TimerState) => {
     const done = state.mode === 'longBreak' && state.sessionCount > 0 && inSet === 0 ? ROUNDS : inSet;
     const rounds = byId<HTMLElement>('rounds');
     rounds.querySelectorAll('i').forEach((dot, index) => dot.classList.toggle('done', index < done));
-    rounds.setAttribute('aria-label', focus ? `Round ${done + 1} of ${ROUNDS}` : `${done} of ${ROUNDS} rounds done`);
+    const roundsLabel = focus ? `Round ${done + 1} of ${ROUNDS}` : `${done} of ${ROUNDS} rounds done`;
+    rounds.setAttribute('aria-label', roundsLabel);
+    byId<HTMLElement>('rounds-text').textContent = focus ? `${done + 1} of ${ROUNDS}` : `${done} of ${ROUNDS} done`;
 
     els.timerModes.forEach(btn => {
         const active = btn.dataset.mode === state.mode;
@@ -158,5 +160,9 @@ export const updateMyPresenceUI = (state: PresenceState, username: string) => {
     els.myAvatar.textContent = initial(username);
     els.myStatusText.textContent = statusText(state.status);
     els.myStatusText.previousElementSibling!.className = `dot ${AWAY_STATUSES.includes(state.status) ? 'away' : state.status.includes('Break') ? 'yellow' : 'green'}`;
-    if (state.focusTime !== undefined) els.myFocusTime.textContent = `Today: ${state.focusTime}m focused`;
+    // Shown from the first minute: a zero at the start of a session helps nobody.
+    if (state.focusTime !== undefined) {
+        els.myFocusTime.textContent = `Today: ${state.focusTime}m focused`;
+        els.myFocusTime.hidden = !state.focusTime;
+    }
 };

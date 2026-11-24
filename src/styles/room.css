@@ -105,11 +105,13 @@ kbd { display: inline-block; min-width: 26px; padding: 2px 7px; border-radius: 6
 /* Keeps the clock below the sky; the sun itself lives in the page-wide .sky layer. */
 .scene-sky { flex: 0 1 calc(var(--horizon) - var(--header-h)); min-height: 0; }
 .pill-timer { display: flex; flex-direction: column; gap: 14px; flex-shrink: 0; padding-top: 22px; }
-.timer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.timer-heading h2 { font-size: 1.15rem; font-stretch: 90%; font-variation-settings: 'wdth' 90; letter-spacing: -.01em; }
+.timer-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.timer-heading h2 { white-space: nowrap; font-size: 1.15rem; font-stretch: 90%; font-variation-settings: 'wdth' 90; letter-spacing: -.01em; }
 .rounds { display: flex; gap: 6px; }
 .rounds i { width: 18px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--text) 22%, transparent); }
 .rounds i.done { background: var(--text); }
+.rounds-wrap { display: flex; align-items: center; gap: 10px; }
+.rounds-text { color: var(--text-3); font-size: .74rem; font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* Tabular figures keep the clock still while digits change. */
 .time-display { font-size: clamp(4.4rem, 13vh, 6.6rem); font-weight: 800; line-height: .85; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .time-toggle { width: max-content; margin-top: -8px; padding: 2px 0; border: 0; background: none; color: var(--text-3); font: inherit; font-size: .78rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
@@ -184,6 +186,9 @@ body[data-timer="break"] .breath { display: block; }
 .video-grid.has-pin { grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr)); align-content: start; }
 .video-grid.has-pin .video-wrapper.pinned { grid-column: 1 / -1; order: -1; aspect-ratio: 16 / 9; max-height: 62vh; }
 .focus-active .video-grid.has-pin .video-wrapper.pinned { width: 100%; }
+/* Desktop: the tiles grow to fill the stage instead of floating in it. gallery.ts picks the columns. */
+.video-grid.fitted { grid-template-columns: repeat(var(--cols), var(--tile-w)); justify-content: center; align-content: center; }
+.video-grid.fitted .video-wrapper { max-height: none; }
 /* Reactions are thrown into the tile and bounce about until they settle (stage.ts moves them). */
 .floating-reaction { position: absolute; left: 0; top: 0; z-index: 15; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: var(--reaction); color: #1d1a16; box-shadow: 0 6px 18px #0006, inset 0 -3px 0 #0002; opacity: 0; pointer-events: none; will-change: transform, opacity; }
 .floating-reaction svg { width: 22px; height: 22px; }
@@ -241,6 +246,7 @@ body[data-timer="break"] .breath { display: block; }
 .progress-heading { display: flex; justify-content: space-between; margin: 18px 0 8px; color: var(--text-3); font-size: .76rem; font-weight: 500; }
 .task-progress-bar { height: 6px; flex-shrink: 0; margin-bottom: 14px; overflow: hidden; border-radius: 6px; background: var(--field); }
 .task-progress-fill { height: 100%; border-radius: 6px; background: var(--primary); transition: width .4s var(--ease); }
+#tasks-tab:not(:has(#room-task-list > li:not(.task-empty-msg))) :is(.progress-heading, .task-progress-bar) { display: none; }
 .task-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; list-style: none; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .task-item { display: flex; align-items: center; flex-shrink: 0; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
 .task-item.saving { opacity: .65; }
@@ -255,7 +261,7 @@ body[data-timer="break"] .breath { display: block; }
 .task-empty-msg strong { display: block; margin-bottom: 6px; color: var(--text); font-size: 1.2rem; font-weight: 700; font-stretch: 85%; font-variation-settings: 'wdth' 85; }
 
 #chat-messages { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 6px; margin-bottom: 14px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; scrollbar-gutter: stable; }
-#chat-messages:empty::before { content: 'Start the conversation. Messages are shared with everyone in this room.'; margin: auto 12px; color: var(--text-3); font-size: .86rem; line-height: 1.6; text-align: center; }
+#chat-messages:empty::before { content: 'Start the conversation. Messages are shared with everyone in this room.'; margin: auto 12px 4px; color: var(--text-3); font-size: .86rem; line-height: 1.6; text-align: center; }
 .chat-message { flex-shrink: 0; align-self: flex-start; max-width: 92%; padding: 9px 13px; border-radius: 4px 16px 16px 16px; background: var(--field); font-size: .9rem; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
 .chat-message.own-message { align-self: flex-end; border-radius: 16px 4px 16px 16px; background: var(--hover); }
 .ai-message { max-width: 100%; border: 1.5px solid color-mix(in srgb, var(--sun) 50%, transparent); background: transparent; }
@@ -308,6 +314,10 @@ body[data-timer="break"] .breath { display: block; }
 .check { display: flex; align-items: flex-start; gap: 12px; margin: 24px 0; color: var(--text); font-size: .9rem; cursor: pointer; }
 .check input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; accent-color: var(--primary); }
 .check small { display: block; margin-top: 2px; color: var(--text-3); font-size: .78rem; }
+.settings-section { margin: 22px 0 10px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--text-2); font-size: .74rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.settings-section:first-of-type { margin-top: 14px; padding-top: 0; border-top: 0; }
+.settings-host-note { margin: -4px 0 12px; color: var(--text-3); font-size: .8rem; }
+.runs-timer .settings-host-note { display: none; }
 .shortcut-list > div { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-top: 1px solid var(--line); font-size: .9rem; }
 .shortcut-list dt { width: 48px; }
 .shortcut-list dd { color: var(--text-2); }
@@ -496,6 +506,17 @@ body:not(.is-host) #room-settings-btn { display: none; }
     .checklist { position: relative; flex-direction: column; align-items: flex-start; gap: 10px; margin-inline: 16px; }
     .checklist .checklist-skip { position: absolute; top: 12px; right: 16px; }
     .stage-header { padding-inline: 16px; }
+    /* Your partners first: seeing them working is the point. Your own tile comes after. */
+    #video-wrapper-local { order: 1; }
+    /* The room code and count stay readable when the sun passes behind them. */
+    .room-info { padding: 4px 6px 4px 12px; border-radius: 999px; background: color-mix(in srgb, var(--sky-top) 55%, transparent); }
+    /* The sky picker shrinks to a round button with a small sun; the list still names every sky. */
+    #theme-picker { width: 44px; height: 44px; flex-shrink: 0; padding: 0; color: transparent; background-image: radial-gradient(circle, var(--text) 0 6px, transparent 6.5px); background-position: center; background-size: auto; }
+    #theme-picker option { color: var(--text); background: var(--bg); }
+    /* While the clock runs it gets compact, so the people you're with show without scrolling. */
+    .room-page:not(.focus-active):is([data-timer="focus"], [data-timer="break"]) { --horizon: 200px; --sun-size: 96px; }
+    .room-page:not(.focus-active):is([data-timer="focus"], [data-timer="break"]) :is(.time-display) { font-size: 3.6rem; }
+    .room-page:not(.focus-active):is([data-timer="focus"], [data-timer="break"]) .timer-modes { display: none; }
 }
 /* The heatmap sits inline only where it fits; everywhere else it waits behind "Last 6 months". */
 .home-year-btn { display: block; margin-top: 8px; padding: 4px 10px; border: 1.5px solid var(--line); border-radius: 999px; background: none; color: var(--text-2); font: inherit; font-size: .74rem; font-weight: 600; white-space: nowrap; cursor: pointer; }
@@ -554,7 +575,7 @@ body:not(.is-host) #room-settings-btn { display: none; }
     .lobby-footer { grid-column: 2; margin: 0; gap: 14px; }
     .lobby-footer .github-star, .lobby-footer a[href="/docs.html"] { display: none; } /* phones keep the exit, the landing page keeps the manual */
     .home-main { padding: 16px 18px 18px; }
-    .home-main h2 { display: none; }
+    .home-main h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .home-switch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 999px; background: var(--field); }
     .home-switch label { margin: 0; padding: 9px 0; border-radius: 999px; color: var(--text-2); font-size: .88rem; font-weight: 600; text-align: center; cursor: pointer; }
     .home-switch label:has(:checked) { background: var(--text); color: var(--bg); }

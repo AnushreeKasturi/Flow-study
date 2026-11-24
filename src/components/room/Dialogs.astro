@@ -106,13 +106,15 @@ const shortcuts = [['S', 'Start or pause the timer'], ['F', 'Enter or leave focu
 
     <div id="timer-settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="timer-settings-title">
         <div class="modal-head"><h2 id="timer-settings-title">Timer settings</h2><button id="close-timer-settings-btn" class="icon-btn quiet" aria-label="Close timer settings"><Icon name="close" /></button></div>
-        <p class="dialog-description">Lengths apply to everyone in the room.</p>
+        <h3 class="settings-section">For everyone in this room</h3>
+        <p class="settings-host-note">Whoever hosts sets these for the room.</p>
         <div class="settings-grid">
             <div><label for="setting-focus-duration">Focus (minutes)</label><input type="number" id="setting-focus-duration" required class="input" value="25" min="1" max="120"></div>
             <div><label for="setting-short-break-duration">Short break (minutes)</label><input type="number" id="setting-short-break-duration" required class="input" value="5" min="1" max="60"></div>
             <div><label for="setting-long-break-duration">Long break (minutes)</label><input type="number" id="setting-long-break-duration" required class="input" value="15" min="1" max="60"></div>
         </div>
         <label class="check"><input type="checkbox" id="setting-auto-advance" checked><span>Start the next block automatically<small>When a block ends, the break (or the next focus block) starts for everyone, so nobody has to press start.</small></span></label>
+        <h3 class="settings-section">Just for you</h3>
         <label class="check"><input type="checkbox" id="setting-notify"><span>Send me system notifications<small>For finished sessions, new chat messages, and reminders, only while Flow is in a background tab.</small></span></label>
         <label class="check"><input type="checkbox" id="setting-preview" checked><span>Show a camera preview before joining<small>See yourself, and choose camera and microphone, before anyone in the room can see you.</small></span></label>
         <label class="check"><input type="checkbox" id="setting-hide-ip"><span>Hide my IP address<small>Calls go through a relay server, so others in the room never see your address. Adds a little delay. On by default in groups from the study-groups board.</small></span></label>
