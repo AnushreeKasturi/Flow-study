@@ -28,7 +28,7 @@ app.use((req, res, next) => {
 });
 
 // Astro's generated pages and fingerprinted assets.
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use(express.static(path.join(__dirname, 'dist'), { extensions: ['html'] })); // /room serves room.html, as vercel.json's rewrites do
 app.use(express.json({ limit: '16kb' }));
 app.use('/api', (req, res, next) => {
     res.set('Cache-Control', 'private, no-store');

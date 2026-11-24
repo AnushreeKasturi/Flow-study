@@ -87,8 +87,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run build
-      - run: npm run test:browser
+      - run: npm run test:browser # builds first (pretest:browser)
       - name: Save browser diagnostics
         if: always()
         uses: actions/upload-artifact@v7

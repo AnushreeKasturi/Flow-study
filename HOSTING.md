@@ -1,6 +1,6 @@
 # Free CDN hosting
 
-Flow serves its HTML, CSS, browser modules, favicon, and social image directly from Vercel's CDN. Only `/api/ai` and `/api/turn-credentials` invoke Node functions. Supabase continues to handle auth, data, and Realtime; WebRTC media stays peer-to-peer or uses the configured TURN provider.
+Flow serves its HTML, CSS, browser modules, favicon, and social image directly from Vercel's CDN. Only `/api/ai`, `/api/turn-credentials`, `/api/errors` (browser error reports) and `/api/visitors` (the README badge) invoke Node functions. Supabase continues to handle auth, data, and Realtime; WebRTC media stays peer-to-peer or uses the configured TURN provider.
 
 This removes Render's sleeping web service from the page-delivery path. Functions can still have startup/provider latency, and hosting/provider usage limits still apply. No keep-alive pings or paid Render instance are required.
 
@@ -46,13 +46,13 @@ The apex A record was switched from Render (`216.24.57.1`) to Vercel (`216.198.7
 
 ## Latency and limits
 
-Both pages load the native HTML Speed Insights integration. It loads Vercel's deferred performance script on the custom domain and Vercel deployment URLs, strips query strings/fragments from reported URLs, and stays disabled on localhost. Enable Speed Insights in the project's dashboard to see incoming real-user measurements; the integration is bundled by Astro and does not require a Next.js component. The fixture browser suite intercepts telemetry so synthetic stress runs do not enter the dashboard. No paid Insights upgrade is enabled by this code.
+Every page loads the native HTML Speed Insights integration. It loads Vercel's deferred performance script on the custom domain and Vercel deployment URLs, strips query strings/fragments from reported URLs, and stays disabled on localhost. Enable Speed Insights in the project's dashboard to see incoming real-user measurements; the integration is bundled by Astro and does not require a Next.js component. The fixture browser suite intercepts telemetry so synthetic stress runs do not enter the dashboard. No paid Insights upgrade is enabled by this code.
 
 The browser loads the site without waiting for an API function. Groq has a 15-second request deadline without SDK retries. Twilio token requests have a four-second deadline, and the browser stops waiting for TURN after five seconds and continues with STUN. STUN-only calls may still fail on restrictive networks; a working TURN configuration remains important.
 
-The existing API request limits remain in Express. Those counters are local to each function instance, so they are not a global distributed quota. Monitor provider and Hobby usage before increasing traffic; distributed quotas can be added when needed.
+Express keeps a per-address rate limit in each function instance. The real limits live in the database: a per-account quota (sql/008, recorded by the server since sql/016) and a project-wide hourly ceiling (sql/013), which hold across instances. Monitor provider and Hobby usage before increasing traffic.
 
-Local development uses `npm ci` followed by `npm run dev` on port 4321. For the production server, run `npm run build` and then `npm start`. The Astro migration changes page generation and bundling without changing the database or provider endpoints.
+Local development uses `npm ci` followed by `npm run dev` on port 4321. For the production server, run `npm run build` and then `npm start`. 
 
 To run the isolated browser fixture suite against a deployed frontend instead of a local server:
 

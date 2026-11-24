@@ -1,4 +1,6 @@
--- Security hardening. Additive and repeatable. Run after 007 in the Supabase SQL editor.
+-- Security hardening. Additive. Run after 007 in the Supabase SQL editor.
+-- Repeatable only before later migrations: room_send() is redefined by 017 and 018, and rooms_guard()
+-- by 024, so re-running this afterwards brings back older versions. Run those again after it.
 --   1. Rooms are visible only to their creator and members (was: every signed-in user could list every room code).
 --   2. Room creation: valid codes and PINs only, creator recorded by the database, a daily cap.
 --   3. Joining: repeated wrong codes or PINs are counted and throttled; failures no longer say which part was wrong.

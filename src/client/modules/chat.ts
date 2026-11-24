@@ -106,6 +106,8 @@ async function sendMessage() {
 
     const query = text.replace(/^\/ai\s*/, '').trim();
     if (!query) { notify('Add a question after /ai to ask the study assistant.'); return; }
+    // The server takes up to 500 characters (server.js); say so here and keep the text to trim.
+    if (query.length > 500) { notify(`Questions for the assistant can be up to 500 characters. This one is ${query.length}.`, 'error'); return; }
     chatInput.value = '';
     aiPending = true;
     const pending = byId<HTMLElement>('ai-pending');

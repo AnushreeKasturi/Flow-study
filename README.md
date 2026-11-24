@@ -103,12 +103,28 @@ For a **new, empty database**, run these files in order in the Supabase SQL edit
 7. [`sql/007_private_room_channels.sql`](sql/007_private_room_channels.sql), as one step of [turning on private room channels](SECURITY.md#turning-on-private-room-channels)
 8. [`sql/008_security_hardening.sql`](sql/008_security_hardening.sql) (room visibility, join attempt limits, quotas, verified message senders)
 9. [`sql/009_only_stamped_room_messages.sql`](sql/009_only_stamped_room_messages.sql), the last step of [verified senders](SECURITY.md#verified-senders), after checking rooms work
+10. [`sql/010_host_handover_and_live_board.sql`](sql/010_host_handover_and_live_board.sql) (host handover, ending a room for everyone, instant board updates)
+11. [`sql/011_fix_room_channel_access.sql`](sql/011_fix_room_channel_access.sql) (room channels after 010)
+12. [`sql/012_temporary_host.sql`](sql/012_temporary_host.sql) (stepping away, and hosting for now)
+13. [`sql/013_global_quotas.sql`](sql/013_global_quotas.sql) (a project-wide ceiling on the assistant and TURN)
+14. [`sql/014_deny_by_default.sql`](sql/014_deny_by_default.sql) (deny by default)
+15. [`sql/015_room_listed.sql`](sql/015_room_listed.sql) (whether a room is on the board)
+16. [`sql/016_server_side_quotas.sql`](sql/016_server_side_quotas.sql), only once the server has `SUPABASE_SERVICE_ROLE_KEY`
+17. [`sql/017_room_timer.sql`](sql/017_room_timer.sql) (the timer survives a reload)
+18. [`sql/018_host_runs_timer.sql`](sql/018_host_runs_timer.sql) (only the host, or the stand-in host, changes the timer)
+19. [`sql/019_focus_days.sql`](sql/019_focus_days.sql) (focus time per day)
+20. [`sql/020_platform_stats.sql`](sql/020_platform_stats.sql) and [`sql/021_platform_accounts.sql`](sql/021_platform_accounts.sql) (the owner's /stats page)
+21. [`sql/022_room_link_status.sql`](sql/022_room_link_status.sql) (what a room link leads to)
+22. [`sql/023_visitor_count.sql`](sql/023_visitor_count.sql) (the README visitor badge)
+23. [`sql/024_room_and_session_integrity.sql`](sql/024_room_and_session_integrity.sql) (the database sets room and focus-session facts)
+
+**Apply migrations in order, and never re-run an older one after a newer one.** Several later files redefine the same functions and policies (for example `room_send()` in 008, 017 and 018, and `rooms_guard()` in 008 and 024), so re-running an older file quietly brings back its older, weaker version. If that happens, run every later file that redefines the same thing again, in order. `npm run check:live` checks that the newest functions exist.
 
 **`schema.sql` drops existing tables. Do not run it as an upgrade on a database with data.** For an existing installation, use the additive migration sequence and compatibility notes in [TESTING.md](TESTING.md#supabase-compatibility).
 
 The app uses profiles, rooms, room participants, tasks, sessions, the `join_room` RPC, and task Realtime updates. Migration 004 supports the older TEXT room references and the newer UUID schema, preserves existing rows, and scopes task access to room participants.
 
-Database RLS protects table access. Private Realtime Broadcast authorization needs its own coordinated policies and client configuration; it is a separate production-hardening task.
+Database RLS protects table access. Room channels are private (`privateRoomChannels` in `supabase.config.json`, with the policies from sql/007, 009 and 011): only a room's members can join its channel, and only presence goes onto it directly; every other message goes through `room_send()`.
 
 ## Shared-link preview
 
@@ -125,7 +141,7 @@ Generation uses the local Bricolage Grotesque font and the committed [lake artwo
 
 ## Architecture
 
-Astro generates six static pages: the landing page (`/`), setup (`/start.html`), sign-in (`/login.html`), the room (`/room.html`), the study-groups board (`/groups.html`), and docs (`/docs.html`). Strict TypeScript powers the room, Vite bundles and fingerprints everything into `dist/_astro`, and fonts are self-hosted, so the only third-party requests are to Supabase, plus YouTube or Spotify when a player is requested, GitHub for the landing page's star count, and Cloudflare Turnstile (the captcha) on the sign-up, log-in, and email pages once a site key is set. No client framework runtime is needed.
+Astro generates eight static pages: the landing page (`/`), setup (`/start.html`), sign-in (`/login.html`), the room (`/room.html`), the study-groups board (`/groups.html`), docs (`/docs.html`), email confirmation (`/verify.html`), and the owner's stats (`/stats.html`). Each also answers without `.html` (`/room`, `/groups`, …). Strict TypeScript powers the room, Vite bundles and fingerprints everything into `dist/_astro`, and fonts are self-hosted, so the only third-party requests are to Supabase, plus YouTube or Spotify when a player is requested, GitHub for the landing page's star count, and Cloudflare Turnstile (the captcha) on the sign-up, log-in, and email pages once a site key is set. No client framework runtime is needed.
 
 | Location | Responsibility |
 | --- | --- |

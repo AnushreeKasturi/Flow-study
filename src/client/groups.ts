@@ -140,7 +140,7 @@ async function load() {
     } catch (error) {
         // PostgREST reports a missing table or column this way when the migrations have not been run.
         const missing = ['42P01', '42703', 'PGRST204', 'PGRST205'].includes((error as { code?: string })?.code ?? '');
-        say(missing ? 'The board is not fully set up on this server yet. Whoever runs it needs to apply sql/005 and sql/006.' : 'Groups could not be loaded. Check your connection, then reload.');
+        say(missing ? 'The board is not fully set up on this server yet. Whoever runs it needs to apply the database migrations in sql/, in order.' : 'Groups could not be loaded. Check your connection, then reload.');
     }
 }
 

@@ -1,6 +1,6 @@
 # Validation and coverage
 
-The UI refinement has repeatable checks across every shipped JavaScript module, the HTTP server, all six HTML pages, all ten skies, and the supplied database schemas. This is a coverage inventory, not a claim that every possible state or production environment has been tested.
+The UI refinement has repeatable checks across every shipped JavaScript module, the HTTP server, all eight HTML pages, all fifteen skies, and the supplied database schemas. This is a coverage inventory, not a claim that every possible state or production environment has been tested.
 
 ## Run the checks
 
@@ -69,11 +69,7 @@ The HTTP checks completed 100 concurrent local static requests. These small, iso
 
 The supplied older schema defines `verify_room_pin`, TEXT room references, and permissive task policies. The current app expects `join_room`, participant membership, profiles, and task assignment.
 
-For an existing database, review and stage these migrations in order:
-
-1. `sql/002_profiles.sql`
-2. `sql/003_task_assignment.sql`
-3. `sql/004_room_access_compatibility.sql`
+For an existing database, apply the migrations in the order listed in the [README](README.md#supabase-setup), starting with `sql/002_profiles.sql`, and never re-run an older one after a newer one. `npm run test:db` applies them in that order on throwaway databases, starting from both the legacy and the current schema.
 
 Migration 004 preserves existing rows and publications, maps recognized legacy room-code references to UUID strings, backfills membership for existing task/session authors, and replaces legacy task policies with participant checks. Unknown room references remain intact and require review. Historical author fields come from the old schema and should be reviewed before relying on their backfilled memberships.
 

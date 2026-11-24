@@ -41,6 +41,12 @@ test('HTTP boundaries and bounded local concurrency', async t => {
 
     await t.test('HTML, CSS, modules, missing files, and private files', async () => {
         for (const path of ['/', '/start.html', '/login.html', '/room.html', '/groups.html', '/docs.html', '/verify.html', '/stats.html', '/favicon.svg', '/rooms/forest.webp', '/rooms/forest-chat.webp', '/rooms/forest-sound.webp']) assert.equal((await fetch(origin + path)).status, 200, path);
+        // Clean URLs, as vercel.json's rewrites: /room is room.html.
+        for (const page of ['start', 'login', 'room', 'groups', 'docs', 'verify', 'stats']) {
+            const [clean, full] = await Promise.all([fetch(origin + '/' + page), fetch(origin + '/' + page + '.html')]);
+            assert.equal(clean.status, 200, '/' + page);
+            assert.equal(await clean.text(), await full.text(), '/' + page + ' is the same page as /' + page + '.html');
+        }
         const html = await (await fetch(origin + '/login.html')).text();
         const asset = html.match(/src="([^"]+\.js)"/)[1];
         assert.equal((await fetch(origin + asset)).status, 200);

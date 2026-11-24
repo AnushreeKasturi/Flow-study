@@ -41,7 +41,9 @@ These are real gaps. They are listed so nobody assumes more than is true.
 - **Automatic hiding can be abused by a patient group.** Three accounts that are each more than a day old can hide a host's listings for a week. The `reports` table records who reported whom.
 - **Removal takes effect at the database immediately, and in the removed person's browser when it hears about it.** Their realtime access ends when their token next refreshes.
 - **Rooms created before `sql/006` have no host,** so nobody can remove people from them.
-- **The shared timer trusts participants.** Anyone in a room can start, pause, or reset it; that is the feature. Message floods are limited in the browser, not yet in the database.
+- **Message floods are limited in the browser, not yet in the database.** Only the host (or the stand-in host) can change the timer (sql/018), but members can still send chat and reactions as fast as the browser allows.
+- **The visitor count can be padded.** Counting visits needs no account, so anyone can record visits with made-up browser ids (sql/020). A daily cap bounds it; it's a vanity number, not a security boundary.
+- **Migrations must run in order.** Re-running an older file after a newer one brings back the older version of a function or policy (see the README). `npm run check:live` checks that the newest functions exist.
 - **Styles still allow inline rules** in the Content-Security-Policy; scripts do not.
 
 ## Checking a live project

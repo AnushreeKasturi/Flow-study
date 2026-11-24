@@ -4,7 +4,8 @@
 --
 -- This file is one of four steps and does nothing visible on its own.
 -- Follow SECURITY.md, "Turning on private room channels", in order.
--- Repeatable.
+-- Repeatable before sql/009: after 009 and 011, re-running this lets browsers broadcast into rooms
+-- directly again, around room_send(). Run 011 again after it.
 
 DROP POLICY IF EXISTS flow_room_receive ON realtime.messages;
 CREATE POLICY flow_room_receive ON realtime.messages FOR SELECT TO authenticated USING (

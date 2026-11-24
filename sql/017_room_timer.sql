@@ -4,7 +4,8 @@
 -- timer change already passes through room_send(), so it now keeps the room's
 -- latest full timer state, stamped with the server's clock. Rejoining restores
 -- it and works out how much time has passed.
--- Repeatable. Run after 016 in the Supabase SQL editor.
+-- Repeatable until sql/018 is applied: after that, re-running this brings back the room_send()
+-- that lets anyone change the timer, so run 018 again after it. Run after 016 in the Supabase SQL editor.
 
 ALTER TABLE public.rooms ADD COLUMN IF NOT EXISTS timer JSONB;
 GRANT SELECT (timer) ON public.rooms TO authenticated;

@@ -64,7 +64,8 @@ const cancelLeave = (userId: string) => {
 
 // Excludes look-alike characters (0/O, 1/I/L) so a code read aloud can't be mistyped into another valid one.
 const ROOM_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-const generateRoomCode = () => Array.from({ length: 6 }, () => ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)]).join('');
+// A code is how people get in, so it comes from the browser's secure random source.
+const generateRoomCode = () => Array.from(crypto.getRandomValues(new Uint32Array(6)), n => ROOM_CODE_CHARS[n % ROOM_CODE_CHARS.length]).join('');
 
 function signOutLocally(message?: string) {
     markSignedOut();

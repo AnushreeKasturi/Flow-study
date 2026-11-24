@@ -7,9 +7,12 @@
   "functions": {
     "api/*.js": {
       "maxDuration": 25,
-      "excludeFiles": "{public,src,dist}/**"
+      "excludeFiles": "{public,src,dist,marketing,emails}/**"
     }
   },
+  "rewrites": [
+    { "source": "/:page(start|login|room|groups|docs|verify|stats)", "destination": "/:page.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
