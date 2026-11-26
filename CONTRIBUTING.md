@@ -49,7 +49,7 @@ npx playwright install chromium   # first time only
 npm run test:browser     # full journey in a real browser, against the build
 ```
 
-Both must pass. CI runs the same commands on Node 22, 24, and 26, plus the database migrations against PostgreSQL 17 and a dependency audit. `main` only accepts changes through a pull request whose checks are green.
+Both must pass. CI runs the same commands on Node 22, 24, and 26, plus the database migrations against PostgreSQL 17 and a dependency audit. It also runs the browser journey in Firefox and WebKit (closest to Safari): install one with `npx playwright install firefox` and run it with `FLOW_TEST_BROWSER=firefox npm run test:browser`. Playwright's WebKit for Windows has no WebRTC, so try WebKit on macOS or Linux, or leave it to CI. `main` only accepts changes through a pull request whose checks are green.
 
 If you change the database, add a new numbered file in `sql/` (never edit an applied one), make it safe to run twice, and extend `scripts/sql-integration.test.cjs`.
 

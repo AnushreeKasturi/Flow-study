@@ -177,7 +177,7 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-The browser command starts and stops its own local server. It tests login through leaving/rejoining a room with isolated Supabase/provider fixtures and synthetic media. No live user data, camera, microphone, or paid provider calls are used.
+The browser command starts and stops its own local server. It runs in Chromium unless `FLOW_TEST_BROWSER` is `firefox` or `webkit`; CI runs all three. It tests login through leaving/rejoining a room with isolated Supabase/provider fixtures and synthetic media. No live user data, camera, microphone, or paid provider calls are used.
 
 For database tests, start an isolated local PostgreSQL server with a test superuser named `flow_test`:
 

@@ -1,4 +1,4 @@
-const { chromium } = require('playwright');
+const playwright = require('playwright');
 const { once } = require('node:events');
 const { mkdirSync, readFileSync, writeFileSync } = require('node:fs');
 const { Script } = require('node:vm');
@@ -13,18 +13,25 @@ const app = require('../server');
     const externalOrigin = process.env.FLOW_TEST_ORIGIN ? new URL(process.env.FLOW_TEST_ORIGIN).origin : null;
     const server = externalOrigin ? null : app.listen(0, '127.0.0.1');
     let browser, context, page;
+    const engine = process.env.FLOW_TEST_BROWSER || 'chromium';
+    // Firefox and WebKit run the same journey more slowly.
+    const minutes = engine === 'chromium' ? 3 : 5;
     const watchdog = setTimeout(() => {
-        console.error('Browser suite exceeded its three-minute limit');
+        console.error(`Browser suite exceeded its ${minutes}-minute limit`);
         process.exitCode = 1;
         browser?.close();
         server?.close();
-    }, 180000);
+    }, minutes * 60000);
     watchdog.unref();
     const errors = [];
     try {
         if (server) await once(server, 'listening');
-        browser = await chromium.launch({
+        if (!['chromium', 'firefox', 'webkit'].includes(engine)) throw new Error('FLOW_TEST_BROWSER must be chromium, firefox or webkit, not ' + engine);
+        browser = await playwright[engine].launch({
             headless: true,
+            // Firefox hides host addresses behind mDNS names and leaves out loopback, so two peers
+            // in one headless browser, with no ICE servers, would never find each other.
+            ...(engine === 'firefox' ? { firefoxUserPrefs: { 'media.peerconnection.ice.obfuscate_host_addresses': false, 'media.peerconnection.ice.loopback': true } } : {}),
             ...(process.env.FLOW_TEST_BROWSER_EXECUTABLE ? { executablePath: process.env.FLOW_TEST_BROWSER_EXECUTABLE } : {})
         });
         context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });

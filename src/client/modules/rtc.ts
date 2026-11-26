@@ -221,7 +221,9 @@ export const initMedia = async (videoEl: HTMLVideoElement) => {
         watchCamera(localStream.getVideoTracks()[0]);
         videoEl.srcObject = localStream;
         videoEl.muted = true;
-        await videoEl.play().catch((err) => console.error('Autoplay failed:', err));
+        // Not awaited: Safari holds play() until the video is on screen, and the preview hides it
+        // when the camera is off, so "Join now" never came back on a second visit.
+        videoEl.play().catch((err) => console.error('Autoplay failed:', err));
         return true;
     } catch (err) {
         if (generation !== mediaGeneration) return false;
@@ -230,7 +232,7 @@ export const initMedia = async (videoEl: HTMLVideoElement) => {
         isDummyMedia = true;
         videoEl.srcObject = localStream;
         videoEl.muted = true;
-        await videoEl.play().catch((e) => console.error('Autoplay failed:', e));
+        videoEl.play().catch((e) => console.error('Autoplay failed:', e));
         return true;
     }
 };
@@ -297,7 +299,7 @@ export const showLocalStream = async (videoEl: HTMLVideoElement) => {
     if (!localStream) return false;
     videoEl.srcObject = localStream;
     videoEl.muted = true;
-    await videoEl.play().catch(() => {});
+    videoEl.play().catch(() => {}); // not awaited, as in initMedia: Safari holds it while the tile is hidden
     return true;
 };
 

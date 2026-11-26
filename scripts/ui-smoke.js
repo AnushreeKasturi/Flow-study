@@ -3,6 +3,10 @@
 async (page) => {
     const origin = new URL(page.url()).origin;
     const failures = [];
+    const engine = page.context().browser().browserType().name();
+    // A check this engine can't make is listed in the results with why, never passed silently.
+    const skipped = [];
+    const skip = (check, reason) => skipped.push({ check, reason });
     page.on('pageerror', error => { if (!error.message.includes('Smoke test error')) failures.push(error.message); });
     const assert = (condition, message) => { if (!condition) throw new Error(message); };
     const visible = async selector => {
@@ -21,8 +25,9 @@ async (page) => {
     await page.route('https://open.spotify.com/**', route => route.fulfill({ body: '<body>Spotify player fixture</body>', contentType: 'text/html' }));
     await page.route('https://www.youtube.com/**', route => route.fulfill({ body: '<body style="background:#14221b;color:#9baa9c;font:12px sans-serif;padding:20px">Background audio preview</body>', contentType: 'text/html' }));
     await page.addInitScript({ path: 'scripts/supabase-fixture.js' });
+    // Camera fakes go on the prototype: WebKit can drop anything set on navigator.mediaDevices itself.
     await page.addInitScript(() => {
-        if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = async () => { throw new Error('Camera disabled for UI test'); };
+        if (window.MediaDevices) MediaDevices.prototype.getUserMedia = async () => { throw new Error('Camera disabled for UI test'); };
     });
     await page.goto(origin + '/login.html');
     await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
@@ -38,19 +43,33 @@ async (page) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     assert(await page.locator('.intro').isHidden(), 'Reduced motion must skip the opening animation');
     // An error on the page is reported to /api/errors, without the address's query string.
+    // WebKit hides a beacon's body from Playwright, so the page keeps a copy of what it sent.
+    await page.evaluate(() => { const send = navigator.sendBeacon.bind(navigator); navigator.sendBeacon = (url, body) => { window.__beacon = body; return send(url, body); }; });
     const reported = page.waitForRequest(request => request.url().endsWith('/api/errors') && request.method() === 'POST');
     await page.evaluate(() => setTimeout(() => { throw new Error('Smoke test error'); }));
-    const report = JSON.parse((await reported).postData());
+    const report = JSON.parse((await reported).postData() ?? await page.evaluate(() => window.__beacon.text()));
     assert(report.message.includes('Smoke test error') && report.kind === 'error' && !report.page.includes('?'), 'Browser errors are reported to Flow\'s own endpoint');
     // Trusted Types: a raw HTML string is refused by the browser itself, so a missed escape cannot become script.
     assert(await page.evaluate(() => { try { document.createElement('div').innerHTML = '<img src=x onerror=alert(1)>'; return false; } catch { return true; } }), 'The page must refuse raw HTML strings (Trusted Types)');
     assert(await page.evaluate(() => { try { document.createElement('script').src = '/elsewhere.js'; return false; } catch { return true; } }), 'Script URLs must go through a policy too');
     // Installable: Chrome reads the manifest under the real Content-Security-Policy, the installed window opens the room, and each icon is the size it says.
-    const cdp = await page.context().newCDPSession(page);
-    const { url: manifestUrl, data: manifestData, errors: manifestErrors } = await cdp.send('Page.getAppManifest');
-    await cdp.detach();
-    assert(manifestData && !manifestErrors.length, 'Chrome should read the web app manifest: ' + (manifestErrors.map(error => error.message).join('; ') || 'none is linked'));
-    const manifest = JSON.parse(manifestData);
+    // Only Chromium can say how it parsed the manifest (over CDP); elsewhere the linked file is read and checked.
+    let manifestUrl, manifest;
+    if (engine === 'chromium') {
+        const cdp = await page.context().newCDPSession(page);
+        const { url, data, errors: manifestErrors } = await cdp.send('Page.getAppManifest');
+        await cdp.detach();
+        assert(data && !manifestErrors.length, 'Chrome should read the web app manifest: ' + (manifestErrors.map(error => error.message).join('; ') || 'none is linked'));
+        manifestUrl = url;
+        manifest = JSON.parse(data);
+    } else {
+        manifestUrl = await page.evaluate(() => document.querySelector('link[rel="manifest"]')?.href);
+        assert(manifestUrl, 'The page should link a web app manifest');
+        const response = await page.request.get(manifestUrl);
+        assert(response.ok(), 'The web app manifest should load');
+        manifest = await response.json();
+        skip('manifest under the Content-Security-Policy', 'only Chromium reports how it parsed the manifest; the file itself is checked');
+    }
     assert(manifest.name === 'Flow' && manifest.display === 'standalone' && new URL(manifest.start_url, manifestUrl).href === origin + '/room.html', 'The installed app should be Flow, in its own window, opening the room');
     const iconSizes = await page.evaluate(icons => Promise.all(icons.map(icon => new Promise((resolve, reject) => {
         const image = new Image();
@@ -904,11 +923,12 @@ async (page) => {
     // A camera that stops mid-call (sleep, another app) is replaced in the tile and in every call.
     const cameraResult = await page.evaluate(async () => {
         const rtc = await import('/__flow-test/rtc.js');
-        const original = navigator.mediaDevices.getUserMedia;
+        const devices = MediaDevices.prototype;
+        const original = devices.getUserMedia;
         const NativePeer = window.RTCPeerConnection;
         window.RTCPeerConnection = class extends NativePeer { constructor() { super({ iceServers: [] }); } };
         const camera = () => { const canvas = document.createElement('canvas'); canvas.getContext('2d').fillRect(0, 0, 1, 1); return canvas.captureStream(5); };
-        navigator.mediaDevices.getUserMedia = async () => camera();
+        devices.getUserMedia = async () => camera();
         const video = document.createElement('video');
         try {
             await rtc.initMedia(video);
@@ -922,10 +942,15 @@ async (page) => {
             const replaced = fresh !== old && fresh.readyState === 'live' && sent === fresh && rtc.isVideoActive();
             // Live but muted (no frames, as after sleep) for too long: replaced as well. A blip is not.
             const blip = fresh;
+            // Firefox never hands a page-made event to a track's listeners, so there the call the
+            // timer would make is made here instead, and the results say the timer went untested.
+            let muteHeard = false;
+            blip.addEventListener('mute', () => { muteHeard = true; });
             Object.defineProperty(blip, 'muted', { configurable: true, value: true });
             blip.dispatchEvent(new Event('mute'));
             await new Promise(resolve => setTimeout(resolve, 1000));
             const keptThroughBlip = video.srcObject.getVideoTracks()[0] === blip;
+            if (!muteHeard) await rtc.recoverCamera();
             for (let waited = 0; waited < 5000 && video.srcObject.getVideoTracks()[0] === blip; waited += 100) await new Promise(resolve => setTimeout(resolve, 100));
             const unmuted = video.srcObject.getVideoTracks()[0];
             const replacedMuted = keptThroughBlip && unmuted !== blip && !unmuted.muted && blip.readyState === 'ended'
@@ -933,21 +958,22 @@ async (page) => {
             // When no camera can be had, it says so instead of showing a black tile marked "on".
             let lost = false;
             rtc.whenCameraLost(() => { lost = true; });
-            navigator.mediaDevices.getUserMedia = async () => { throw new Error('Camera in use'); };
+            devices.getUserMedia = async () => { throw new Error('Camera in use'); };
             unmuted.stop();
             unmuted.dispatchEvent(new Event('ended'));
             await rtc.recoverCamera();
-            return { replaced, replacedMuted, lost, offAfterLoss: !rtc.isVideoActive() };
+            return { replaced, replacedMuted, lost, offAfterLoss: !rtc.isVideoActive(), muteHeard };
         } finally {
             rtc.removePeer('camera-test');
             video.srcObject?.getTracks().forEach(track => track.stop());
-            navigator.mediaDevices.getUserMedia = original;
+            devices.getUserMedia = original;
             window.RTCPeerConnection = NativePeer;
         }
     });
     assert(cameraResult.replaced, 'A camera that stops mid-call must be replaced in the tile and the call');
     assert(cameraResult.replacedMuted, 'A camera muted for seconds must be replaced, and a short mute left alone');
     assert(cameraResult.lost && cameraResult.offAfterLoss, 'A camera that cannot be restarted must show as off');
+    if (!cameraResult.muteHeard) skip('camera muted too long, by its timer', 'a page-made mute event never reaches the track\'s listeners here; the replacement itself is checked');
 
     // Someone drops off without a word (Wi-Fi off) and rejoins: the other side still holds the
     // old call. The new page's call must replace it, and video must flow again within seconds.
@@ -1273,7 +1299,11 @@ async (page) => {
     await page.getByLabel('What are you studying?').fill('<b>Linear algebra</b> problem set');
     await page.getByLabel('Subject', { exact: true }).selectOption('maths');
     await page.getByLabel('Cameras', { exact: true }).selectOption('off');
-    await page.getByRole('button', { name: 'Open a room', exact: true }).click();
+    // WebKit ignores clicks while its "fill this in" bubble from the empty attempt is still up, so try a few times.
+    for (let tries = 0; tries < 5 && new URL(page.url()).pathname === '/groups.html'; tries++) {
+        await page.getByRole('button', { name: 'Open a room', exact: true }).click();
+        await page.waitForURL(url => url.pathname === '/room.html', { timeout: 2000 }).catch(() => {});
+    }
     await page.waitForURL(url => url.pathname === '/room.html');
     await page.waitForFunction(() => window.__fixture.tables.open_rooms.length === 1 && !document.getElementById('new-task-input').disabled);
     assert(await page.evaluate(() => { const row = window.__fixture.tables.open_rooms[0]; return row.seats === 4 && row.seats_taken === 1 && row.host_id === 'test-user' && row.subject === 'maths' && row.camera === 'off' && row.timer_mode === 'focus' && row.closed === false; }) && await page.evaluate(() => window.__fixture.calls.filter(call => call.table === 'open_rooms' && call.payload).every(call => !('last_seen' in call.payload))), 'A hosted room should be listed with its details, and never send its own last-seen time');
@@ -1324,7 +1354,8 @@ async (page) => {
     assert(await page.locator('#leave-new-host').inputValue() === 'zz-next', 'The person here is offered as the new host');
     await page.getByText('End the room for everyone', { exact: true }).click();
     assert(await page.getByRole('button', { name: 'End room for everyone', exact: true }).isVisible(), 'The button says what will happen');
-    await page.getByText('Hand it to', { exact: false }).click();
+    // The radio itself: the middle of its label is the new-host menu in some layouts (Firefox).
+    await page.locator('input[name="leave-choice"][value="handover"]').check();
     // Leaving loads a new page, so keep this page's record of calls across it.
     await page.evaluate(() => addEventListener('pagehide', () => sessionStorage.setItem('test-rpcs', JSON.stringify(window.__fixture.calls.filter(call => call.action === 'rpc').map(call => call.name)))));
     await page.getByRole('button', { name: 'Hand over and leave', exact: true }).click();
@@ -1621,6 +1652,6 @@ async (page) => {
     await page.waitForURL(origin + '/login.html');
     assert(await page.evaluate(() => localStorage.getItem('flow_user') === null && localStorage.getItem('flow_signed_in') === null), 'A stale flag and an old copy of the account are cleared');
     assert(failures.length === 0, 'Uncaught browser errors: ' + failures.join('; '));
-    return { passed: true, taskRows: 500, reconciliations: 5, taskRenderMs: taskTiming, incomingMessages: 1000, retainedMessages: 300, simulatedParticipants: 16, localWebRTC: rtcResult, cleanup, browserErrors: failures };
+    return { passed: true, engine, skipped, taskRows: 500, reconciliations: 5, taskRenderMs: taskTiming, incomingMessages: 1000, retainedMessages: 300, simulatedParticipants: 16, localWebRTC: rtcResult, cleanup, browserErrors: failures };
 
 }
